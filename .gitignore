@@ -1,0 +1,27 @@
+# Binaries
+astro
+astro.exe
+/bin/
+/dist/
+
+# Test output
+*.test
+*.out
+coverage.html
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Dependency cache
+/vendor/
+
+# Build artifacts
+*.prof
