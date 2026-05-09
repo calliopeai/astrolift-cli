@@ -1,0 +1,112 @@
+# GoReleaser config for astro CLI distribution (#17).
+#
+# Builds amd64 + arm64 binaries for Linux + macOS + Windows;
+# packages for Homebrew + Scoop; produces a curl|sh installer
+# script + a Docker image.
+#
+# Run `goreleaser release --snapshot --clean` for a local
+# dry-run; CI invokes `goreleaser release` on git tags.
+
+version: 2
+
+project_name: astro
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: astro
+    main: ./main.go
+    binary: astro
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/astrolift/astrolift-cli/cmd.Version={{ .Version }}
+
+archives:
+  - id: archives
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+# Homebrew tap
+brews:
+  - name: astro
+    repository:
+      owner: calliopeai
+      name: homebrew-tap
+    homepage: https://astrolift.app
+    description: "Astrolift CLI"
+    license: "Apache-2.0"
+    install: |
+      bin.install "astro"
+    test: |
+      system "#{bin}/astro version"
+
+# Scoop bucket (Windows)
+scoops:
+  - repository:
+      owner: calliopeai
+      name: scoop-bucket
+    homepage: https://astrolift.app
+    description: "Astrolift CLI"
+    license: "Apache-2.0"
+
+# Docker image
+dockers:
+  - image_templates:
+      - "ghcr.io/calliopeai/astro:{{ .Version }}-amd64"
+    use: buildx
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=Astrolift CLI"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.source=https://github.com/calliopeai/astrolift-cli"
+  - image_templates:
+      - "ghcr.io/calliopeai/astro:{{ .Version }}-arm64"
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - name_template: "ghcr.io/calliopeai/astro:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/calliopeai/astro:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astro:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/calliopeai/astro:latest"
+    image_templates:
+      - "ghcr.io/calliopeai/astro:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astro:{{ .Version }}-arm64"

@@ -108,6 +108,16 @@ func LoadCredentials(serverSlug string) (*auth.Credentials, error) {
 	return &creds, nil
 }
 
+// DeleteCredentials removes the stored credentials file for a server.
+// No-op when the file doesn't exist.
+func DeleteCredentials(serverSlug string) error {
+	path := filepath.Join(Dir(), "credentials", serverSlug+".yaml")
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing credentials: %w", err)
+	}
+	return nil
+}
+
 // SaveCredentials writes credentials for a server slug, creating the
 // credentials directory and setting mode 0600 on the file.
 func SaveCredentials(serverSlug string, creds *auth.Credentials) error {
