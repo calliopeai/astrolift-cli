@@ -273,3 +273,5 @@ Community standards: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 MIT. See [LICENSE](LICENSE).
 
 Copyright (c) 2026 Calliope Labs Inc. All Rights Reserved. Calliope AI is a trademark of Calliope Labs Inc.
+
+Portions of the framework underlying this repo are derived from **[boilerworks](https://github.com/ConflictHQ/boilerworks)** (Copyright (c) Conflict LLC, MIT-licensed). Tip of the hat 🎩
