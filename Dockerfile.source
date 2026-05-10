@@ -1,0 +1,35 @@
+# From-source Dockerfile for non-release container builds (e.g. main
+# branch -> :latest). Tagged releases still go through goreleaser +
+# the thin distroless Dockerfile in this repo's root.
+
+FROM golang:1.22-alpine AS build
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ARG VERSION=dev
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
+    go build \
+        -ldflags="-s -w -X github.com/calliopeai/astrolift-cli/cmd.Version=${VERSION}" \
+        -o /out/astro \
+        ./main.go
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+LABEL org.opencontainers.image.title="astro"
+LABEL org.opencontainers.image.description="Astrolift CLI"
+LABEL org.opencontainers.image.source="https://github.com/calliopeai/astrolift-cli"
+LABEL org.opencontainers.image.licenses="MIT"
+
+COPY --from=build /out/astro /usr/local/bin/astro
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["/usr/local/bin/astro"]

@@ -82,10 +82,14 @@ scoops:
     description: "Astrolift CLI"
     license: "MIT"
 
-# Docker image
+# Docker images — published to Docker Hub + GHCR under the calliopeai
+# org. Image name matches the rest of the astrolift family
+# (astrolift-backend, astrolift-frontend, astrolift-status,
+# astrolift-cli). Binary is still `astro`.
 dockers:
   - image_templates:
-      - "ghcr.io/calliopeai/astro:{{ .Version }}-amd64"
+      - "docker.io/calliopeai/astrolift-cli:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-amd64"
     use: buildx
     goarch: amd64
     build_flag_templates:
@@ -95,18 +99,31 @@ dockers:
       - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.source=https://github.com/calliopeai/astrolift-cli"
   - image_templates:
-      - "ghcr.io/calliopeai/astro:{{ .Version }}-arm64"
+      - "docker.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
+      - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
     use: buildx
     goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=Astrolift CLI"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.source=https://github.com/calliopeai/astrolift-cli"
 
 docker_manifests:
-  - name_template: "ghcr.io/calliopeai/astro:{{ .Version }}"
+  - name_template: "docker.io/calliopeai/astrolift-cli:{{ .Version }}"
     image_templates:
-      - "ghcr.io/calliopeai/astro:{{ .Version }}-amd64"
-      - "ghcr.io/calliopeai/astro:{{ .Version }}-arm64"
-  - name_template: "ghcr.io/calliopeai/astro:latest"
+      - "docker.io/calliopeai/astrolift-cli:{{ .Version }}-amd64"
+      - "docker.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
+  - name_template: "docker.io/calliopeai/astrolift-cli:latest"
     image_templates:
-      - "ghcr.io/calliopeai/astro:{{ .Version }}-amd64"
-      - "ghcr.io/calliopeai/astro:{{ .Version }}-arm64"
+      - "docker.io/calliopeai/astrolift-cli:{{ .Version }}-amd64"
+      - "docker.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/calliopeai/astrolift-cli:latest"
+    image_templates:
+      - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
