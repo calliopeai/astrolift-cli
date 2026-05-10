@@ -69,14 +69,6 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.TAP_PUBLISH_TOKEN }}
           SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.TAP_PUBLISH_TOKEN }}
 
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ env.IMAGE }}
-          readme-filepath: ./DOCKERHUB.md
-
   main-image:
     name: Main image (${{ matrix.suffix }})
     if: ${{ github.ref_type != 'tag' }}
@@ -156,8 +148,6 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
@@ -187,11 +177,3 @@ jobs:
               docker manifest push "${BASE}:${ALIAS}"
             done
           done
-
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ env.IMAGE }}
-          readme-filepath: ./DOCKERHUB.md
