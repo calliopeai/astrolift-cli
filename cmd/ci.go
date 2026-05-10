@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astrolift/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/spf13/cobra"
 )
 

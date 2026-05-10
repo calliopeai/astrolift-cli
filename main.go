@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/astrolift/astrolift-cli/cmd"
+	"github.com/calliopeai/astrolift-cli/cmd"
 )
 
 func main() {

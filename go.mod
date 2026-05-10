@@ -1,4 +1,4 @@
-module github.com/astrolift/astrolift-cli
+module github.com/calliopeai/astrolift-cli
 
 go 1.23
 
