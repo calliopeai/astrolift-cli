@@ -2,7 +2,7 @@
 # branch -> :latest). Tagged releases still go through goreleaser +
 # the thin distroless Dockerfile in this repo's root.
 
-FROM golang:1.22-alpine AS build
+FROM golang:1.23-alpine AS build
 
 WORKDIR /src
 
