@@ -77,10 +77,10 @@ make build              # produces ./astro
 Or, with `go install`:
 
 ```bash
-go install github.com/astrolift/astrolift-cli@latest
+go install github.com/calliopeai/astrolift-cli@latest
 ```
 
-(Note: the Go module path is `github.com/astrolift/astrolift-cli`; the
+(Note: the Go module path is `github.com/calliopeai/astrolift-cli`; the
 GitHub repo is `calliopeai/astrolift-cli`. The two are intentional — the
 module path will follow the public repo on the next major.)
 
@@ -271,3 +271,5 @@ Community standards: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+Copyright (c) 2026 Calliope Labs Inc. All Rights Reserved. Calliope AI is a trademark of Calliope Labs Inc.

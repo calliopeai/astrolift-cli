@@ -10,7 +10,7 @@ ARG TARGETARCH
 LABEL org.opencontainers.image.title="astro"
 LABEL org.opencontainers.image.description="Astrolift CLI"
 LABEL org.opencontainers.image.source="https://github.com/calliopeai/astrolift-cli"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.licenses="MIT"
 
 COPY astro /usr/local/bin/astro
 

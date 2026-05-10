@@ -1,5 +1,5 @@
 BINARY   := astro
-MODULE   := github.com/astrolift/astrolift-cli
+MODULE   := github.com/calliopeai/astrolift-cli
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS  := -ldflags "-X $(MODULE)/cmd.Version=$(VERSION)"
 

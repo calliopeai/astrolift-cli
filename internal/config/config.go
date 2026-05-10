@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/astrolift/astrolift-cli/internal/auth"
+	"github.com/calliopeai/astrolift-cli/internal/auth"
 	"gopkg.in/yaml.v3"
 )
 

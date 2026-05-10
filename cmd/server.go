@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/astrolift/astrolift-cli/internal/config"
+	"github.com/calliopeai/astrolift-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
