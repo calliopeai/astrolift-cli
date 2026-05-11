@@ -72,7 +72,8 @@ jobs:
   main-image:
     name: Main image (${{ matrix.suffix }})
     if: ${{ github.ref_type != 'tag' }}
-    runs-on: ubuntu-latest
+    # Native arm64 runner avoids QEMU emulation overhead.
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
@@ -83,8 +84,10 @@ jobs:
         include:
           - platform: linux/amd64
             suffix: amd64
+            runner: ubuntu-latest
           - platform: linux/arm64
             suffix: arm64
+            runner: ubuntu-24.04-arm
 
     outputs:
       sha_tag: ${{ steps.tag.outputs.sha_tag }}
