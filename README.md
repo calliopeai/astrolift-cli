@@ -14,8 +14,8 @@ register clusters and configure providers against an Astrolift control plane.
 > `not yet wired to the API` until the matching backend resolvers
 > ship. The wired surfaces today are: `astro server *`, `astro auth *`,
 > `astro app init`, `astro ci deploy` / `astro ci status`, `astro
-> version-check` / `astro self-update`, `astro version`, and `astro
-> docs`. Subcommand surface, flag names, and exit codes may shift
+> version-check` / `astro self-update`, `astro version`, `astro
+> docs`, and `astro cluster bootstrap`. Subcommand surface, flag names, and exit codes may shift
 > before 1.0 — pin a tagged release in CI rather than tracking `main`.
 
 ---
@@ -152,6 +152,7 @@ the status note above.)
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. |
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. |
 | `astro operator` | Operator (admin) cluster, provider, and federation management. |
+| `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro scm` / `astro alert` | Source-control webhooks and alert rules. |
 | `astro status` | Platform status snapshot. |
 | `astro docs` | Open the platform docs in your browser. |
