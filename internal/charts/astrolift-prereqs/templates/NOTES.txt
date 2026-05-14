@@ -1,0 +1,34 @@
+astrolift-prereqs {{ .Chart.Version }} installed in release {{ .Release.Name }}.
+
+Glue rendered:
+{{- if .Values.storageClasses.enabled }}
+  - StorageClasses: standard / balanced (default) / high_iops / extreme
+    {{- if .Values.storageClasses.longhorn.rwxEnabled }} + astrolift-rwx{{ end }}
+    (provisioner: {{- if .Values.storageClasses.longhorn.enabled }} Longhorn{{ end }})
+{{- end }}
+{{- if and .Values.certManager.enabled .Values.clusterIssuer.enabled }}
+  - ClusterIssuer: {{ .Values.clusterIssuer.name }}
+{{- end }}
+
+Subchart toggles in this release:
+  cert-manager:    {{ .Values.certManager.enabled }}
+  external-dns:    {{ .Values.externalDns.enabled }}
+  ingress-nginx:   {{ .Values.ingressNginx.enabled }}
+  metallb:         {{ .Values.metallb.enabled }}
+  longhorn:        {{ .Values.longhorn.enabled }}
+  rook-ceph:       {{ .Values.rookCeph.enabled }}
+  cnpg:            {{ .Values.cnpg.enabled }}
+  strimzi:         {{ .Values.strimzi.enabled }}
+  redis-operator:  {{ .Values.redisOperator.enabled }}
+  vault:           {{ .Values.vault.enabled }}
+  velero:          {{ .Values.velero.enabled }}
+  otel-collector:  {{ .Values.otelCollector.enabled }}
+  prometheus:      {{ .Values.prometheus.enabled }}
+  loki:            {{ .Values.loki.enabled }}
+  tempo:           {{ .Values.tempo.enabled }}
+
+Subcharts are added in follow-up commits; this release ships the wrapper
+structure + storage classes + cluster issuer glue.
+
+Next:
+  helm install astrolift ./helm/astrolift -f ./helm/astrolift/values.k8s.yaml

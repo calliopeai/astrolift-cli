@@ -1,0 +1,174 @@
+# astrolift-prereqs — vanilla Kubernetes overrides (kind / bare-metal / on-prem)
+#
+# Applied on top of values.yaml when the operator bootstraps a vanilla cluster
+# that doesn't bring its own LB / storage / DNS controllers. The defaults bias
+# toward "everything you need in-cluster": cert-manager + nginx-ingress +
+# Longhorn for block (and optional RWX) + MetalLB for bare-metal LB.
+
+# -----------------------------------------------------------------------------
+# Storage — Longhorn provides block + optional RWX. Single replica is fine
+# for dev / kind; operators bump to replica-2 / replica-3 in production.
+# -----------------------------------------------------------------------------
+
+storageClasses:
+  enabled: true
+  longhorn:
+    enabled: true
+    rwxEnabled: true
+    classes:
+      standard:
+        replicas: 1
+        fsType: ext4
+      balanced:
+        default: true
+        replicas: 2
+        fsType: ext4
+      high-iops:
+        replicas: 3
+        fsType: ext4
+        dataLocality: best-effort
+      extreme:
+        replicas: 1
+        fsType: ext4
+        dataLocality: strict-local
+
+longhorn:
+  enabled: true
+  defaultSettings:
+    defaultDataPath: /var/lib/longhorn/
+    createDefaultDiskLabeledNodes: true
+    defaultReplicaCount: 2
+  ingress:
+    enabled: false
+
+# -----------------------------------------------------------------------------
+# Cluster essentials
+# -----------------------------------------------------------------------------
+
+# cert-manager: enabled with CRDs.
+certManager:
+  enabled: true
+  installCRDs: true
+
+# ClusterIssuer: HTTP-01 against Let's Encrypt prod via ingress-nginx.
+# Operator sets `clusterIssuer.email` to a real address before requesting certs.
+clusterIssuer:
+  enabled: true
+  name: letsencrypt-prod
+  acmeServer: https://acme-v02.api.letsencrypt.org/directory
+  email: ""
+  ingressClass: nginx
+
+# external-dns: OFF by default on vanilla clusters — most bare-metal installs
+# don't have a managed DNS provider integration. Operators with Cloudflare /
+# RFC2136 / PowerDNS flip this on and set `provider` accordingly.
+externalDns:
+  enabled: false
+  provider: ""
+  policy: sync
+  txtOwnerId: astrolift
+  sources:
+    - service
+    - ingress
+
+# ingress-nginx: the default ingress controller for vanilla clusters.
+ingress-nginx:
+  enabled: true
+  controller:
+    ingressClassResource:
+      name: nginx
+      default: true
+    service:
+      type: LoadBalancer
+    metrics:
+      enabled: true
+ingressNginx:
+  enabled: true
+
+# MetalLB: OFF by default. Bare-metal operators enable it + supply an
+# IPAddressPool; managed-k8s (k3s, microk8s) flavors ship their own LB.
+metallb:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Managed-service operators — vanilla clusters have no cloud-managed
+# equivalents, so CNPG (Postgres) is on by default. Strimzi / redis-operator
+# / vault remain opt-in (heavy + not needed by most installs out of the gate).
+# -----------------------------------------------------------------------------
+
+cnpg:
+  enabled: true
+  monitoring:
+    podMonitorEnabled: false
+
+strimzi:
+  enabled: false
+redis-operator:
+  enabled: false
+redisOperator:
+  enabled: false
+vault:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Backup — Velero off by default (no cloud object-store assumed). Operators
+# with MinIO / on-prem S3 flip it on with their bucket + creds.
+# -----------------------------------------------------------------------------
+
+velero:
+  enabled: false
+  initContainers: []
+  configuration:
+    backupStorageLocation: []
+    volumeSnapshotLocation: []
+
+# -----------------------------------------------------------------------------
+# Observability — vanilla clusters have no cloud equivalents, so the OTel
+# collector + Prom / Loki / Tempo stack is on by default. Operators with
+# external observability flip these off + point OTel at their endpoints.
+# -----------------------------------------------------------------------------
+
+opentelemetry-collector:
+  enabled: true
+  mode: deployment
+  image:
+    repository: otel/opentelemetry-collector-contrib
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    exporters:
+      debug: { verbosity: basic }
+    service:
+      pipelines:
+        traces:  { receivers: [otlp], exporters: [debug] }
+        metrics: { receivers: [otlp], exporters: [debug] }
+        logs:    { receivers: [otlp], exporters: [debug] }
+otelCollector:
+  enabled: true
+
+kube-prometheus-stack:
+  enabled: true
+  prometheus:
+    prometheusSpec:
+      retention: 30d
+      retentionSize: ""
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      storageSpec: {}
+  grafana:
+    enabled: true
+    adminPassword: ""
+    persistence: { enabled: true, type: pvc, size: 10Gi }
+  alertmanager:
+    enabled: true
+prometheus:
+  enabled: true
+
+loki:
+  enabled: false
+tempo:
+  enabled: false

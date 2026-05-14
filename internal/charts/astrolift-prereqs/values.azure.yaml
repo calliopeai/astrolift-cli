@@ -1,0 +1,140 @@
+# astrolift-prereqs — Azure / AKS overrides
+#
+# Applied on top of values.yaml when the operator bootstraps an AKS cluster.
+# AKS ships with the Azure Disk / File CSI drivers, the Application Gateway
+# Ingress Controller (AGIC) when the operator enables the add-on, and
+# Federated Identity Credentials for Azure DNS access.
+#
+# Operator responsibilities NOT covered by this chart:
+#   * Application Gateway Ingress Controller (AGIC) — enabled as an AKS
+#     add-on by the operator's terraform.
+#   * Azure Disk / File CSI drivers — bundled with AKS.
+#   * Federated Identity Credentials for cert-manager (Azure DNS) +
+#     external-dns + velero — provisioned in `astrolift-opscode/azure/terraform`.
+
+# -----------------------------------------------------------------------------
+# Storage — AKS uses Azure Disk (managed-csi-premium / managed-csi) via the
+# bundled CSI; no in-cluster block storage needed.
+# -----------------------------------------------------------------------------
+
+storageClasses:
+  enabled: false
+  longhorn:
+    enabled: false
+  topolvm:
+    enabled: false
+  rookCeph:
+    enabled: false
+  localPath:
+    enabled: false
+  nfs:
+    enabled: false
+
+longhorn:
+  enabled: false
+rook-ceph:
+  enabled: false
+rookCeph:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Cluster essentials
+# -----------------------------------------------------------------------------
+
+# cert-manager: enabled. Workload Identity / Federated Credential for Azure
+# DNS dns-01 lives in the Azure terraform tree.
+certManager:
+  enabled: true
+  installCRDs: true
+
+# Azure DNS + Let's Encrypt prod via dns-01.
+# Operator sets:
+#   clusterIssuer.email                       ACME contact
+#   clusterIssuer.azure.subscriptionID        Azure subscription hosting the zone
+#   clusterIssuer.azure.resourceGroupName     RG of the Azure DNS zone
+#   clusterIssuer.azure.hostedZoneName        Azure DNS zone name (base_domain)
+#   serviceAccount.annotations.<wi>           Federated cred + client id
+clusterIssuer:
+  enabled: true
+  name: letsencrypt-prod
+  acmeServer: https://acme-v02.api.letsencrypt.org/directory
+  email: ""
+  ingressClass: azure-application-gateway
+  azure:
+    subscriptionID: ""
+    resourceGroupName: ""
+    hostedZoneName: ""
+
+# external-dns: enabled, Azure provider. Federated identity client id +
+# tenant id are set by the operator (terraform output → helm values).
+externalDns:
+  enabled: true
+  provider: azure
+  policy: sync
+  txtOwnerId: astrolift
+  sources:
+    - service
+    - ingress
+  # podLabels.azure.workload.identity/use: "true"
+  # serviceAccount.annotations.azure.workload.identity/client-id: <set by operator>
+
+# ingress-nginx: OFF — AKS uses AGIC (Application Gateway Ingress Controller).
+ingress-nginx:
+  enabled: false
+ingressNginx:
+  enabled: false
+
+# MetalLB: OFF — AKS LBs are managed by Azure.
+metallb:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Managed-service operators — pair with Azure Database / Cache for Redis by
+# default; flip these on for in-cluster operators on this cluster.
+# -----------------------------------------------------------------------------
+
+cnpg:
+  enabled: false
+strimzi:
+  enabled: false
+redis-operator:
+  enabled: false
+redisOperator:
+  enabled: false
+vault:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Backup — Velero with Azure plugin. Opt-in: requires storage account +
+# federated identity for blob access.
+# -----------------------------------------------------------------------------
+
+velero:
+  enabled: false
+  initContainers:
+    - name: velero-plugin-for-microsoft-azure
+      image: velero/velero-plugin-for-microsoft-azure:v1.10.0
+      volumeMounts:
+        - mountPath: /target
+          name: plugins
+  configuration:
+    backupStorageLocation: []
+    volumeSnapshotLocation: []
+
+# -----------------------------------------------------------------------------
+# Observability — default OFF on AKS; operators typically route to Azure
+# Monitor / Log Analytics. Flip on for in-cluster Prom.
+# -----------------------------------------------------------------------------
+
+opentelemetry-collector:
+  enabled: false
+otelCollector:
+  enabled: false
+kube-prometheus-stack:
+  enabled: false
+prometheus:
+  enabled: false
+loki:
+  enabled: false
+tempo:
+  enabled: false

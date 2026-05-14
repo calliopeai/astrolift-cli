@@ -1,0 +1,147 @@
+# astrolift-prereqs — AWS / EKS overrides
+#
+# Applied on top of values.yaml when the operator bootstraps an EKS cluster.
+# EKS ships with EBS CSI, AWS Load Balancer Controller (when installed by the
+# operator's terraform), and IRSA for Route53 access — so the in-cluster
+# storage / LB / DNS controllers in the base values are mostly off here and
+# the AWS-native equivalents are wired instead.
+#
+# Operator responsibilities NOT covered by this chart:
+#   * AWS Load Balancer Controller — installed via the EKS add-on or the
+#     `aws-load-balancer-controller` helm chart in `kube-system`. Provides
+#     the `alb` IngressClass that ingress hostnames bind to.
+#   * EBS / EFS CSI drivers — installed as EKS add-ons.
+#   * IRSA roles for cert-manager (Route53 dns-01) + external-dns + velero —
+#     provisioned in `astrolift-opscode/aws/terraform`.
+#
+# Usage:
+#   astro cluster bootstrap --cluster-slug <slug>   # operator-side CLI path
+#   helm install astrolift-prereqs ./helm/astrolift-prereqs -f values.aws.yaml
+
+# -----------------------------------------------------------------------------
+# Storage — EKS uses EBS gp3 + EFS via the CSI add-ons; no Longhorn / Rook.
+# -----------------------------------------------------------------------------
+
+storageClasses:
+  enabled: false
+  longhorn:
+    enabled: false
+  topolvm:
+    enabled: false
+  rookCeph:
+    enabled: false
+  localPath:
+    enabled: false
+  nfs:
+    enabled: false
+
+longhorn:
+  enabled: false
+rook-ceph:
+  enabled: false
+rookCeph:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Cluster essentials
+# -----------------------------------------------------------------------------
+
+# cert-manager: enabled. IRSA role for Route53 dns-01 is provisioned in
+# the AWS terraform tree; the ClusterIssuer below wires it up.
+certManager:
+  enabled: true
+  installCRDs: true
+
+# Route53 + Let's Encrypt prod via dns-01 (works behind private ingress).
+# Operator sets:
+#   clusterIssuer.email                  contact for ACME registration
+#   clusterIssuer.aws.region             account region (e.g. us-west-2)
+#   clusterIssuer.aws.hostedZoneId       Route53 hosted-zone id of base_domain
+#   serviceAccount.annotations.<irsa>    IRSA role-arn on the cert-manager SA
+clusterIssuer:
+  enabled: true
+  name: letsencrypt-prod
+  acmeServer: https://acme-v02.api.letsencrypt.org/directory
+  email: ""
+  # ingressClass is unused for dns-01 but the helper template references it;
+  # `alb` is the EKS norm.
+  ingressClass: alb
+  # Route53 solver block — values are placeholders the operator fills in.
+  aws:
+    region: ""
+    hostedZoneId: ""
+
+# external-dns: enabled, AWS provider. IRSA role-arn on the SA is set by
+# the operator (terraform output → helm values).
+externalDns:
+  enabled: true
+  provider: aws
+  policy: sync
+  txtOwnerId: astrolift
+  sources:
+    - service
+    - ingress
+  # serviceAccount.annotations.eks.amazonaws.com/role-arn: <set by operator>
+
+# ingress-nginx: OFF — EKS uses AWS Load Balancer Controller's ALB instead.
+ingress-nginx:
+  enabled: false
+ingressNginx:
+  enabled: false
+
+# MetalLB: OFF — AWS ELB / ALB is the cloud LB.
+metallb:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Managed-service operators — keep cnpg / strimzi / redis-operator OFF by
+# default on EKS. Most AWS operators pair tenant Postgres / Kafka / Redis
+# with RDS / MSK / ElastiCache via the platform's managed-service drivers.
+# Operators who want in-cluster operators can flip these on per-cluster.
+# -----------------------------------------------------------------------------
+
+cnpg:
+  enabled: false
+strimzi:
+  enabled: false
+redis-operator:
+  enabled: false
+redisOperator:
+  enabled: false
+vault:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Backup — Velero with AWS S3 plugin. Bucket + role come from terraform.
+# -----------------------------------------------------------------------------
+
+velero:
+  enabled: false  # Opt-in: operator flips on once S3 bucket + IRSA exist.
+  initContainers:
+    - name: velero-plugin-for-aws
+      image: velero/velero-plugin-for-aws:v1.10.0
+      volumeMounts:
+        - mountPath: /target
+          name: plugins
+  configuration:
+    backupStorageLocation: []
+    volumeSnapshotLocation: []
+
+# -----------------------------------------------------------------------------
+# Observability — OTel collector + Prometheus stack stay OFF by default on
+# AWS; operators typically route to AMP / AMG / OpenSearch. Flip on if you
+# want an in-cluster Prometheus stack.
+# -----------------------------------------------------------------------------
+
+opentelemetry-collector:
+  enabled: false
+otelCollector:
+  enabled: false
+kube-prometheus-stack:
+  enabled: false
+prometheus:
+  enabled: false
+loki:
+  enabled: false
+tempo:
+  enabled: false
