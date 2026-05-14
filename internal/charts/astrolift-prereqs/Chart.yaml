@@ -1,0 +1,102 @@
+apiVersion: v2
+name: astrolift-prereqs
+description: |
+  Cluster prerequisites for Astrolift on vanilla Kubernetes — cert-manager,
+  ingress, storage, managed-service operators, observability, backup. Each
+  component is an optional subchart toggled by .Values.<component>.enabled.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - astrolift
+  - prereqs
+  - kubernetes
+  - bootstrap
+home: https://astrolift.dev
+sources:
+  - https://github.com/<your-fork>/astrolift-opscode
+maintainers:
+  - name: Astrolift
+    url: https://astrolift.dev
+
+# Subchart dependencies. Each is gated by its `condition` key in values.yaml.
+# Run `helm dependency update ./helm/astrolift-prereqs` to populate charts/.
+dependencies:
+  # Cluster essentials
+  - name: cert-manager
+    version: "1.16.2"
+    repository: "https://charts.jetstack.io"
+    condition: certManager.enabled
+  - name: external-dns
+    version: "1.15.0"
+    repository: "https://kubernetes-sigs.github.io/external-dns/"
+    condition: externalDns.enabled
+  - name: ingress-nginx
+    version: "4.11.3"
+    repository: "https://kubernetes.github.io/ingress-nginx"
+    condition: ingressNginx.enabled
+    alias: ingress-nginx
+  - name: metallb
+    version: "0.14.9"
+    repository: "https://metallb.github.io/metallb"
+    condition: metallb.enabled
+
+  # Storage operators
+  - name: longhorn
+    version: "1.7.2"
+    repository: "https://charts.longhorn.io"
+    condition: longhorn.enabled
+  - name: rook-ceph
+    version: "v1.15.5"
+    repository: "https://charts.rook.io/release"
+    condition: rookCeph.enabled
+    alias: rook-ceph
+
+  # Managed-service operators — match astrolift-providers/k8s_native/preflight.py
+  # REQUIREMENTS so tenant managed-service kinds (postgres, kafka, redis,
+  # mysql, etc.) preflight clean against a fresh prereqs install.
+  - name: cloudnative-pg
+    version: "0.22.0"
+    repository: "https://cloudnative-pg.github.io/charts"
+    condition: cnpg.enabled
+  - name: strimzi-kafka-operator
+    version: "0.43.0"
+    repository: "https://strimzi.io/charts/"
+    condition: strimzi.enabled
+  - name: redis-operator
+    version: "0.20.0"
+    repository: "https://ot-container-kit.github.io/helm-charts/"
+    condition: redisOperator.enabled
+    alias: redis-operator
+  - name: vault
+    version: "0.28.1"
+    repository: "https://helm.releases.hashicorp.com"
+    condition: vault.enabled
+
+  # Backup
+  - name: velero
+    version: "8.0.0"
+    repository: "https://vmware-tanzu.github.io/helm-charts"
+    condition: velero.enabled
+
+  # Observability stack — Prometheus + Grafana + Alertmanager via the
+  # community kube-prometheus-stack; Loki for logs; Tempo for traces;
+  # OTel collector as the universal ingest path.
+  - name: opentelemetry-collector
+    version: "0.108.0"
+    repository: "https://open-telemetry.github.io/opentelemetry-helm-charts"
+    condition: otelCollector.enabled
+    alias: opentelemetry-collector
+  - name: kube-prometheus-stack
+    version: "65.5.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus.enabled
+    alias: kube-prometheus-stack
+  - name: loki
+    version: "6.18.0"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: loki.enabled
+  - name: tempo
+    version: "1.10.1"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: tempo.enabled

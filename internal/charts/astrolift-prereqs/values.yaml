@@ -1,0 +1,338 @@
+# Astrolift prereqs — default values
+#
+# Each top-level key matches a subchart (added in follow-up commits) plus
+# its `condition: <key>.enabled` in Chart.yaml. Defaults bias toward
+# vanilla bare-metal: cert-manager + nginx ingress + Longhorn for storage.
+# Cloud-managed clusters typically disable Longhorn / MetalLB / Vault.
+
+# -----------------------------------------------------------------------------
+# Glue (this chart's own templates — render even with no subcharts enabled)
+# -----------------------------------------------------------------------------
+
+# StorageClass tier mapping. Provisioner values default to Longhorn; flip
+# to topolvm.io / rook-ceph.cephfs.csi.ceph.com / rancher.io/local-path /
+# nfs.csi.k8s.io as needed by the cluster's actual CSI drivers.
+storageClasses:
+  enabled: true
+
+  longhorn:
+    enabled: true
+    rwxEnabled: true
+    classes:
+      standard:
+        replicas: 1
+        fsType: ext4
+      balanced:
+        # default class — astrolift bind-class default for tenant PVs
+        default: true
+        replicas: 2
+        fsType: ext4
+      high-iops:
+        replicas: 3
+        fsType: ext4
+        dataLocality: best-effort
+      extreme:
+        # extreme = local NVMe; in Longhorn this means strict-local + replicas=1
+        replicas: 1
+        fsType: ext4
+        dataLocality: strict-local
+
+  # Operators on bare-metal with TopoLVM / Rook Ceph / NFS / local-path can
+  # add their own StorageClass blocks here. Keep them disabled unless the
+  # cluster has the underlying CSI installed.
+  topolvm:
+    enabled: false
+  rookCeph:
+    enabled: false
+  localPath:
+    enabled: false
+  nfs:
+    enabled: false
+
+# Optional cert-manager ClusterIssuer (rendered only when certManager.enabled
+# AND clusterIssuer.enabled). Operators can leave this off and supply their
+# own Issuer/ClusterIssuer if they have a private CA or different ACME flow.
+clusterIssuer:
+  enabled: false
+  name: letsencrypt-prod
+  acmeServer: https://acme-v02.api.letsencrypt.org/directory
+  email: ""
+  ingressClass: nginx
+
+# -----------------------------------------------------------------------------
+# Subchart toggles (subcharts wired in follow-up commits)
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Cluster essentials
+# Each block is also passed wholesale to the subchart, so any key the
+# upstream chart accepts can be set under here (in addition to `enabled`,
+# which only controls Chart.yaml condition gating).
+# -----------------------------------------------------------------------------
+
+# cert-manager: ACME / private-CA TLS issuance.
+# Upstream values: https://github.com/cert-manager/cert-manager/tree/master/deploy/charts/cert-manager
+certManager:
+  enabled: false
+  installCRDs: true
+
+# external-dns: keeps DNS records in sync with Ingress / Gateway hosts.
+# Set `provider` to aws / google / azure / cloudflare / pdns / etc. per cluster.
+# Upstream values: https://github.com/kubernetes-sigs/external-dns/tree/master/charts/external-dns
+externalDns:
+  enabled: false
+  provider: ""
+  policy: sync
+  txtOwnerId: astrolift
+  sources:
+    - service
+    - ingress
+
+# ingress-nginx: default ingress controller for HTTP/HTTPS.
+# Aliased to `ingress-nginx` so the values key matches the subchart name
+# expected by the upstream chart's templates.
+# Upstream values: https://github.com/kubernetes/ingress-nginx/tree/main/charts/ingress-nginx
+ingress-nginx:
+  enabled: false
+  controller:
+    ingressClassResource:
+      name: nginx
+      default: true
+    service:
+      type: LoadBalancer
+    metrics:
+      enabled: true
+
+# Convenience alias so the toggle key matches the rest of the file's camelCase
+# pattern; the actual subchart values live under `ingress-nginx:` above.
+ingressNginx:
+  enabled: false
+
+# MetalLB: bare-metal LoadBalancer (skip on cloud — they bring their own).
+# Upstream values: https://github.com/metallb/metallb/tree/main/charts/metallb
+metallb:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Storage operators
+# -----------------------------------------------------------------------------
+
+# Longhorn: distributed block storage with optional RWX. Single-replica is
+# fine for dev; replica-2 / replica-3 in stg/prd. The astrolift StorageClass
+# tier map (storageClasses.longhorn) drives how tenant PVs bind.
+# Upstream values: https://github.com/longhorn/longhorn/tree/master/chart
+longhorn:
+  enabled: false
+  defaultSettings:
+    defaultDataPath: /var/lib/longhorn/
+    createDefaultDiskLabeledNodes: true
+    defaultReplicaCount: 2
+  ingress:
+    # Don't expose the Longhorn UI by default; operators turn this on
+    # if they want the admin dashboard reachable.
+    enabled: false
+
+# Rook Ceph: distributed block + filesystem (RWX via CephFS) for clusters
+# that need shared-volume semantics across many pods. Operators typically
+# enable EITHER Longhorn OR Rook Ceph, not both.
+# This subchart installs the operator only; the actual cluster + pools
+# come from rook-ceph-cluster (operators add separately or via GitOps).
+# Upstream values: https://github.com/rook/rook/tree/master/deploy/charts/rook-ceph
+rook-ceph:
+  enabled: false
+  resources:
+    requests: { cpu: "100m", memory: "256Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  csi:
+    enableCephfsDriver: true
+    enableRbdDriver: true
+
+rookCeph:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Managed-service operators
+#
+# Match astrolift-providers/k8s_native/preflight.py REQUIREMENTS so that
+# tenant managed-service kinds (postgres, kafka, redis, mysql, etc.)
+# preflight clean against a fresh prereqs install. Each operator installs
+# CRDs that downstream tenant CRDs depend on.
+# -----------------------------------------------------------------------------
+
+# CloudNativePG: Postgres operator. Tenant Postgres clusters bind via the
+# k8s_native CNPGPostgresDriver (see preflight.py REQUIREMENTS["postgres",
+# "cnpg"]).
+# Upstream values: https://github.com/cloudnative-pg/charts/tree/main/charts/cloudnative-pg
+cnpg:
+  enabled: false
+  monitoring:
+    podMonitorEnabled: false  # set true when prometheus subchart is on
+
+# Strimzi: Kafka operator. Tenant Kafka clusters bind via the k8s_native
+# Kafka driver. Strimzi's chart only installs the operator; tenant Kafka
+# clusters come from Kafka CRDs in tenant namespaces.
+# Upstream values: https://github.com/strimzi/strimzi-kafka-operator/tree/main/helm-charts/helm3/strimzi-kafka-operator
+strimzi:
+  enabled: false
+  watchAnyNamespace: true
+
+# OT-Container-Kit Redis Operator: Redis cluster + standalone + sentinel.
+# Aliased as `redis-operator` to match the upstream chart name.
+# Upstream values: https://github.com/OT-CONTAINER-KIT/helm-charts/tree/main/charts/redis-operator
+redis-operator:
+  enabled: false
+  watchNamespace: ""  # empty = cluster-wide
+
+redisOperator:
+  enabled: false
+
+# HashiCorp Vault: secrets, dynamic credentials, transit encryption.
+# HA + Raft + auto-unseal are recommended for prod; operators wire
+# auto-unseal to a cloud KMS (AWS / GCP / Azure) per cluster.
+# Upstream values: https://github.com/hashicorp/vault-helm
+vault:
+  enabled: false
+  server:
+    ha:
+      enabled: true
+      replicas: 3
+      raft:
+        enabled: true
+        setNodeId: true
+    # auto-unseal: operators uncomment + populate one of the seal blocks
+    # below per cloud — examples kept here for visibility.
+    #
+    # extraEnvironmentVars:
+    #   VAULT_LOG_LEVEL: info
+    # extraSecretEnvironmentVars: []
+    #
+    # AWS KMS auto-unseal example:
+    # extraVolumes:
+    #   - type: secret
+    #     name: vault-kms-creds
+    # ha:
+    #   config: |
+    #     ui = true
+    #     listener "tcp" { tls_disable = 1, address = "[::]:8200" }
+    #     storage "raft" { path = "/vault/data" }
+    #     seal "awskms" { region = "us-west-2", kms_key_id = "alias/vault-unseal" }
+  ui:
+    enabled: true
+  injector:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# Backup
+# -----------------------------------------------------------------------------
+
+# Velero: cluster-wide backup of k8s resources + PV snapshots.
+# `configuration.backupStorageLocation` and `volumeSnapshotLocation` need
+# operator wiring per cloud — see the commented examples below.
+# Upstream values: https://github.com/vmware-tanzu/helm-charts/tree/main/charts/velero
+velero:
+  enabled: false
+  initContainers:
+    # Plugins are installed via init containers; uncomment per cloud.
+    # AWS:
+    # - name: velero-plugin-for-aws
+    #   image: velero/velero-plugin-for-aws:v1.10.0
+    #   volumeMounts:
+    #     - mountPath: /target
+    #       name: plugins
+    # GCP / Azure / CSI plugins follow the same pattern.
+    []
+  configuration:
+    # backupStorageLocation:
+    #   - name: default
+    #     provider: aws
+    #     bucket: <set by operator>
+    #     config:
+    #       region: us-west-2
+    backupStorageLocation: []
+    volumeSnapshotLocation: []
+
+# -----------------------------------------------------------------------------
+# Observability stack
+#
+# OTel collector is the universal ingest path; metrics flow to Prometheus
+# (kube-prometheus-stack), traces to Tempo, logs to Loki. Operators on
+# managed clouds (AWS, GCP, Azure) typically point OTel at the cloud-
+# managed equivalents instead and disable the in-cluster Prom/Loki/Tempo.
+# -----------------------------------------------------------------------------
+
+# OpenTelemetry collector: gateway + DaemonSet pattern.
+# Upstream values: https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector
+opentelemetry-collector:
+  enabled: false
+  mode: deployment
+  image:
+    repository: otel/opentelemetry-collector-contrib
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    exporters:
+      # Operators wire one or more of: prometheus, loki, otlp/tempo,
+      # cloud-managed exporters (xray, gcp.cloudtrace, azuremonitor).
+      debug: { verbosity: basic }
+    service:
+      pipelines:
+        traces:  { receivers: [otlp], exporters: [debug] }
+        metrics: { receivers: [otlp], exporters: [debug] }
+        logs:    { receivers: [otlp], exporters: [debug] }
+
+otelCollector:
+  enabled: false
+
+# kube-prometheus-stack: Prometheus + Grafana + Alertmanager + kube-state-
+# metrics + node-exporter + Prometheus Operator.
+# Upstream values: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+kube-prometheus-stack:
+  enabled: false
+  prometheus:
+    prometheusSpec:
+      retention: 30d
+      retentionSize: ""  # unbounded by default; cap on small clusters
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      storageSpec: {}  # operators wire PVC for persistence
+  grafana:
+    enabled: true
+    adminPassword: ""  # operators set via secret + grafana.admin.existingSecret
+    persistence: { enabled: true, type: pvc, size: 10Gi }
+  alertmanager:
+    enabled: true
+
+prometheus:
+  enabled: false
+
+# Loki: log aggregation.
+# Upstream values: https://github.com/grafana/loki/tree/main/production/helm/loki
+loki:
+  enabled: false
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      # Operators wire S3 / GCS / Azure / filesystem storage backends.
+      type: filesystem
+  # Compact 1-replica defaults; production deployments scale up.
+  singleBinary:
+    replicas: 1
+
+# Tempo: distributed tracing storage.
+# Upstream values: https://github.com/grafana/helm-charts/tree/main/charts/tempo
+tempo:
+  enabled: false
+  tempo:
+    storage:
+      trace:
+        # Operators wire S3 / GCS / Azure backends. Defaults to local
+        # (works for dev / kind, not production).
+        backend: local
+        local:
+          path: /var/tempo

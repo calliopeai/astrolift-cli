@@ -1,0 +1,56 @@
+{{- /*
+Storage class tier mapping per spec 22 (persistent storage tiers):
+  standard / balanced (default) / high_iops / extreme + RWX.
+
+Tenant workloads bind by tier name (astrolift-<tier>); the provisioner
+behind each class is configurable per cluster — Longhorn ships as the
+default. Operators on TopoLVM / Rook Ceph / NFS / local-path enable
+those sections in values.yaml and disable longhorn.
+*/ -}}
+{{- if .Values.storageClasses.enabled -}}
+{{- if .Values.storageClasses.longhorn.enabled -}}
+{{- range $tier, $cfg := .Values.storageClasses.longhorn.classes }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: astrolift-{{ $tier }}
+  labels:
+    {{- include "astrolift-prereqs.labels" $ | nindent 4 }}
+    astrolift.dev/storage-tier: {{ $tier | quote }}
+  {{- if $cfg.default }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  {{- end }}
+provisioner: driver.longhorn.io
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  numberOfReplicas: {{ $cfg.replicas | quote }}
+  staleReplicaTimeout: "30"
+  fsType: {{ $cfg.fsType | default "ext4" }}
+  {{- if $cfg.dataLocality }}
+  dataLocality: {{ $cfg.dataLocality }}
+  {{- end }}
+{{- end }}
+{{- if .Values.storageClasses.longhorn.rwxEnabled }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: astrolift-rwx
+  labels:
+    {{- include "astrolift-prereqs.labels" . | nindent 4 }}
+    astrolift.dev/storage-tier: rwx
+provisioner: driver.longhorn.io
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  numberOfReplicas: "2"
+  fsType: ext4
+  share: "true"
+{{- end }}
+{{- end }}
+{{- end -}}

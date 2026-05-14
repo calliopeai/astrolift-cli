@@ -1,0 +1,135 @@
+# astrolift-prereqs — GCP / GKE overrides
+#
+# Applied on top of values.yaml when the operator bootstraps a GKE cluster.
+# GKE ships with the GCE Persistent Disk CSI driver, Filestore CSI, the
+# Gateway API controller (Autopilot + Standard), and Workload Identity for
+# Cloud DNS access — so we skip the in-cluster storage / LB controllers and
+# wire the cloud-native equivalents instead.
+#
+# Operator responsibilities NOT covered by this chart:
+#   * GKE Gateway / GCE Ingress controllers — bundled with GKE; the operator
+#     enables them via the cluster's HttpLoadBalancing add-on.
+#   * GCE PD / Filestore CSI drivers — bundled with GKE.
+#   * Workload Identity bindings for cert-manager (Cloud DNS) + external-dns
+#     + velero — provisioned in `astrolift-opscode/gcp/terraform`.
+
+# -----------------------------------------------------------------------------
+# Storage — GKE uses GCE PD (pd-balanced / pd-ssd) via the bundled CSI; no
+# Longhorn / Rook needed.
+# -----------------------------------------------------------------------------
+
+storageClasses:
+  enabled: false
+  longhorn:
+    enabled: false
+  topolvm:
+    enabled: false
+  rookCeph:
+    enabled: false
+  localPath:
+    enabled: false
+  nfs:
+    enabled: false
+
+longhorn:
+  enabled: false
+rook-ceph:
+  enabled: false
+rookCeph:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Cluster essentials
+# -----------------------------------------------------------------------------
+
+# cert-manager: enabled. Workload Identity binding for Cloud DNS dns-01 lives
+# in the GCP terraform tree; the ClusterIssuer below wires the GSA + project.
+certManager:
+  enabled: true
+  installCRDs: true
+
+# Cloud DNS + Let's Encrypt prod via dns-01.
+# Operator sets:
+#   clusterIssuer.email                  ACME contact
+#   clusterIssuer.gcp.project            GCP project hosting the DNS zone
+#   serviceAccount.annotations.<wi>      GSA email for Workload Identity
+clusterIssuer:
+  enabled: true
+  name: letsencrypt-prod
+  acmeServer: https://acme-v02.api.letsencrypt.org/directory
+  email: ""
+  ingressClass: gce
+  gcp:
+    project: ""
+
+# external-dns: enabled, Google provider. Workload Identity GSA email is
+# set by the operator (terraform output → helm values).
+externalDns:
+  enabled: true
+  provider: google
+  policy: sync
+  txtOwnerId: astrolift
+  sources:
+    - service
+    - ingress
+  # serviceAccount.annotations.iam.gke.io/gcp-service-account: <set by operator>
+
+# ingress-nginx: OFF — GKE uses GCE / Gateway API.
+ingress-nginx:
+  enabled: false
+ingressNginx:
+  enabled: false
+
+# MetalLB: OFF — GKE LBs are managed by Google.
+metallb:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Managed-service operators — pair with Cloud SQL / Memorystore / Pub/Sub by
+# default; flip these on if running in-cluster operators on this cluster.
+# -----------------------------------------------------------------------------
+
+cnpg:
+  enabled: false
+strimzi:
+  enabled: false
+redis-operator:
+  enabled: false
+redisOperator:
+  enabled: false
+vault:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Backup — Velero with GCP plugin. Opt-in: requires GCS bucket + WI.
+# -----------------------------------------------------------------------------
+
+velero:
+  enabled: false
+  initContainers:
+    - name: velero-plugin-for-gcp
+      image: velero/velero-plugin-for-gcp:v1.10.0
+      volumeMounts:
+        - mountPath: /target
+          name: plugins
+  configuration:
+    backupStorageLocation: []
+    volumeSnapshotLocation: []
+
+# -----------------------------------------------------------------------------
+# Observability — default OFF on GKE; operators typically use Cloud
+# Operations Suite (Logging, Monitoring, Trace). Flip on for in-cluster Prom.
+# -----------------------------------------------------------------------------
+
+opentelemetry-collector:
+  enabled: false
+otelCollector:
+  enabled: false
+kube-prometheus-stack:
+  enabled: false
+prometheus:
+  enabled: false
+loki:
+  enabled: false
+tempo:
+  enabled: false
