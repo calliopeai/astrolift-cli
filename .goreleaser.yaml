@@ -39,14 +39,15 @@ archives:
       - goos: windows
         formats:
           - zip
-    name_template: >-
-      {{ .ProjectName }}_{{ .Version }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else }}{{ .Arch }}{{ end }}
+    # ``astro-{os}-{arch}.tar.gz`` (e.g. ``astro-darwin-arm64.tar.gz``)
+    # is the asset shape the in-app Downloads page links to and the
+    # ``curl | tar`` install snippet expects. Keep it stable across
+    # releases — changing this requires updating the in-app
+    # ``downloads-client.tsx`` table in lockstep.
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
 
 checksum:
-  name_template: "checksums.txt"
+  name_template: "astro-checksums.txt"
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
