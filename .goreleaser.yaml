@@ -60,28 +60,40 @@ changelog:
       - "^test:"
       - "^chore:"
 
-# Homebrew tap
-brews:
-  - name: astro
-    repository:
-      owner: calliopeai
-      name: homebrew-tap
-    homepage: https://astrolift.app
-    description: "Astrolift CLI"
-    license: "MIT"
-    install: |
-      bin.install "astro"
-    test: |
-      system "#{bin}/astro version"
-
-# Scoop bucket (Windows)
-scoops:
-  - repository:
-      owner: calliopeai
-      name: scoop-bucket
-    homepage: https://astrolift.app
-    description: "Astrolift CLI"
-    license: "MIT"
+# Homebrew tap + Scoop bucket are intentionally disabled for the
+# v0.1.x line: the upstream tap repos (calliopeai/homebrew-tap,
+# calliopeai/scoop-bucket) do not exist yet, and goreleaser fails
+# the whole release when their default-branch lookup 404s.
+#
+# v0.1.x is a binaries-only release (curl|tar install + Docker
+# images). Package-manager distribution is tracked separately:
+#   - Homebrew tap setup: see follow-up issue
+#   - Scoop bucket setup: see follow-up issue
+#
+# Once the tap repos exist and TAP_PUBLISH_TOKEN has contents:write
+# on them, uncomment the blocks below and the release will publish
+# brew + scoop alongside the existing artifacts.
+#
+# brews:
+#   - name: astro
+#     repository:
+#       owner: calliopeai
+#       name: homebrew-tap
+#     homepage: https://astrolift.app
+#     description: "Astrolift CLI"
+#     license: "MIT"
+#     install: |
+#       bin.install "astro"
+#     test: |
+#       system "#{bin}/astro version"
+#
+# scoops:
+#   - repository:
+#       owner: calliopeai
+#       name: scoop-bucket
+#     homepage: https://astrolift.app
+#     description: "Astrolift CLI"
+#     license: "MIT"
 
 # Docker images — published to Docker Hub + GHCR under the calliopeai
 # org. Image name matches the rest of the astrolift family
