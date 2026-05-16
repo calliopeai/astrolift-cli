@@ -121,7 +121,17 @@ jobs:
           set -euo pipefail
           URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
           echo "Fetching $URL"
-          curl -fsSL "$URL" | tar -xz
+          # Download to a file first (instead of piping straight into tar)
+          # so curl failures surface with stderr and HTTP status, and tar
+          # failures don't get conflated with curl failures by pipefail.
+          # `-S` makes curl print errors even with `-s`; `--retry` covers
+          # the brief CDN propagation window between asset publish and the
+          # release-assets.githubusercontent.com SAS URL becoming live.
+          curl -fSL --retry 5 --retry-delay 3 --retry-all-errors \
+               -o "$ASSET" -w "http_code=%{http_code} size=%{size_download}\n" "$URL"
+          ls -la "$ASSET"
+          file "$ASSET" || true
+          tar -xzf "$ASSET"
           test -x ./astro || { echo "astro binary missing or non-executable" >&2; ls -la; exit 1; }
           OUT="$(./astro --version)"
           echo "astro --version: $OUT"
