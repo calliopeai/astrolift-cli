@@ -118,20 +118,28 @@ jobs:
           TAG: ${{ github.ref_name }}
           ASSET: ${{ matrix.asset }}
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          # Surface the failing command + line on any error.
+          trap 'rc=$?; echo "::error::smoke step failed at line $LINENO with exit code $rc (cmd: $BASH_COMMAND)" >&2; ls -la; exit $rc' ERR
+          # Extract into a dedicated tmpdir so we never collide with
+          # the runner workspace or with the downloaded tarball.
+          WORK="$(mktemp -d)"
+          cd "$WORK"
           URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
-          echo "Fetching $URL"
-          # Download to a file first (instead of piping straight into tar)
-          # so curl failures surface with stderr and HTTP status, and tar
-          # failures don't get conflated with curl failures by pipefail.
-          # `-S` makes curl print errors even with `-s`; `--retry` covers
-          # the brief CDN propagation window between asset publish and the
-          # release-assets.githubusercontent.com SAS URL becoming live.
+          echo "Fetching $URL into $WORK"
+          # Download to a file first so curl errors print stderr +
+          # HTTP code, and tar failures aren't conflated with curl
+          # failures via pipefail. --retry rides out the brief window
+          # where the release API has the asset but the SAS URL on
+          # release-assets.githubusercontent.com is still propagating.
           curl -fSL --retry 5 --retry-delay 3 --retry-all-errors \
-               -o "$ASSET" -w "http_code=%{http_code} size=%{size_download}\n" "$URL"
+               -o "$ASSET" \
+               -w "http_code=%{http_code} size=%{size_download} url_effective=%{url_effective}\n" \
+               "$URL"
           ls -la "$ASSET"
           file "$ASSET" || true
-          tar -xzf "$ASSET"
+          tar -xzvf "$ASSET"
+          ls -la
           test -x ./astro || { echo "astro binary missing or non-executable" >&2; ls -la; exit 1; }
           OUT="$(./astro --version)"
           echo "astro --version: $OUT"
@@ -150,11 +158,12 @@ jobs:
           ASSET: ${{ matrix.asset }}
           SHA_CMD: ${{ matrix.sha_cmd }}
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'rc=$?; echo "::error::sha verify failed at line $LINENO with exit code $rc (cmd: $BASH_COMMAND)" >&2; exit $rc' ERR
           CHK_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/astro-checksums.txt"
           ASSET_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
-          curl -fsSL -o astro-checksums.txt "$CHK_URL"
-          curl -fsSL -o "$ASSET" "$ASSET_URL"
+          curl -fSL --retry 5 --retry-delay 3 --retry-all-errors -o astro-checksums.txt "$CHK_URL"
+          curl -fSL --retry 5 --retry-delay 3 --retry-all-errors -o "$ASSET" "$ASSET_URL"
           EXPECTED="$(grep -E "  ${ASSET}\$" astro-checksums.txt | awk '{print $1}')"
           if [ -z "$EXPECTED" ]; then
             echo "no checksum line for $ASSET in astro-checksums.txt" >&2
