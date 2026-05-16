@@ -141,8 +141,11 @@ jobs:
           tar -xzvf "$ASSET"
           ls -la
           test -x ./astro || { echo "astro binary missing or non-executable" >&2; ls -la; exit 1; }
-          OUT="$(./astro --version)"
-          echo "astro --version: $OUT"
+          # `astro version` is the Cobra subcommand; `--version` is
+          # not wired up on the root command (rootCmd.Version is empty
+          # so the flag exits 1 with no output).
+          OUT="$(./astro version)"
+          echo "astro version: $OUT"
           # The tag is `vX.Y.Z`; the binary may print `X.Y.Z` or
           # `vX.Y.Z`. Accept either as long as the numeric core
           # appears in the output.
