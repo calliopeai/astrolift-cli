@@ -69,6 +69,96 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.TAP_PUBLISH_TOKEN }}
           SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.TAP_PUBLISH_TOKEN }}
 
+  release-smoke:
+    name: Release smoke (${{ matrix.os_label }})
+    # Runs the exact curl one-liner the downloads page advertises,
+    # against the release we just cut. Catches asset-naming and
+    # checksum-publishing regressions before any user does.
+    needs: release
+    if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os_label: linux-amd64
+            asset: astro-linux-amd64.tar.gz
+            sha_cmd: sha256sum
+          - runner: macos-14
+            os_label: darwin-arm64
+            asset: astro-darwin-arm64.tar.gz
+            sha_cmd: shasum -a 256
+    steps:
+      - name: Wait for release assets to be visible
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          set -euo pipefail
+          # goreleaser-action uploads synchronously, but the GitHub
+          # release API can lag by a few seconds. Poll up to 60s.
+          for i in $(seq 1 30); do
+            if gh release view "$TAG" \
+                 --repo "${{ github.repository }}" \
+                 --json assets \
+                 --jq '.assets[].name' | grep -qx "$ASSET"; then
+              echo "asset $ASSET visible after ${i}x2s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "asset $ASSET not visible after 60s" >&2
+          gh release view "$TAG" --repo "${{ github.repository }}" --json assets >&2 || true
+          exit 1
+
+      - name: Download, extract, and run astro
+        env:
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          set -euo pipefail
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
+          echo "Fetching $URL"
+          curl -fsSL "$URL" | tar -xz
+          test -x ./astro || { echo "astro binary missing or non-executable" >&2; ls -la; exit 1; }
+          OUT="$(./astro --version)"
+          echo "astro --version: $OUT"
+          # The tag is `vX.Y.Z`; the binary may print `X.Y.Z` or
+          # `vX.Y.Z`. Accept either as long as the numeric core
+          # appears in the output.
+          NUMERIC="${TAG#v}"
+          if ! printf '%s\n' "$OUT" | grep -qF "$NUMERIC"; then
+            echo "version mismatch: output does not contain $NUMERIC" >&2
+            exit 1
+          fi
+
+      - name: Verify SHA-256 against astro-checksums.txt
+        env:
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ matrix.asset }}
+          SHA_CMD: ${{ matrix.sha_cmd }}
+        run: |
+          set -euo pipefail
+          CHK_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/astro-checksums.txt"
+          ASSET_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
+          curl -fsSL -o astro-checksums.txt "$CHK_URL"
+          curl -fsSL -o "$ASSET" "$ASSET_URL"
+          EXPECTED="$(grep -E "  ${ASSET}\$" astro-checksums.txt | awk '{print $1}')"
+          if [ -z "$EXPECTED" ]; then
+            echo "no checksum line for $ASSET in astro-checksums.txt" >&2
+            cat astro-checksums.txt >&2
+            exit 1
+          fi
+          ACTUAL="$($SHA_CMD "$ASSET" | awk '{print $1}')"
+          echo "expected: $EXPECTED"
+          echo "actual:   $ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "checksum mismatch for $ASSET" >&2
+            exit 1
+          fi
+
   main-image:
     name: Main image (${{ matrix.suffix }})
     if: ${{ github.ref_type != 'tag' }}
