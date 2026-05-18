@@ -52,7 +52,7 @@ func (c *Client) GraphQL(ctx context.Context, query string, variables map[string
 		return fmt.Errorf("marshalling graphql body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/graphql/", bytes.NewReader(encoded))
+	req, err := c.newRequest(ctx, http.MethodPost, "/app/gql/config/", bytes.NewReader(encoded))
 	if err != nil {
 		return err
 	}
