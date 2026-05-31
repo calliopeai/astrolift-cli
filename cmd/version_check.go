@@ -14,11 +14,11 @@ import (
 // CompatStatus is what the platform returns from
 // GET /api/cli/v1/compat/<cli-version>/.
 type CompatStatus struct {
-	Compatible    bool   `json:"compatible"`
-	MinSupported  string `json:"min_supported_cli"`
-	LatestStable  string `json:"latest_stable_cli"`
-	UpgradeURL    string `json:"upgrade_url"`
-	Reason        string `json:"reason,omitempty"`
+	Compatible   bool   `json:"compatible"`
+	MinSupported string `json:"min_supported_cli"`
+	LatestStable string `json:"latest_stable_cli"`
+	UpgradeURL   string `json:"upgrade_url"`
+	Reason       string `json:"reason,omitempty"`
 }
 
 var versionCheckCmd = &cobra.Command{
@@ -128,4 +128,3 @@ func parseSemver(v string) (int, int, int, error) {
 	}
 	return maj, min, patch, nil
 }
-
