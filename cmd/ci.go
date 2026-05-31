@@ -71,11 +71,11 @@ Exit codes: 0 success, 1 deploy failure, 2 config error.`,
 		}
 
 		body := map[string]interface{}{
-			"image_tags":    imageTags,
-			"commit_sha":    commitSHA,
-			"branch":        branch,
-			"environment":   environment,
-			"trigger_kind":  "ci",
+			"image_tags":   imageTags,
+			"commit_sha":   commitSHA,
+			"branch":       branch,
+			"environment":  environment,
+			"trigger_kind": "ci",
 		}
 		if idem := os.Getenv("ASTROLIFT_IDEMPOTENCY_KEY"); idem != "" {
 			body["idempotency_key"] = idem
@@ -87,8 +87,8 @@ Exit codes: 0 success, 1 deploy failure, 2 config error.`,
 		defer cancel()
 
 		var resp struct {
-			WorkflowID  string `json:"workflow_id"`
-			PollingURL  string `json:"polling_url"`
+			WorkflowID string `json:"workflow_id"`
+			PollingURL string `json:"polling_url"`
 		}
 		path := fmt.Sprintf("/api/cli/v1/apps/%s/deploy/", slug)
 		if err := client.Post(ctx, path, body, &resp); err != nil {
@@ -184,7 +184,7 @@ func pollWorkflow(ctx context.Context, client *api.Client, pollingURL string) (s
 
 	terminal := map[string]bool{
 		"succeeded": true, "completed": true,
-		"failed":    true, "cancelled": true,
+		"failed": true, "cancelled": true,
 		"timed_out": true,
 	}
 

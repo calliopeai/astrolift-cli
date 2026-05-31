@@ -13,7 +13,7 @@ register clusters and configure providers against an Astrolift control plane.
 > subcommands wired in Cobra) but several command bodies still surface
 > `not yet wired to the API` until the matching backend resolvers
 > ship. The wired surfaces today are: `astro server *`, `astro auth *`,
-> `astro app init`, `astro ci deploy` / `astro ci status`, `astro
+> `astro app init`, `astro app register`, `astro ci deploy` / `astro ci status`, `astro
 > version-check` / `astro self-update`, `astro version`, `astro
 > docs`, and `astro cluster bootstrap`. Subcommand surface, flag names, and exit codes may shift
 > before 1.0 — pin a tagged release in CI rather than tracking `main`.
@@ -100,7 +100,7 @@ cd my-service/
 astro app init                  # writes astrolift.toml
 
 # 3. Register and deploy
-astro app register
+astro app register --project-id <project-uuid> --source-repo myorg/my-service
 astro app deploy
 
 # 4. Watch it run
