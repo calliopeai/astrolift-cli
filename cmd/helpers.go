@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
@@ -60,38 +62,158 @@ func loadActiveClient(ctx context.Context, debug bool) (*api.Client, *config.Con
 	return client, cfg, &entry, nil
 }
 
+// detectedFramework summarises what detect() found in a directory.
+type detectedFramework struct {
+	// Name is a human-readable label ("Django", "Next.js", …)
+	Name string
+	// Port is the default listen port for this framework (0 = unknown)
+	Port int
+	// CPULimit is a sensible default cpu_limit for the primary workload
+	CPULimit string
+	// MemoryLimit is a sensible default memory_limit
+	MemoryLimit string
+}
+
+// fileExists reports whether a path exists relative to dir.
+func fileExists(dir, rel string) bool {
+	_, err := os.Stat(filepath.Join(dir, rel))
+	return err == nil
+}
+
+// detectFramework inspects a directory and returns the most likely framework.
+// Returns nil if nothing recognisable is found — a generic manifest is used.
+func detectFramework(dir string) *detectedFramework {
+	type probe struct {
+		files       []string
+		content     string // substring to look for in the first match
+		contentFile string
+		fw          detectedFramework
+	}
+
+	probes := []probe{
+		// Next.js (check before generic Node.js)
+		{files: []string{"next.config.js", "next.config.ts", "next.config.mjs"}, fw: detectedFramework{"Next.js", 3000, "500m", "512Mi"}},
+		// Django
+		{files: []string{"manage.py"}, contentFile: "requirements.txt", content: "django", fw: detectedFramework{"Django", 8000, "500m", "256Mi"}},
+		// FastAPI / generic Python ASGI
+		{files: []string{"requirements.txt"}, content: "fastapi", fw: detectedFramework{"FastAPI", 8000, "500m", "256Mi"}},
+		// Flask
+		{files: []string{"requirements.txt"}, content: "flask", fw: detectedFramework{"Flask", 5000, "200m", "128Mi"}},
+		// Generic Python (Pipfile or pyproject without a specific marker)
+		{files: []string{"Pipfile", "pyproject.toml"}, fw: detectedFramework{"Python", 8000, "500m", "256Mi"}},
+		// Go module
+		{files: []string{"go.mod"}, fw: detectedFramework{"Go", 8080, "200m", "64Mi"}},
+		// Ruby on Rails
+		{files: []string{"Gemfile"}, content: "rails", fw: detectedFramework{"Rails", 3000, "500m", "256Mi"}},
+		// Generic Ruby
+		{files: []string{"Gemfile"}, fw: detectedFramework{"Ruby", 3000, "500m", "256Mi"}},
+		// Spring (Maven)
+		{files: []string{"pom.xml"}, fw: detectedFramework{"Spring (Maven)", 8080, "500m", "512Mi"}},
+		// Spring (Gradle)
+		{files: []string{"build.gradle", "build.gradle.kts"}, fw: detectedFramework{"Spring (Gradle)", 8080, "500m", "512Mi"}},
+		// Generic Node.js
+		{files: []string{"package.json"}, fw: detectedFramework{"Node.js", 3000, "500m", "256Mi"}},
+	}
+
+	for _, p := range probes {
+		found := false
+		for _, f := range p.files {
+			if fileExists(dir, f) {
+				found = true
+				// If content check is required, scan the file
+				if p.content != "" {
+					checkFile := f
+					if p.contentFile != "" {
+						checkFile = p.contentFile
+					}
+					data, err := os.ReadFile(filepath.Join(dir, checkFile))
+					if err != nil || !strings.Contains(strings.ToLower(string(data)), p.content) {
+						found = false
+					}
+				}
+				break
+			}
+		}
+		if found {
+			fw := p.fw
+			return &fw
+		}
+	}
+	// Dockerfile present → generic container workload
+	if fileExists(dir, "Dockerfile") {
+		return &detectedFramework{"Docker", 8080, "500m", "256Mi"}
+	}
+	return nil
+}
+
 // scaffoldManifest writes a minimal astrolift.toml at path.
-// Refuses to overwrite an existing file.
+// Refuses to overwrite an existing file. Detects the project framework
+// and generates a tailored starting template.
 func scaffoldManifest(path string, cmd *cobra.Command) error {
 	if _, err := os.Stat(path); err == nil {
 		return fmt.Errorf("%s already exists", path)
 	}
-	content := "# astrolift.toml — Astrolift app manifest\n" +
-		"# Spec ref: spec 05 (manifest)\n" +
-		"#\n" +
-		"# Run `astro app register` after editing to register this app\n" +
-		"# on the platform.\n" +
-		"\n" +
-		"[app]\n" +
-		"slug = \"my-app\"\n" +
-		"display_name = \"My App\"\n" +
-		"\n" +
-		"[[environments]]\n" +
-		"name = \"production\"\n" +
-		"\n" +
-		"# Uncomment + edit the workload(s) your app actually runs.\n" +
-		"# [[workloads]]\n" +
-		"# slug = \"web\"\n" +
-		"# image = \"ghcr.io/myorg/my-app:latest\"\n" +
-		"# port = 8080\n" +
-		"#\n" +
-		"# [workloads.resources]\n" +
-		"# cpu_request = \"100m\"\n" +
-		"# cpu_limit = \"500m\"\n" +
-		"# memory_request = \"128Mi\"\n" +
-		"# memory_limit = \"256Mi\"\n"
+
+	dir := filepath.Dir(path)
+	fw := detectFramework(dir)
+
+	appSlug := filepath.Base(dir)
+	if appSlug == "." || appSlug == "" {
+		appSlug = "my-app"
+	}
+
+	var port int = 8080
+	var cpuLimit string = "500m"
+	var memLimit string = "256Mi"
+	var fwNote string = "# No framework detected — using generic defaults."
+
+	if fw != nil {
+		port = fw.Port
+		if fw.Port == 0 {
+			port = 8080
+		}
+		cpuLimit = fw.CPULimit
+		memLimit = fw.MemoryLimit
+		fwNote = fmt.Sprintf("# Detected framework: %s", fw.Name)
+	}
+
+	content := fmt.Sprintf(`# astrolift.toml — Astrolift app manifest
+# Spec ref: spec 05 (manifest)
+%s
+#
+# Run `+"`astro app register`"+` after editing to register this app
+# on the platform.
+
+[app]
+slug = %q
+display_name = %q
+
+[[environments]]
+name = "production"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+replicas = 1
+
+  [[workloads.containers]]
+  name = "web"
+  is_primary = true
+  port = %d
+
+  [workloads.containers.resources]
+  cpu_request  = "100m"
+  cpu_limit    = %q
+  memory_request = "128Mi"
+  memory_limit   = %q
+`, fwNote, appSlug, appSlug, port, cpuLimit, memLimit)
+
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)
+	}
+
+	if fw != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "Detected: %s\n", fw.Name)
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Created %s\n", path)
 	fmt.Fprintln(cmd.OutOrStdout(), "Edit the file, then run `astro app register`.")
