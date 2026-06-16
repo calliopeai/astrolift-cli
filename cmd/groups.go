@@ -18,12 +18,12 @@ var orgCmd = &cobra.Command{
 	Short: "Org-scoped operations (#8 + #9)",
 }
 var orgListCmd = &cobra.Command{
-	Use: "list", Short: "List orgs you belong to",
-	RunE: stub("org list"),
+	Use: "list", Aliases: []string{"ls"}, Short: "List orgs you belong to",
+	RunE: runOrgList,
 }
 var orgShowCmd = &cobra.Command{
-	Use: "show [slug]", Short: "Show org details",
-	Args: cobra.MaximumNArgs(1), RunE: stub("org show"),
+	Use: "show [slug]", Short: "Show org details (defaults to the working org)",
+	Args: cobra.MaximumNArgs(1), RunE: runOrgShow,
 }
 
 var teamCmd = &cobra.Command{
