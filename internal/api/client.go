@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -70,7 +71,7 @@ func (c *Client) GraphQL(ctx context.Context, query string, variables map[string
 	}
 
 	if c.debug {
-		fmt.Fprintf(io.Discard, "graphql response status=%d body=%s\n", resp.StatusCode, respBytes)
+		fmt.Fprintf(os.Stderr, "graphql response status=%d body=%s\n", resp.StatusCode, respBytes)
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
