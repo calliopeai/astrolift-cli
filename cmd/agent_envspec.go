@@ -125,18 +125,22 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 	}
 
 	common := map[string]interface{}{
-		"name":               name,
-		"agentType":          envSpecAgentType,
-		"imageTag":           envSpecImageTag,
-		"runtime":            envSpecRuntime,
-		"toolPreset":         envSpecToolPreset,
-		"allowInstall":       envSpecAllowInstall,
-		"vncEnabled":         envSpecVNC,
-		"configRepo":         envSpecConfigRepo,
-		"configBranch":       envSpecConfigBranch,
-		"configManifestPath": envSpecManifestPath,
-		"secretRefs":         secretRefs,
-		"envVars":            envVars,
+		"name":         name,
+		"agentType":    envSpecAgentType,
+		"imageTag":     envSpecImageTag,
+		"runtime":      envSpecRuntime,
+		"toolPreset":   envSpecToolPreset,
+		"allowInstall": envSpecAllowInstall,
+		"vncEnabled":   envSpecVNC,
+		"configRepo":   envSpecConfigRepo,
+		"configBranch": envSpecConfigBranch,
+		"secretRefs":   secretRefs,
+		"envVars":      envVars,
+	}
+	// Only send configManifestPath when set — older control planes (pre
+	// manifest_path) don't define the field and reject it outright.
+	if envSpecManifestPath != "" {
+		common["configManifestPath"] = envSpecManifestPath
 	}
 
 	// Already exists? -> update (slug-keyed, org from token).
