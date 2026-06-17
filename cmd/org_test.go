@@ -15,7 +15,7 @@ import (
 func orgServer(orgs []orgRef) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": map[string]interface{}{"organizations": orgs},
+			"data": map[string]interface{}{"astroliftOrganizations": orgs},
 		})
 	}))
 }
