@@ -1,15 +1,30 @@
 // Package cmd — `astro agent ...` subcommand tree.
 //
 // Provides terminal-side access to the agent dispatch layer:
-//   - run     — launch a WorkflowInstance from a WorkflowDefinition slug
-//   - ls      — list Tasks / WorkflowInstances
-//   - logs    — stream or fetch logs for a Task
-//   - cancel  — cancel a Task
-//   - inspect — print the full Task record
+//   - run     — launch an agent WorkflowDefinition's stages via Temporal
+//   - ls      — list the org's AgentTasks
+//   - logs    — stream or fetch logs for a Task (see note below)
+//   - cancel  — cancel an AgentTask
+//   - inspect — print the full AgentTask record
 //
-// All commands use the DRF REST API surface under /api/cli/v1/workflows/
-// and /api/cli/v1/tasks/, which is only available when
-// astrolift_agent_dispatch is installed on the target server.
+// These commands talk to the control-plane GraphQL API via
+// client.GraphQL (the same surface org.go / agent_envspec.go use), not a
+// REST surface — the earlier `/api/cli/v1/workflows/` and
+// `/api/cli/v1/tasks/` routes were never built and 404 to the SPA shell.
+//
+// GraphQL operations (field names per backend/schema.graphql):
+//   - run     → runWorkflowDefinition(workflowSlug, triggerPayload) → { ok, errors{field, messages}, workflowRunId, temporalWorkflowId }
+//   - ls      → agentTasks(orgId, status) → [AstroliftAgentTask]
+//   - inspect → agentTask(id) → AstroliftAgentTask
+//   - cancel  → cancelTask(id) → { ok, errors{code, message} }
+//
+// --wait polls astroliftWorkflowInstance(workflowId) for the returned
+// temporalWorkflowId until its status is terminal.
+//
+// `logs` has no GraphQL or operator-facing REST surface: the only log
+// route on the platform is the dispatcher-facing ingest endpoint
+// (/api/dispatch/v1/tasks/<id>/logs/, a worker push). It is left wired to
+// the old paths and is UNVERIFIED — see the command's comment.
 //
 // Issue: calliopeai/astrolift#61
 package cmd
@@ -21,8 +36,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"text/tabwriter"
 	"time"
 
+	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -32,9 +50,8 @@ var agentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Interact with the agent dispatch layer",
 	Long: `Commands for running and monitoring agent tasks via the
-Astrolift dispatch layer.
+Astrolift control-plane GraphQL API.
 
-Requires astrolift_agent_dispatch to be installed on the target server.
 All commands authenticate via the active server credentials
 (see 'astro auth login') or ASTROLIFT_DEPLOY_TOKEN.`,
 }
@@ -42,15 +59,12 @@ All commands authenticate via the active server credentials
 // ---- flags -----------------------------------------------------------------
 
 var (
-	agentRunInput      string
-	agentRunDispatcher string
-	agentRunWait       bool
+	agentRunInput string
+	agentRunWait  bool
 
-	agentListStatus     string
-	agentListWorkflow   string
-	agentListDispatcher string
-	agentListLimit      int
-	agentListJSON       bool
+	agentListStatus string
+	agentListLimit  int
+	agentListJSON   bool
 
 	agentLogsFollow bool
 	agentLogsTail   int
@@ -60,229 +74,316 @@ var (
 	agentInspectJSON bool
 )
 
-// ---- response shapes -------------------------------------------------------
+// ---- GraphQL operations ----------------------------------------------------
 
-type workflowRunResp struct {
-	InstanceID string `json:"instance_id"`
-	TaskID     string `json:"task_id"`
+// runWorkflowMutation launches an agent WorkflowDefinition's stages durably
+// via Temporal. The resolver takes only workflowSlug + triggerPayload (there
+// is no dispatcher arg — routing is platform-side), and returns the
+// WorkflowRun mirror pk plus the Temporal workflow id.
+const runWorkflowMutation = `mutation($workflowSlug: String!, $triggerPayload: JSON) {
+  runWorkflowDefinition(workflowSlug: $workflowSlug, triggerPayload: $triggerPayload) {
+    ok
+    errors { field messages }
+    workflowRunId
+    temporalWorkflowId
+  }
+}`
+
+// workflowInstanceQuery is the cheap single-instance status poll used by
+// --wait. It is keyed by the Temporal workflow id (an exact describe, not a
+// visibility LIKE), so it resolves on standard SQL visibility.
+const workflowInstanceQuery = `query($workflowId: String!) {
+  astroliftWorkflowInstance(workflowId: $workflowId) {
+    workflowId
+    status
+  }
+}`
+
+const agentTasksQuery = `query($orgId: ID!, $status: String) {
+  agentTasks(orgId: $orgId, status: $status) {
+    id
+    status
+    callbackUrl
+    result
+    createdAt
+    startedAt
+    finishedAt
+    vncEnabled
+    vncUrl
+    snapshotUrl
+  }
+}`
+
+const agentTaskQuery = `query($id: ID!) {
+  agentTask(id: $id) {
+    id
+    status
+    callbackUrl
+    result
+    createdAt
+    startedAt
+    finishedAt
+    vncEnabled
+    vncUrl
+    snapshotUrl
+  }
+}`
+
+const cancelTaskMutation = `mutation($id: ID!) {
+  cancelTask(id: $id) {
+    ok
+    errors { code message field }
+  }
+}`
+
+// ---- response shapes (GraphQL camelCase) -----------------------------------
+
+type runWorkflowResult struct {
+	Ok     bool `json:"ok"`
+	Errors []struct {
+		Field    string   `json:"field"`
+		Messages []string `json:"messages"`
+	} `json:"errors"`
+	WorkflowRunID      string `json:"workflowRunId"`
+	TemporalWorkflowID string `json:"temporalWorkflowId"`
+}
+
+// workflowInstance is the AstroliftWorkflowInstance status summary (--wait).
+type workflowInstance struct {
+	WorkflowID string `json:"workflowId"`
 	Status     string `json:"status"`
-	PollingURL string `json:"polling_url"`
 }
 
-type taskRow struct {
-	ID           string `json:"id"`
-	ShortID      string `json:"short_id"`
-	Workflow     string `json:"workflow"`
-	Stage        string `json:"stage"`
-	Status       string `json:"status"`
-	AgentVariant string `json:"agent_variant"`
-	Dispatcher   string `json:"dispatcher"`
-	Duration     string `json:"duration"`
+// agentTask mirrors the AstroliftAgentTask GraphQL type.
+type agentTask struct {
+	ID          string      `json:"id"`
+	Status      string      `json:"status"`
+	CallbackURL string      `json:"callbackUrl"`
+	Result      interface{} `json:"result"`
+	CreatedAt   string      `json:"createdAt"`
+	StartedAt   *string     `json:"startedAt"`
+	FinishedAt  *string     `json:"finishedAt"`
+	VNCEnabled  bool        `json:"vncEnabled"`
+	VNCURL      string      `json:"vncUrl"`
+	SnapshotURL *string     `json:"snapshotUrl"`
 }
 
-type tasksListResp struct {
-	Results []taskRow `json:"results"`
-	Count   int       `json:"count"`
+// noneMutationResult is the NoneTypeMutationResult envelope (cancelTask). Its
+// errors carry a `message` (MutationError), not the `messages` list that the
+// ValidationError-based results use.
+type noneMutationResult struct {
+	Ok     bool `json:"ok"`
+	Errors []struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Field   string `json:"field"`
+	} `json:"errors"`
 }
 
-type taskDetail struct {
-	ID           string                   `json:"id"`
-	ShortID      string                   `json:"short_id"`
-	Workflow     string                   `json:"workflow"`
-	Status       string                   `json:"status"`
-	Stage        string                   `json:"stage"`
-	AgentVariant string                   `json:"agent_variant"`
-	Dispatcher   string                   `json:"dispatcher"`
-	StartedAt    string                   `json:"started_at"`
-	EndedAt      string                   `json:"ended_at"`
-	NoVNCURL     string                   `json:"novnc_url,omitempty"`
-	Metering     map[string]interface{}   `json:"metering,omitempty"`
-	Stages       []map[string]interface{} `json:"stage_chain,omitempty"`
-	Brief        string                   `json:"brief_key,omitempty"`
+// terminalWorkflowStatuses are the statuses --wait treats as final. Temporal
+// reports closed workflows as COMPLETED/FAILED/CANCELED/TERMINATED/TIMED_OUT
+// (compared case-insensitively).
+var terminalWorkflowStatuses = map[string]bool{
+	"completed":  true,
+	"failed":     true,
+	"canceled":   true,
+	"cancelled":  true,
+	"terminated": true,
+	"timed_out":  true,
+	"timedout":   true,
 }
 
 // ---- astro agent run -------------------------------------------------------
 
 var agentRunCmd = &cobra.Command{
 	Use:   "run <workflow-slug>",
-	Short: "Launch a WorkflowInstance from a WorkflowDefinition slug",
-	Long: `Posts to /api/cli/v1/workflows/<slug>/run/ and either:
-  * prints the WorkflowInstance ID and first Task ID then returns (default)
-  * blocks until the WorkflowInstance reaches a terminal state and streams
-    stage transitions to stdout (--wait)
+	Short: "Launch an agent WorkflowDefinition's stages via Temporal",
+	Long: `Calls the runWorkflowDefinition GraphQL mutation, which creates the
+WorkflowInstance + WorkflowRun mirror rows and enqueues the durable stage
+executor. Prints the WorkflowRun id and Temporal workflow id.
 
-The --input flag accepts a JSON string or a @filename to read from a file.
-The --dispatcher flag targets a specific DispatcherInstance; omit to let
-the platform auto-route to the best available dispatcher.
+The --input flag accepts a JSON string or a @filename to read from a file;
+it is passed through as the workflow's triggerPayload.
 
-Exit codes: 0 success, 1 dispatch failure, 2 config error.`,
+With --wait, blocks until the Temporal workflow reaches a terminal state,
+polling astroliftWorkflowInstance and surfacing status transitions.
+
+Exit codes: 0 success, 1 dispatch/run failure.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		debug, _ := cmd.Flags().GetBool("debug")
-		client, _, _, err := loadActiveClient(cmd.Context(), debug)
+		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
 			return err
 		}
+		return runAgentRun(cmd, cmd.Context(), client, cfg, args[0])
+	},
+}
 
-		workflowSlug := args[0]
-
-		body := map[string]interface{}{}
-		if agentRunInput != "" {
-			raw := agentRunInput
-			if strings.HasPrefix(raw, "@") {
-				data, err := os.ReadFile(raw[1:])
-				if err != nil {
-					return fmt.Errorf("reading input file: %w", err)
-				}
-				raw = string(data)
+func runAgentRun(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, workflowSlug string) error {
+	vars := map[string]interface{}{"workflowSlug": workflowSlug}
+	if agentRunInput != "" {
+		raw := agentRunInput
+		if strings.HasPrefix(raw, "@") {
+			data, err := os.ReadFile(raw[1:])
+			if err != nil {
+				return fmt.Errorf("reading input file: %w", err)
 			}
-			var payload interface{}
-			if err := json.Unmarshal([]byte(raw), &payload); err != nil {
-				return fmt.Errorf("--input is not valid JSON: %w", err)
+			raw = string(data)
+		}
+		var payload interface{}
+		if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+			return fmt.Errorf("--input is not valid JSON: %w", err)
+		}
+		vars["triggerPayload"] = payload
+	}
+
+	runCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	var resp struct {
+		Result runWorkflowResult `json:"runWorkflowDefinition"`
+	}
+	if err := client.GraphQL(runCtx, runWorkflowMutation, vars, &resp); err != nil {
+		return fmt.Errorf("running workflow: %w", err)
+	}
+	if !resp.Result.Ok {
+		return fmt.Errorf("run failed: %s", firstValidationError(resp.Result.Errors))
+	}
+
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "WorkflowRun ID:    %s\n", resp.Result.WorkflowRunID)
+	fmt.Fprintf(out, "Temporal workflow: %s\n", resp.Result.TemporalWorkflowID)
+
+	if !agentRunWait {
+		return nil
+	}
+
+	workflowID := resp.Result.TemporalWorkflowID
+	if workflowID == "" {
+		return fmt.Errorf("cannot --wait: server returned no temporalWorkflowId")
+	}
+
+	fmt.Fprintln(out, "Waiting for terminal state...")
+	pollCtx, pollCancel := context.WithTimeout(ctx, 30*time.Minute)
+	defer pollCancel()
+
+	last := ""
+	for {
+		select {
+		case <-pollCtx.Done():
+			return fmt.Errorf("timed out waiting for terminal state (last status: %s)", last)
+		case <-time.After(5 * time.Second):
+		}
+
+		var pollResp struct {
+			Instance *workflowInstance `json:"astroliftWorkflowInstance"`
+		}
+		if err := client.GraphQL(pollCtx, workflowInstanceQuery,
+			map[string]interface{}{"workflowId": workflowID}, &pollResp); err != nil {
+			return fmt.Errorf("polling workflow instance: %w", err)
+		}
+		// describe can momentarily return null before the workflow is visible;
+		// keep polling rather than treating it as terminal.
+		if pollResp.Instance == nil {
+			continue
+		}
+		status := pollResp.Instance.Status
+		if status != last {
+			fmt.Fprintf(out, "  → %s\n", status)
+			last = status
+		}
+		if terminalWorkflowStatuses[strings.ToLower(status)] {
+			fmt.Fprintf(out, "Final status: %s\n", status)
+			if !strings.EqualFold(status, "completed") {
+				return fmt.Errorf("workflow ended in %q", status)
 			}
-			body["input"] = payload
-		}
-		if agentRunDispatcher != "" {
-			body["dispatcher"] = agentRunDispatcher
-		}
-
-		ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
-		defer cancel()
-
-		var resp workflowRunResp
-		path := fmt.Sprintf("/api/cli/v1/workflows/%s/run/", workflowSlug)
-		if err := client.Post(ctx, path, body, &resp); err != nil {
-			return fmt.Errorf("dispatching workflow: %w", err)
-		}
-
-		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "WorkflowInstance: %s\n", resp.InstanceID)
-		fmt.Fprintf(out, "Task ID:          %s\n", resp.TaskID)
-		fmt.Fprintf(out, "Status:           %s\n", resp.Status)
-
-		if !agentRunWait {
 			return nil
 		}
-
-		// --wait: poll for terminal state and surface status transitions
-		fmt.Fprintln(out, "Waiting for terminal state...")
-		pollCtx, pollCancel := context.WithTimeout(cmd.Context(), 30*time.Minute)
-		defer pollCancel()
-
-		last := resp.Status
-		for {
-			select {
-			case <-pollCtx.Done():
-				return fmt.Errorf("timed out waiting for terminal state (last status: %s)", last)
-			case <-time.After(5 * time.Second):
-			}
-
-			var detail taskDetail
-			taskPath := fmt.Sprintf("/api/cli/v1/tasks/%s/", resp.TaskID)
-			if err := client.Get(pollCtx, taskPath, &detail); err != nil {
-				return fmt.Errorf("polling task: %w", err)
-			}
-			if detail.Status != last {
-				fmt.Fprintf(out, "  → %s\n", detail.Status)
-				last = detail.Status
-			}
-			switch detail.Status {
-			case "completed", "succeeded", "failed", "cancelled", "timed_out":
-				fmt.Fprintf(out, "Final status: %s\n", detail.Status)
-				if detail.Status == "failed" {
-					return fmt.Errorf("task ended in %q", detail.Status)
-				}
-				return nil
-			}
-		}
-	},
+	}
 }
 
 // ---- astro agent ls --------------------------------------------------------
 
 var agentListCmd = &cobra.Command{
 	Use:   "ls",
-	Short: "List Tasks / WorkflowInstances",
-	Long: `Lists Tasks for the current org/team context.
-
-Defaults to showing running and queued tasks. Use --status to filter.
-Output is a table unless --json is given.`,
+	Short: "List the org's AgentTasks",
+	Long: `Lists AgentTasks for the working org (newest first) via the
+agentTasks GraphQL query. Use --status to filter to a single status
+(e.g. running, queued, completed, failed). Output is a table unless
+--json is given.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		debug, _ := cmd.Flags().GetBool("debug")
-		client, _, _, err := loadActiveClient(cmd.Context(), debug)
+		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
 			return err
 		}
-
-		params := []string{}
-		if agentListStatus != "" {
-			params = append(params, "status="+agentListStatus)
-		} else {
-			// Default: running + queued
-			params = append(params, "status=running,queued")
-		}
-		if agentListWorkflow != "" {
-			params = append(params, "workflow="+agentListWorkflow)
-		}
-		if agentListDispatcher != "" {
-			params = append(params, "dispatcher="+agentListDispatcher)
-		}
-		params = append(params, fmt.Sprintf("limit=%d", agentListLimit))
-
-		path := "/api/cli/v1/tasks/?" + strings.Join(params, "&")
-
-		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-		defer cancel()
-
-		var resp tasksListResp
-		if err := client.Get(ctx, path, &resp); err != nil {
-			return fmt.Errorf("listing tasks: %w", err)
-		}
-
-		out := cmd.OutOrStdout()
-		if agentListJSON {
-			enc := json.NewEncoder(out)
-			enc.SetIndent("", "  ")
-			return enc.Encode(resp.Results)
-		}
-
-		if len(resp.Results) == 0 {
-			fmt.Fprintln(out, "No tasks found.")
-			return nil
-		}
-
-		fmt.Fprintf(out, "%-12s  %-20s  %-14s  %-14s  %-14s  %-20s  %s\n",
-			"TASK ID", "WORKFLOW", "STAGE", "STATUS", "VARIANT", "DISPATCHER", "DURATION",
-		)
-		fmt.Fprintln(out, strings.Repeat("-", 108))
-		for _, t := range resp.Results {
-			id := t.ShortID
-			if id == "" {
-				id = t.ID
-				if len(id) > 12 {
-					id = id[:12]
-				}
-			}
-			fmt.Fprintf(out, "%-12s  %-20s  %-14s  %-14s  %-14s  %-20s  %s\n",
-				id, agentTruncate(t.Workflow, 20), agentTruncate(t.Stage, 14),
-				t.Status, agentTruncate(t.AgentVariant, 14),
-				agentTruncate(t.Dispatcher, 20), t.Duration,
-			)
-		}
-		fmt.Fprintf(out, "\n%d task(s) shown.\n", len(resp.Results))
-		return nil
+		return runAgentList(cmd, cmd.Context(), client, cfg)
 	},
+}
+
+func runAgentList(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg *config.Config) error {
+	org, err := resolveOrg(cmd, ctx, client, cfg)
+	if err != nil {
+		return err
+	}
+
+	listCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	vars := map[string]interface{}{"orgId": org.ID}
+	if agentListStatus != "" {
+		vars["status"] = agentListStatus
+	}
+
+	var resp struct {
+		AgentTasks []agentTask `json:"agentTasks"`
+	}
+	if err := client.GraphQL(listCtx, agentTasksQuery, vars, &resp); err != nil {
+		return fmt.Errorf("listing tasks: %w", err)
+	}
+
+	tasks := resp.AgentTasks
+	// The resolver caps at 200 and has no limit arg; apply --limit client-side.
+	if agentListLimit > 0 && len(tasks) > agentListLimit {
+		tasks = tasks[:agentListLimit]
+	}
+
+	out := cmd.OutOrStdout()
+	if agentListJSON {
+		return renderJSON(cmd, tasks)
+	}
+
+	if len(tasks) == 0 {
+		fmt.Fprintln(out, "No tasks found.")
+		return nil
+	}
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "TASK ID\tSTATUS\tVNC\tCREATED\tSTARTED\tFINISHED")
+	for _, t := range tasks {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			t.ID, t.Status, yesNo(t.VNCEnabled),
+			shortTime(&t.CreatedAt), shortTime(t.StartedAt), shortTime(t.FinishedAt),
+		)
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "\n%d task(s) shown.\n", len(tasks))
+	return nil
 }
 
 // ---- astro agent logs ------------------------------------------------------
 
 var agentLogsCmd = &cobra.Command{
 	Use:   "logs <task-id>",
-	Short: "Stream or fetch logs for a Task",
-	Long: `Streams live logs for a running Task (-f / --follow) using the SSE
-endpoint, or fetches the last N lines for a completed task (--tail <n>).
+	Short: "Stream or fetch logs for a Task (unverified surface)",
+	Long: `Streams live logs for a running Task (-f / --follow), or fetches the
+last N lines for a completed task (--tail <n>).
 
-The stream exits automatically when the Task reaches a terminal state.`,
+NOTE: the platform exposes no GraphQL or operator-facing REST log surface.
+The only log route is the dispatcher-facing ingest endpoint
+(/api/dispatch/v1/tasks/<id>/logs/, a worker push). The paths below are
+UNVERIFIED and likely 404 until an operator-facing log read API exists.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		debug, _ := cmd.Flags().GetBool("debug")
@@ -293,8 +394,12 @@ The stream exits automatically when the Task reaches a terminal state.`,
 
 		taskID := args[0]
 
+		// UNVERIFIED: no operator-facing log read surface exists on the
+		// control plane today (the only /api/dispatch/v1/.../logs/ route is a
+		// worker-facing ingest/push endpoint). Left wired to the historical
+		// paths so the command compiles and is ready to point at a real log
+		// API when one ships; expect a 404 until then.
 		if agentLogsFollow {
-			// SSE stream — no timeout; exits on terminal state or ctrl-c
 			path := fmt.Sprintf("/api/dispatch/v1/tasks/%s/logs/stream", taskID)
 			stream, err := client.Stream(cmd.Context(), path)
 			if err != nil {
@@ -306,20 +411,17 @@ The stream exits automatically when the Task reaches a terminal state.`,
 			scanner := bufio.NewScanner(stream)
 			for scanner.Scan() {
 				line := scanner.Text()
-				// SSE lines arrive as "data: <payload>" or "event: <type>"
 				switch {
 				case strings.HasPrefix(line, "data: "):
 					fmt.Fprintln(out, strings.TrimPrefix(line, "data: "))
 				case strings.HasPrefix(line, "event: done"),
 					strings.HasPrefix(line, "event: terminal"):
-					// Server signals task has reached terminal state
 					return nil
 				}
 			}
 			return scanner.Err()
 		}
 
-		// Non-follow: fetch tail lines
 		path := fmt.Sprintf("/api/cli/v1/tasks/%s/logs/?tail=%d", taskID, agentLogsTail)
 		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 		defer cancel()
@@ -343,146 +445,191 @@ The stream exits automatically when the Task reaches a terminal state.`,
 
 var agentCancelCmd = &cobra.Command{
 	Use:   "cancel <task-id>",
-	Short: "Cancel a running or queued Task",
-	Long: `Cancels a Task in DRAFT, QUEUED, or PROVISIONING state.
-For RUNNING tasks, sends a stop signal to the Dispatch Service.
+	Short: "Cancel an AgentTask",
+	Long: `Cancels an AgentTask via the cancelTask GraphQL mutation. Only
+DRAFT / QUEUED / PROVISIONING tasks cancel directly; a RUNNING task needs a
+stop signal to the Dispatcher and is rejected as a precondition failure.
 
 Prompts for confirmation unless --yes is given.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		debug, _ := cmd.Flags().GetBool("debug")
-		client, _, _, err := loadActiveClient(cmd.Context(), debug)
+		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
 			return err
 		}
+		return runAgentCancel(cmd, cmd.Context(), client, cfg, args[0])
+	},
+}
 
-		taskID := args[0]
-
-		if !agentCancelYes {
-			noPrompt, _ := cmd.Root().PersistentFlags().GetBool("no-prompt")
-			if !noPrompt {
-				fmt.Fprintf(cmd.OutOrStdout(), "Cancel task %s? [y/N] ", taskID)
-				var answer string
-				fmt.Fscan(cmd.InOrStdin(), &answer)
-				if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
-				}
+func runAgentCancel(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, taskID string) error {
+	if !agentCancelYes {
+		noPrompt, _ := cmd.Root().PersistentFlags().GetBool("no-prompt")
+		if !noPrompt {
+			fmt.Fprintf(cmd.OutOrStdout(), "Cancel task %s? [y/N] ", taskID)
+			var answer string
+			fmt.Fscan(cmd.InOrStdin(), &answer)
+			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
+				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+				return nil
 			}
 		}
+	}
 
-		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-		defer cancel()
+	cancelCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
-		path := fmt.Sprintf("/api/cli/v1/tasks/%s/cancel/", taskID)
-		if err := client.Post(ctx, path, nil, nil); err != nil {
-			return fmt.Errorf("cancelling task: %w", err)
-		}
+	var resp struct {
+		Result noneMutationResult `json:"cancelTask"`
+	}
+	if err := client.GraphQL(cancelCtx, cancelTaskMutation,
+		map[string]interface{}{"id": taskID}, &resp); err != nil {
+		return fmt.Errorf("cancelling task: %w", err)
+	}
+	if !resp.Result.Ok {
+		return fmt.Errorf("cancel failed: %s", firstMutationError(resp.Result.Errors))
+	}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "Task %s cancelled.\n", taskID)
-		return nil
-	},
+	fmt.Fprintf(cmd.OutOrStdout(), "Task %s cancelled.\n", taskID)
+	return nil
 }
 
 // ---- astro agent inspect ---------------------------------------------------
 
 var agentInspectCmd = &cobra.Command{
 	Use:   "inspect <task-id>",
-	Short: "Print the full Task record",
-	Long: `Prints the full Task record: status, Brief key, AgentDefinition,
-DispatcherInstance, stage execution chain, metering summary (if terminal),
-and noVNC URL (if RUNNING + VNC variant).`,
+	Short: "Print the full AgentTask record",
+	Long: `Fetches one AgentTask by GUID via the agentTask GraphQL query and
+prints its record: status, timestamps, VNC relay path, and terminal result
+payload (if any). Use --json for the raw record.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		debug, _ := cmd.Flags().GetBool("debug")
-		client, _, _, err := loadActiveClient(cmd.Context(), debug)
+		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
 			return err
 		}
-
-		taskID := args[0]
-		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-		defer cancel()
-
-		path := fmt.Sprintf("/api/cli/v1/tasks/%s/", taskID)
-		var detail taskDetail
-		if err := client.Get(ctx, path, &detail); err != nil {
-			return fmt.Errorf("fetching task: %w", err)
-		}
-
-		out := cmd.OutOrStdout()
-
-		if agentInspectJSON {
-			enc := json.NewEncoder(out)
-			enc.SetIndent("", "  ")
-			return enc.Encode(detail)
-		}
-
-		fmt.Fprintf(out, "Task ID:       %s\n", detail.ID)
-		fmt.Fprintf(out, "Workflow:      %s\n", detail.Workflow)
-		fmt.Fprintf(out, "Status:        %s\n", detail.Status)
-		fmt.Fprintf(out, "Stage:         %s\n", detail.Stage)
-		fmt.Fprintf(out, "Agent variant: %s\n", detail.AgentVariant)
-		fmt.Fprintf(out, "Dispatcher:    %s\n", detail.Dispatcher)
-		if detail.Brief != "" {
-			fmt.Fprintf(out, "Brief key:     %s\n", detail.Brief)
-		}
-		if detail.StartedAt != "" {
-			fmt.Fprintf(out, "Started at:    %s\n", detail.StartedAt)
-		}
-		if detail.EndedAt != "" {
-			fmt.Fprintf(out, "Ended at:      %s\n", detail.EndedAt)
-		}
-		if detail.NoVNCURL != "" {
-			fmt.Fprintf(out, "noVNC URL:     %s\n", detail.NoVNCURL)
-		}
-
-		if len(detail.Stages) > 0 {
-			fmt.Fprintln(out, "\nStage chain:")
-			for i, s := range detail.Stages {
-				name, _ := s["name"].(string)
-				status, _ := s["status"].(string)
-				fmt.Fprintf(out, "  %d. %-30s %s\n", i+1, name, status)
-			}
-		}
-
-		if len(detail.Metering) > 0 {
-			fmt.Fprintln(out, "\nMetering:")
-			for k, v := range detail.Metering {
-				fmt.Fprintf(out, "  %-20s %v\n", k+":", v)
-			}
-		}
-		return nil
+		return runAgentInspect(cmd, cmd.Context(), client, cfg, args[0])
 	},
+}
+
+func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, taskID string) error {
+	inspectCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var resp struct {
+		AgentTask *agentTask `json:"agentTask"`
+	}
+	if err := client.GraphQL(inspectCtx, agentTaskQuery,
+		map[string]interface{}{"id": taskID}, &resp); err != nil {
+		return fmt.Errorf("fetching task: %w", err)
+	}
+	if resp.AgentTask == nil {
+		return fmt.Errorf("task %s not found", taskID)
+	}
+	t := resp.AgentTask
+
+	out := cmd.OutOrStdout()
+	if agentInspectJSON {
+		return renderJSON(cmd, t)
+	}
+
+	fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
+	fmt.Fprintf(out, "Status:        %s\n", t.Status)
+	fmt.Fprintf(out, "VNC enabled:   %s\n", yesNo(t.VNCEnabled))
+	if t.CreatedAt != "" {
+		fmt.Fprintf(out, "Created at:    %s\n", t.CreatedAt)
+	}
+	if t.StartedAt != nil && *t.StartedAt != "" {
+		fmt.Fprintf(out, "Started at:    %s\n", *t.StartedAt)
+	}
+	if t.FinishedAt != nil && *t.FinishedAt != "" {
+		fmt.Fprintf(out, "Finished at:   %s\n", *t.FinishedAt)
+	}
+	if t.CallbackURL != "" {
+		fmt.Fprintf(out, "Callback URL:  %s\n", t.CallbackURL)
+	}
+	if t.VNCURL != "" {
+		fmt.Fprintf(out, "VNC URL:       %s\n", t.VNCURL)
+	}
+	if t.SnapshotURL != nil && *t.SnapshotURL != "" {
+		fmt.Fprintf(out, "Snapshot URL:  %s\n", *t.SnapshotURL)
+	}
+	if t.Result != nil {
+		enc, err := json.MarshalIndent(t.Result, "", "  ")
+		if err == nil {
+			fmt.Fprintf(out, "\nResult:\n%s\n", enc)
+		}
+	}
+	return nil
 }
 
 // ---- helpers ---------------------------------------------------------------
 
-// agentTruncate caps s at n runes, appending "…" if truncated.
-func agentTruncate(s string, n int) string {
-	runes := []rune(s)
-	if len(runes) <= n {
-		return s
+// firstValidationError renders the first {field, messages} error for display.
+func firstValidationError(errs []struct {
+	Field    string   `json:"field"`
+	Messages []string `json:"messages"`
+}) string {
+	if len(errs) == 0 {
+		return "unknown error"
 	}
-	if n < 1 {
-		return ""
+	e := errs[0]
+	msg := strings.Join(e.Messages, "; ")
+	if e.Field != "" {
+		return fmt.Sprintf("%s: %s", e.Field, msg)
 	}
-	return string(runes[:n-1]) + "…"
+	return msg
+}
+
+// firstMutationError renders the first MutationError {code, message} for display.
+func firstMutationError(errs []struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Field   string `json:"field"`
+}) string {
+	if len(errs) == 0 {
+		return "unknown error"
+	}
+	return errs[0].Message
+}
+
+// yesNo renders a bool as a compact yes/no.
+func yesNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
+}
+
+// shortTime trims an ISO-8601 timestamp to its minute, dropping the timezone
+// suffix, for a compact table column. Empty/nil → "-".
+func shortTime(s *string) string {
+	if s == nil || *s == "" {
+		return "-"
+	}
+	v := *s
+	if i := strings.IndexByte(v, '.'); i >= 0 {
+		return v[:i]
+	}
+	// Trim an explicit offset / Z if there are no sub-seconds.
+	if i := strings.IndexByte(v, '+'); i >= 0 {
+		return v[:i]
+	}
+	if strings.HasSuffix(v, "Z") {
+		return strings.TrimSuffix(v, "Z")
+	}
+	return v
 }
 
 // ---- init ------------------------------------------------------------------
 
 func init() {
 	// run
-	agentRunCmd.Flags().StringVar(&agentRunInput, "input", "", "Workflow input as a JSON string or @file.json")
-	agentRunCmd.Flags().StringVar(&agentRunDispatcher, "dispatcher", "", "Target a specific DispatcherInstance slug (default: auto-route)")
-	agentRunCmd.Flags().BoolVar(&agentRunWait, "wait", false, "Block until WorkflowInstance reaches terminal state")
+	agentRunCmd.Flags().StringVar(&agentRunInput, "input", "", "Workflow trigger payload as a JSON string or @file.json")
+	agentRunCmd.Flags().BoolVar(&agentRunWait, "wait", false, "Block until the workflow reaches a terminal state")
 
 	// ls
-	agentListCmd.Flags().StringVar(&agentListStatus, "status", "", "Filter by status: running|queued|completed|failed (default: running+queued)")
-	agentListCmd.Flags().StringVar(&agentListWorkflow, "workflow", "", "Filter by workflow slug")
-	agentListCmd.Flags().StringVar(&agentListDispatcher, "dispatcher", "", "Filter by dispatcher slug")
-	agentListCmd.Flags().IntVar(&agentListLimit, "limit", 20, "Maximum number of tasks to return")
+	agentListCmd.Flags().StringVar(&agentListStatus, "status", "", "Filter by a single status (e.g. running|queued|completed|failed)")
+	agentListCmd.Flags().IntVar(&agentListLimit, "limit", 20, "Maximum number of tasks to show")
 	agentListCmd.Flags().BoolVar(&agentListJSON, "json", false, "Output as JSON")
 
 	// logs
