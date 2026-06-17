@@ -204,17 +204,18 @@ func runEnvSpecLs(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	type specRow struct {
-		Slug               string `json:"slug"`
-		AgentType          string `json:"agentType"`
-		ImageTag           string `json:"imageTag"`
-		ConfigRepo         string `json:"configRepo"`
-		ConfigManifestPath string `json:"configManifestPath"`
+		Slug       string `json:"slug"`
+		AgentType  string `json:"agentType"`
+		ImageTag   string `json:"imageTag"`
+		ConfigRepo string `json:"configRepo"`
 	}
 	var resp struct {
 		AgentEnvironmentSpecs []specRow `json:"agentEnvironmentSpecs"`
 	}
+	// configManifestPath is intentionally not queried: control planes that
+	// predate the field reject the whole query. Omit until the backend ships it.
 	if err := client.GraphQL(ctx,
-		`query($orgId:ID!){ agentEnvironmentSpecs(orgId:$orgId){ slug agentType imageTag configRepo configManifestPath } }`,
+		`query($orgId:ID!){ agentEnvironmentSpecs(orgId:$orgId){ slug agentType imageTag configRepo } }`,
 		map[string]interface{}{"orgId": org.ID}, &resp); err != nil {
 		return err
 	}
@@ -228,11 +229,7 @@ func runEnvSpecLs(cmd *cobra.Command, args []string) error {
 		if img == "" {
 			img = "-"
 		}
-		cfgRef := s.ConfigRepo
-		if s.ConfigManifestPath != "" {
-			cfgRef += ":" + s.ConfigManifestPath
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Slug, s.AgentType, img, cfgRef)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Slug, s.AgentType, img, s.ConfigRepo)
 	}
 	return w.Flush()
 }
