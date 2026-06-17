@@ -37,9 +37,9 @@ func boolFlag(cmd *cobra.Command, name string) bool {
 
 func listOrgs(ctx context.Context, client *api.Client) ([]orgRef, error) {
 	var resp struct {
-		Organizations []orgRef `json:"organizations"`
+		Organizations []orgRef `json:"astroliftOrganizations"`
 	}
-	if err := client.GraphQL(ctx, `query { organizations { id name slug } }`, nil, &resp); err != nil {
+	if err := client.GraphQL(ctx, `query { astroliftOrganizations { id name slug } }`, nil, &resp); err != nil {
 		return nil, err
 	}
 	return resp.Organizations, nil
