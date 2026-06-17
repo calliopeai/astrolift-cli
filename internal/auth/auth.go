@@ -24,9 +24,9 @@ import (
 
 // Credentials holds the tokens returned by a successful login.
 type Credentials struct {
-	AccessToken  string    `yaml:"access_token"`
-	RefreshToken string    `yaml:"refresh_token"`
-	ExpiresAt    time.Time `yaml:"expires_at"`
+	AccessToken  string    `json:"access_token" yaml:"access_token"`
+	RefreshToken string    `json:"refresh_token" yaml:"refresh_token"`
+	ExpiresAt    time.Time `json:"expires_at" yaml:"expires_at"`
 }
 
 // IsExpired returns true if the access token has expired or will
