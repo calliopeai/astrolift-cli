@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/calliopeai/astrolift-cli/internal/config"
@@ -216,6 +218,107 @@ func TestAgentListJSONOutput(t *testing.T) {
 	}
 	if len(rows) != 1 || rows[0].ID != "task-aaa" || rows[0].Status != "completed" {
 		t.Errorf("decoded rows wrong: %+v", rows)
+	}
+}
+
+func TestAgentLogsFetchesAndPrintsLines(t *testing.T) {
+	agentLogsFollow = false
+	agentLogsTail = 50
+	defer func() { agentLogsTail = 100 }()
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"agentTaskLogs": []interface{}{"line one", "line two", "line three"},
+	}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out := agentTestCmd()
+	if err := runAgentLogs(cmd, context.Background(), client, "task-aaa"); err != nil {
+		t.Fatalf("runAgentLogs: %v", err)
+	}
+
+	// Sent the agentTaskLogs query with the task id + tail.
+	if !strings.Contains(captured.Query, "agentTaskLogs(id: $id, tail: $tail)") {
+		t.Errorf("query did not call agentTaskLogs with expected args:\n%s", captured.Query)
+	}
+	if captured.Variables["id"] != "task-aaa" {
+		t.Errorf("id var = %v, want task-aaa", captured.Variables["id"])
+	}
+	if captured.Variables["tail"].(float64) != 50 {
+		t.Errorf("tail var = %v, want 50", captured.Variables["tail"])
+	}
+	// Printed each line verbatim, one per row.
+	if out.String() != "line one\nline two\nline three\n" {
+		t.Errorf("log output wrong:\n%q", out.String())
+	}
+}
+
+func TestAgentLogsEmptyIsNotAnError(t *testing.T) {
+	agentLogsFollow = false
+	agentLogsTail = 100
+
+	srv := gqlServer(t, map[string]interface{}{
+		"agentTaskLogs": []interface{}{},
+	}, nil)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out := agentTestCmd()
+	if err := runAgentLogs(cmd, context.Background(), client, "task-empty"); err != nil {
+		t.Fatalf("empty logs should not error: %v", err)
+	}
+	if out.String() != "" {
+		t.Errorf("expected no output for empty logs, got:\n%q", out.String())
+	}
+}
+
+func TestAgentLogsFollowPollsAndPrintsOnlyNewLines(t *testing.T) {
+	agentLogsFollow = true
+	agentLogsTail = 100
+	defer func() { agentLogsFollow = false }()
+
+	// The server's tail snapshot grows between polls; --follow must print
+	// each line exactly once (the newly-appended suffix), not re-print the
+	// whole snapshot every cycle.
+	var mu sync.Mutex
+	snapshots := [][]interface{}{
+		{"a", "b"},
+		{"a", "b", "c"},
+		{"a", "b", "c", "d"},
+	}
+	idx := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		snap := snapshots[idx]
+		if idx < len(snapshots)-1 {
+			idx++
+		}
+		mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{"agentTaskLogs": snap},
+		})
+	}))
+	defer srv.Close()
+
+	// Drive the poll loop fast so the test doesn't wait whole seconds.
+	prevInterval := agentLogsPollIntervalForTest
+	agentLogsPollIntervalForTest = 10 * time.Millisecond
+	defer func() { agentLogsPollIntervalForTest = prevInterval }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out := agentTestCmd()
+	if err := runAgentLogs(cmd, ctx, client, "task-follow"); err != nil {
+		t.Fatalf("runAgentLogs --follow: %v", err)
+	}
+
+	// Each distinct line printed exactly once, in order.
+	got := out.String()
+	if got != "a\nb\nc\nd\n" {
+		t.Errorf("follow de-dup wrong, got:\n%q", got)
 	}
 }
 
