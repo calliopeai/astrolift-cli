@@ -17,20 +17,20 @@
 //   - ls      → agentTasks(orgId, status) → [AstroliftAgentTask]
 //   - inspect → agentTask(id) → AstroliftAgentTask
 //   - cancel  → cancelTask(id) → { ok, errors{code, message} }
+//   - logs    → agentTaskLogs(id, tail) → [String!]
 //
 // --wait polls astroliftWorkflowInstance(workflowId) for the returned
 // temporalWorkflowId until its status is terminal.
 //
-// `logs` has no GraphQL or operator-facing REST surface: the only log
-// route on the platform is the dispatcher-facing ingest endpoint
-// (/api/dispatch/v1/tasks/<id>/logs/, a worker push). It is left wired to
-// the old paths and is UNVERIFIED — see the command's comment.
+// `logs` reads the task's pod logs via the agentTaskLogs query (tenant-
+// scoped server-side). There is no SSE log stream on the control plane,
+// so --follow polls the query on an interval and prints newly-appended
+// lines rather than holding a long-lived connection.
 //
 // Issue: calliopeai/astrolift#61
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -134,6 +134,15 @@ const cancelTaskMutation = `mutation($id: ID!) {
     ok
     errors { code message field }
   }
+}`
+
+// agentTaskLogsQuery fetches the last N stdout/stderr lines for a task's
+// pod. Tenant-scoped server-side (the active session's org), so it takes
+// only the task id + a tail count. Returns a flat list of message lines;
+// an empty list means "no logs yet" (or the task has no readable pod),
+// never an error.
+const agentTaskLogsQuery = `query($id: ID!, $tail: Int!) {
+  agentTaskLogs(id: $id, tail: $tail)
 }`
 
 // ---- response shapes (GraphQL camelCase) -----------------------------------
@@ -376,69 +385,89 @@ func runAgentList(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 
 var agentLogsCmd = &cobra.Command{
 	Use:   "logs <task-id>",
-	Short: "Stream or fetch logs for a Task (unverified surface)",
-	Long: `Streams live logs for a running Task (-f / --follow), or fetches the
-last N lines for a completed task (--tail <n>).
+	Short: "Fetch (or poll) the logs for an agent Task",
+	Long: `Fetches the last N stdout/stderr lines for a Task's pod via the
+agentTaskLogs GraphQL query (--tail <n>, default 100).
 
-NOTE: the platform exposes no GraphQL or operator-facing REST log surface.
-The only log route is the dispatcher-facing ingest endpoint
-(/api/dispatch/v1/tasks/<id>/logs/, a worker push). The paths below are
-UNVERIFIED and likely 404 until an operator-facing log read API exists.`,
+The control plane has no SSE log stream, so --follow (-f) instead polls
+the query on a fixed interval and prints only newly-appended lines until
+interrupted (Ctrl-C). An empty result means the task has produced no logs
+yet (or has no readable pod); it is not an error.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		debug, _ := cmd.Flags().GetBool("debug")
-		client, _, _, err := loadActiveClient(cmd.Context(), debug)
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
 			return err
 		}
+		return runAgentLogs(cmd, cmd.Context(), client, args[0])
+	},
+}
 
-		taskID := args[0]
+// agentLogsPollIntervalForTest is the cadence --follow re-queries
+// agentTaskLogs. The control plane exposes no push stream; this is a
+// deliberate poll. It is a var (not a const) so tests can shorten it.
+var agentLogsPollIntervalForTest = 3 * time.Second
 
-		// UNVERIFIED: no operator-facing log read surface exists on the
-		// control plane today (the only /api/dispatch/v1/.../logs/ route is a
-		// worker-facing ingest/push endpoint). Left wired to the historical
-		// paths so the command compiles and is ready to point at a real log
-		// API when one ships; expect a 404 until then.
-		if agentLogsFollow {
-			path := fmt.Sprintf("/api/dispatch/v1/tasks/%s/logs/stream", taskID)
-			stream, err := client.Stream(cmd.Context(), path)
-			if err != nil {
-				return fmt.Errorf("opening log stream: %w", err)
-			}
-			defer stream.Close()
+func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, taskID string) error {
+	out := cmd.OutOrStdout()
 
-			out := cmd.OutOrStdout()
-			scanner := bufio.NewScanner(stream)
-			for scanner.Scan() {
-				line := scanner.Text()
-				switch {
-				case strings.HasPrefix(line, "data: "):
-					fmt.Fprintln(out, strings.TrimPrefix(line, "data: "))
-				case strings.HasPrefix(line, "event: done"),
-					strings.HasPrefix(line, "event: terminal"):
-					return nil
-				}
-			}
-			return scanner.Err()
-		}
-
-		path := fmt.Sprintf("/api/cli/v1/tasks/%s/logs/?tail=%d", taskID, agentLogsTail)
-		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-		defer cancel()
-
+	fetch := func(fetchCtx context.Context) ([]string, error) {
 		var resp struct {
-			Lines []string `json:"lines"`
+			Lines []string `json:"agentTaskLogs"`
 		}
-		if err := client.Get(ctx, path, &resp); err != nil {
+		if err := client.GraphQL(fetchCtx, agentTaskLogsQuery,
+			map[string]interface{}{"id": taskID, "tail": agentLogsTail}, &resp); err != nil {
+			return nil, err
+		}
+		return resp.Lines, nil
+	}
+
+	if !agentLogsFollow {
+		fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		lines, err := fetch(fetchCtx)
+		if err != nil {
 			return fmt.Errorf("fetching logs: %w", err)
 		}
-
-		out := cmd.OutOrStdout()
-		for _, line := range resp.Lines {
+		for _, line := range lines {
 			fmt.Fprintln(out, line)
 		}
 		return nil
-	},
+	}
+
+	// --follow: poll the query and print only lines we haven't printed yet.
+	// agentTaskLogs returns a tail snapshot (most-recent <=tail lines), so
+	// across polls we track how many lines we've already emitted and print
+	// only the newly-appended suffix. A snapshot shorter than what we've
+	// seen (the ring buffer rolled, or the pod restarted) resets the
+	// watermark so we don't drop the fresh tail.
+	printed := 0
+	for {
+		fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		lines, err := fetch(fetchCtx)
+		cancel()
+		if err != nil {
+			// A transient error mid-follow shouldn't kill the session; the
+			// context being done is the real exit signal, handled below.
+			if ctx.Err() != nil {
+				return nil
+			}
+			return fmt.Errorf("polling logs: %w", err)
+		}
+		if len(lines) < printed {
+			printed = 0
+		}
+		for _, line := range lines[printed:] {
+			fmt.Fprintln(out, line)
+		}
+		printed = len(lines)
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(agentLogsPollIntervalForTest):
+		}
+	}
 }
 
 // ---- astro agent cancel ----------------------------------------------------
