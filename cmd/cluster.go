@@ -110,6 +110,10 @@ func init() {
 
 	clusterCmd.AddCommand(clusterBootstrapCmd)
 	rootCmd.AddCommand(clusterCmd)
+
+	clusterDeployAgentCmd.Flags().StringVar(&deployAgentClusterSlug, "slug", "", "TenantCluster slug (required)")
+	_ = clusterDeployAgentCmd.MarkFlagRequired("slug")
+	operatorClusterCmd.AddCommand(clusterDeployAgentCmd)
 }
 
 // ---- GraphQL shapes ----------------------------------------------------
@@ -287,6 +291,66 @@ func runClusterBootstrap(cmd *cobra.Command, _ []string) error {
 	if installErr != nil {
 		return installErr
 	}
+	return nil
+}
+
+// ---- astro operator cluster deploy-agent ----------------------------------
+
+var deployAgentClusterSlug string
+
+const deployClusterAgentMutation = `
+mutation DeployClusterAgent($input: DeployClusterAgentInput!) {
+  deployClusterAgent(input: $input) {
+    ok
+    errors { code message field }
+  }
+}`
+
+var clusterDeployAgentCmd = &cobra.Command{
+	Use:   "deploy-agent",
+	Short: "Deploy (or re-apply) the in-cluster keep-alive agent",
+	Long: `Applies the keep-alive agent's Namespace + Deployment to a managed
+cluster via the deployClusterAgent mutation. Server-side apply, idempotent —
+re-running converges the Deployment to the current rendered spec, so this also
+rolls the agent to a new image. Issue an agent key first
+('astro operator cluster ...') so the agent Secret exists.
+
+Requires the cluster.manage permission (enforced server-side).`,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		if err != nil {
+			return err
+		}
+		return runClusterDeployAgent(cmd, cmd.Context(), client, deployAgentClusterSlug)
+	},
+}
+
+func runClusterDeployAgent(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
+	if strings.TrimSpace(slug) == "" {
+		return errors.New("--slug is required")
+	}
+
+	resolveCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cluster, err := fetchClusterBySlug(resolveCtx, client, slug)
+	if err != nil {
+		return err
+	}
+
+	deployCtx, cancelDeploy := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancelDeploy()
+	var resp struct {
+		Result noneMutationResult `json:"deployClusterAgent"`
+	}
+	vars := map[string]interface{}{"input": map[string]interface{}{"clusterId": cluster.ID}}
+	if err := client.GraphQL(deployCtx, deployClusterAgentMutation, vars, &resp); err != nil {
+		return fmt.Errorf("deploying agent: %w", err)
+	}
+	if !resp.Result.Ok {
+		return fmt.Errorf("agent deploy failed: %s", firstMutationError(resp.Result.Errors))
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "Keep-alive agent applied to cluster %s.\n", cluster.Slug)
 	return nil
 }
 
