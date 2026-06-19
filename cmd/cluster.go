@@ -27,6 +27,11 @@ import (
 	"github.com/calliopeai/astrolift-cli/internal/bootstrap"
 	"github.com/calliopeai/astrolift-cli/internal/charts"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var clusterCmd = &cobra.Command{
@@ -114,6 +119,12 @@ func init() {
 	clusterDeployAgentCmd.Flags().StringVar(&deployAgentClusterSlug, "slug", "", "TenantCluster slug (required)")
 	_ = clusterDeployAgentCmd.MarkFlagRequired("slug")
 	operatorClusterCmd.AddCommand(clusterDeployAgentCmd)
+
+	clusterInstallAgentCmd.Flags().StringVar(&installAgentClusterSlug, "slug", "", "TenantCluster slug (required)")
+	clusterInstallAgentCmd.Flags().StringVar(&installAgentKubeconfig, "kubeconfig", "", "Override the kubeconfig path (default: from cluster auth_method or $KUBECONFIG)")
+	clusterInstallAgentCmd.Flags().IntVar(&installAgentInterval, "interval-seconds", 0, "Heartbeat interval to set on the cluster (0 = leave unchanged)")
+	_ = clusterInstallAgentCmd.MarkFlagRequired("slug")
+	operatorClusterCmd.AddCommand(clusterInstallAgentCmd)
 }
 
 // ---- GraphQL shapes ----------------------------------------------------
@@ -292,6 +303,157 @@ func runClusterBootstrap(cmd *cobra.Command, _ []string) error {
 		return installErr
 	}
 	return nil
+}
+
+// ---- astro operator cluster install-agent ---------------------------------
+
+var (
+	installAgentClusterSlug string
+	installAgentKubeconfig  string
+	installAgentInterval    int
+)
+
+const issueClusterAgentKeyMutation = `
+mutation IssueClusterAgentKey($input: IssueClusterAgentKeyInput!) {
+  issueClusterAgentKey(input: $input) {
+    ok
+    errors { code message field }
+    data { agentKey heartbeatUrl intervalSeconds rotated }
+  }
+}`
+
+var clusterInstallAgentCmd = &cobra.Command{
+	Use:   "install-agent",
+	Short: "Issue an agent key and install the in-cluster keep-alive agent Secret",
+	Long: `Provisions the keep-alive agent's credential on a managed cluster: issues
+(rotating) the cluster's agent key via the control plane, then applies the
+'astrolift-agent' Secret (heartbeat_url + agent_key) into the astrolift-system
+namespace. This is the step the control plane cannot do itself — the raw key is
+surfaced exactly once at issuance and never persisted, so the operator must land
+the Secret. Without it the keep-alive Deployment fails with
+CreateContainerConfigError ("secret astrolift-agent not found").
+
+Run 'deploy-agent' afterward (or it's idempotently re-applied) to land the
+Deployment that consumes the Secret. The raw key is never printed.
+
+Requires cluster.manage (enforced server-side) and kubectl access to the
+cluster (its auth_method or --kubeconfig).`,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		if err != nil {
+			return err
+		}
+		return runClusterInstallAgent(cmd, cmd.Context(), client, installAgentClusterSlug, installAgentKubeconfig, installAgentInterval)
+	},
+}
+
+func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, kubeconfigOverride string, interval int) error {
+	if strings.TrimSpace(slug) == "" {
+		return errors.New("--slug is required")
+	}
+
+	resolveCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cluster, err := fetchClusterBySlug(resolveCtx, client, slug)
+	if err != nil {
+		return err
+	}
+
+	// 1) Issue (rotate) the agent key — the raw key is returned once here.
+	issueCtx, cancelIssue := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelIssue()
+	input := map[string]interface{}{"clusterId": cluster.ID}
+	if interval > 0 {
+		input["intervalSeconds"] = interval
+	}
+	var resp struct {
+		Result struct {
+			noneMutationResult
+			Data *struct {
+				AgentKey        string `json:"agentKey"`
+				HeartbeatURL    string `json:"heartbeatUrl"`
+				IntervalSeconds int    `json:"intervalSeconds"`
+				Rotated         bool   `json:"rotated"`
+			} `json:"data"`
+		} `json:"issueClusterAgentKey"`
+	}
+	if err := client.GraphQL(issueCtx, issueClusterAgentKeyMutation, map[string]interface{}{"input": input}, &resp); err != nil {
+		return fmt.Errorf("issuing agent key: %w", err)
+	}
+	if !resp.Result.Ok || resp.Result.Data == nil {
+		return fmt.Errorf("issuing agent key failed: %s", firstMutationError(resp.Result.Errors))
+	}
+	key := resp.Result.Data
+
+	// 2) Resolve a kubeconfig for the cluster and build a client.
+	src, err := buildKubeconfigSource(ctx, client, cluster, kubeconfigOverride)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = src.Cleanup() }()
+	scratch, err := os.MkdirTemp("", "astro-install-agent-")
+	if err != nil {
+		return fmt.Errorf("scratch dir: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(scratch) }()
+	if err := src.Materialize(scratch); err != nil {
+		return fmt.Errorf("resolving kubeconfig: %w", err)
+	}
+	restCfg, err := clientcmd.BuildConfigFromFlags("", src.Path)
+	if err != nil {
+		return fmt.Errorf("building kube client config: %w", err)
+	}
+	clientset, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("building kube client: %w", err)
+	}
+
+	// 3) Apply the astrolift-agent Secret (create-or-update).
+	applyCtx, cancelApply := context.WithTimeout(ctx, 60*time.Second)
+	defer cancelApply()
+	if err := applyAgentSecret(applyCtx, clientset, key.HeartbeatURL, key.AgentKey); err != nil {
+		return fmt.Errorf("applying astrolift-agent Secret: %w", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(),
+		"Installed agent key + Secret on cluster %s (key %s). Run `astro operator cluster deploy-agent --slug %s` to (re)land the Deployment.\n",
+		cluster.Slug, map[bool]string{true: "rotated", false: "issued"}[key.Rotated], cluster.Slug)
+	return nil
+}
+
+// applyAgentSecret create-or-updates the astrolift-system/astrolift-agent
+// Secret the keep-alive Deployment mounts. The raw key lands only in the
+// Secret — never logged.
+func applyAgentSecret(ctx context.Context, cs *kubernetes.Clientset, heartbeatURL, agentKey string) error {
+	const (
+		ns   = "astrolift-system"
+		name = "astrolift-agent"
+	)
+	secrets := cs.CoreV1().Secrets(ns)
+	desired := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels:    map[string]string{"astrolift.io/managed-by": "astro-cli"},
+		},
+		Type: corev1.SecretTypeOpaque,
+		StringData: map[string]string{
+			"heartbeat_url": heartbeatURL,
+			"agent_key":     agentKey,
+		},
+	}
+	existing, err := secrets.Get(ctx, name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		_, err = secrets.Create(ctx, desired, metav1.CreateOptions{})
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	existing.StringData = desired.StringData
+	existing.Type = corev1.SecretTypeOpaque
+	_, err = secrets.Update(ctx, existing, metav1.UpdateOptions{})
+	return err
 }
 
 // ---- astro operator cluster deploy-agent ----------------------------------
