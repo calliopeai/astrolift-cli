@@ -40,6 +40,15 @@ func (c *Client) SetTimeout(d time.Duration) {
 	c.httpClient.Timeout = d
 }
 
+// BaseURL returns the configured HTTP API base (no trailing slash). The
+// exec command derives its ws(s):// endpoint from this.
+func (c *Client) BaseURL() string { return c.baseURL }
+
+// Token returns the bearer credential the client authenticates with, so
+// the WebSocket exec dialer can set the same Authorization header the
+// GraphQL calls use.
+func (c *Client) Token() string { return c.token }
+
 // GraphQL sends a GraphQL query to the platform API and decodes the
 // data field into the provided target. The target is the inner shape
 // (i.e. `{"app": {...}}`), not the full envelope.
