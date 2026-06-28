@@ -106,7 +106,8 @@ astro app deploy
 # 4. Watch it run
 astro app logs                  # tail logs
 astro app events                # platform events
-astro app exec web -- ps aux    # one-shot in a workload
+astro exec --app web -- bash    # interactive shell in a running pod
+astro exec --app web -- ps aux  # one-off command in a running pod
 ```
 
 ### From CI
@@ -148,7 +149,9 @@ the status note above.)
 |---|---|
 | `astro server` | Manage Astrolift installs the CLI knows about (add / list / use / remove). One install = one DNS zone + database. |
 | `astro auth` | Browser device-flow login, logout, status, refresh. |
-| `astro app` | App lifecycle (`init`, `register`, `deploy`, `rollback`, `promote`) plus sub-resources (secrets, services, domains, tokens, members, jobs, events, audit, logs, exec, previews). |
+| `astro app` | App lifecycle (`init`, `register`, `deploy`, `rollback`, `promote`) plus sub-resources (secrets, services, domains, tokens, members, jobs, events, audit, logs, previews). |
+| `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
+| `astro agent` | Agent dispatch (`run`, `ls`, `logs`, `cancel`, `inspect`). |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. |
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. |
 | `astro operator` | Operator (admin) cluster, provider, and federation management. |
