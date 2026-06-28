@@ -201,7 +201,11 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 				}
 			}
 			if rerr != nil {
-				_ = writeJSON(map[string]interface{}{"type": "close"})
+				// stdin EOF: stop pumping, but do NOT close the session —
+				// a non-interactive `astro exec -- cmd` has an immediate
+				// stdin EOF (empty pipe), and closing here would tear the
+				// session down before the command's output streams back.
+				// The command's exit frame drives termination instead.
 				return
 			}
 		}
