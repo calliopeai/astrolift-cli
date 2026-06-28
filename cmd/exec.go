@@ -201,11 +201,12 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 				}
 			}
 			if rerr != nil {
-				// stdin EOF: stop pumping, but do NOT close the session —
-				// a non-interactive `astro exec -- cmd` has an immediate
-				// stdin EOF (empty pipe), and closing here would tear the
-				// session down before the command's output streams back.
-				// The command's exit frame drives termination instead.
+				// stdin EOF: signal the remote to half-close its stdin so a
+				// piped read-to-EOF command (cat, psql < script) sees EOF and
+				// finishes — but keep the session open for its output + exit
+				// frame (don't send a full close, which would cut output on
+				// the common non-interactive `astro exec -- cmd`).
+				_ = writeJSON(map[string]interface{}{"type": "stdin_eof"})
 				return
 			}
 		}
@@ -240,8 +241,15 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 			if restore != nil {
 				restore()
 			}
+			// Propagate the remote command's exit code as our own (like
+			// ssh / kubectl exec) instead of collapsing to 1. os.Exit is
+			// the sanctioned exception here (cf. cmd/ci.go configErr) — the
+			// command ran and its output already streamed; only the status
+			// remains to forward. Deferred conn.Close won't run under
+			// os.Exit, so close explicitly first.
 			if frame.Code != 0 {
-				return fmt.Errorf("command exited with code %d", frame.Code)
+				_ = conn.Close()
+				os.Exit(frame.Code)
 			}
 			return nil
 		}
