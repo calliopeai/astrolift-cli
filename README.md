@@ -13,9 +13,12 @@ register clusters and configure providers against an Astrolift control plane.
 > subcommands wired in Cobra) but several command bodies still surface
 > `not yet wired to the API` until the matching backend resolvers
 > ship. The wired surfaces today are: `astro server *`, `astro auth *`,
-> `astro app init`, `astro app register`, `astro ci deploy` / `astro ci status`, `astro
-> version-check` / `astro self-update`, `astro version`, `astro
-> docs`, and `astro cluster bootstrap`. Subcommand surface, flag names, and exit codes may shift
+> `astro app` (`init`, `register`, `deploy`, `list`, `show`, `logs`,
+> `exec`, `rollback`), `astro exec`, `astro agent *`, `astro ci deploy` /
+> `astro ci status`, `astro version-check` / `astro self-update`, `astro
+> version`, `astro docs`, and `astro cluster bootstrap`. `astro app
+> promote` and the `astro app` sub-resource groups (secrets, services,
+> domains, …) are still scaffolded. Subcommand surface, flag names, and exit codes may shift
 > before 1.0 — pin a tagged release in CI rather than tracking `main`.
 
 ---
@@ -101,13 +104,16 @@ astro app init                  # writes astrolift.toml
 
 # 3. Register and deploy
 astro app register --project-id <project-uuid> --source-repo myorg/my-service
-astro app deploy
+astro app deploy --image-tag sha-deadbeef --wait   # --env defaults to production
 
 # 4. Watch it run
-astro app logs                  # tail logs
+astro app list                  # apps in the org
+astro app show                  # status, source, workloads, environments
+astro app logs                  # recent logs (-f to follow, [workload] to narrow)
 astro app events                # platform events
-astro exec --app web -- bash    # interactive shell in a running pod
+astro app exec -- bash          # interactive shell (wraps `astro exec`)
 astro exec --app web -- ps aux  # one-off command in a running pod
+# astro app rollback            # roll back the running deployment
 ```
 
 ### From CI
@@ -149,7 +155,7 @@ the status note above.)
 |---|---|
 | `astro server` | Manage Astrolift installs the CLI knows about (add / list / use / remove). One install = one DNS zone + database. |
 | `astro auth` | Browser device-flow login, logout, status, refresh. |
-| `astro app` | App lifecycle (`init`, `register`, `deploy`, `rollback`, `promote`) plus sub-resources (secrets, services, domains, tokens, members, jobs, events, audit, logs, previews). |
+| `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `rollback`) plus sub-resources (secrets, services, domains, tokens, members, jobs, events, audit, previews). `deploy` needs `--image-tag`; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `promote` is not yet available (no backend mutation). |
 | `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
 | `astro agent` | Agent dispatch (`run`, `ls`, `logs`, `cancel`, `inspect`). |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. |

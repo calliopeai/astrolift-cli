@@ -178,60 +178,8 @@ mutation RegisterApp($input: RegisterAppInput!) {
 	},
 }
 
-var appDeployCmd = &cobra.Command{
-	Use:   "deploy",
-	Short: "Trigger a deploy for the current app",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		_, _, _, err := loadActiveClient(cmd.Context(), false)
-		if err != nil {
-			return err
-		}
-		return notImplemented(cmd, "app deploy")
-	},
-}
-
-var appRollbackCmd = &cobra.Command{
-	Use:   "rollback [deployment-id]",
-	Short: "Roll back to a previous deployment",
-	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Backend policy: backend/astrolift_lifecycle/rollback.py
-		// (resolve_target with explicit-target-id override OR
-		// last running deployment).
-		return notImplemented(cmd, "app rollback")
-	},
-}
-
-var appPromoteCmd = &cobra.Command{
-	Use:   "promote",
-	Short: "Promote a deployment from one environment to another",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Backend policy: spec 14 §15 + portability_surfacing.py
-		// (#65) for promote-check.
-		return notImplemented(cmd, "app promote")
-	},
-}
-
-var appListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List apps in the current org / project",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		_, _, _, err := loadActiveClient(cmd.Context(), false)
-		if err != nil {
-			return err
-		}
-		return notImplemented(cmd, "app list")
-	},
-}
-
-var appShowCmd = &cobra.Command{
-	Use:   "show [app-slug]",
-	Short: "Show app details",
-	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return notImplemented(cmd, "app show")
-	},
-}
+// app deploy / rollback / promote / list / show are wired in
+// cmd/app_lifecycle.go.
 
 // ---- sub-resources ----
 //
@@ -256,27 +204,8 @@ var appMembersCmd = newSubResourceCmd("members", "Manage app team members")
 var appJobsCmd = newSubResourceCmd("jobs", "Manage scheduled jobs")
 var appEventsCmd = newSubResourceCmd("events", "Show app event log (#12)")
 var appAuditCmd = newSubResourceCmd("audit", "Show app audit log (#12)")
-var appLogsCmd = &cobra.Command{
-	Use:   "logs [workload]",
-	Short: "Stream logs from one or more workloads (#6)",
-	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Calls the streaming endpoint via api.Client.Stream;
-		// reads SSE lines, prints to stdout.
-		return notImplemented(cmd, "app logs")
-	},
-}
-var appExecCmd = &cobra.Command{
-	Use:   "exec [workload] -- <command...>",
-	Short: "Run a one-shot command in a workload's pod (#6)",
-	Args:  cobra.MinimumNArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Backend policy: command_run.py (#142) +
-		// command_run_output.py (#275). Exec uses the
-		// CommandRunWorkflow synchronously then prints output.
-		return notImplemented(cmd, "app exec")
-	},
-}
+
+// app logs and app exec are wired in cmd/app_lifecycle.go.
 
 var appPreviewsCmd = newSubResourceCmd("previews", "Manage preview environments (#95)")
 
