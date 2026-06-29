@@ -604,14 +604,42 @@ func TestAppRollbackSurfacesMutationError(t *testing.T) {
 
 // ---- app promote -----------------------------------------------------------
 
-func TestAppPromoteNotAvailable(t *testing.T) {
-	cmd, _ := appTestCmd()
-	err := appPromoteCmd.RunE(cmd, nil)
-	if err == nil || !strings.Contains(err.Error(), "not available") {
-		t.Fatalf("expected not-available error, got %v", err)
+func TestAppPromote(t *testing.T) {
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"promoteDeployment": map[string]interface{}{
+			"ok": true, "errors": []interface{}{},
+			"data": map[string]interface{}{
+				"id": "dep-prom", "status": "pending", "environmentName": "production",
+				"imageTag": "sha-staging", "registeredAppSlug": "web", "triggerKind": "promotion",
+				"createdAt": "2026-06-20T13:00:00+00:00",
+			},
+		},
+	}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out := appTestCmd()
+	if err := runAppPromote(cmd, context.Background(), client, "web", "staging", "production"); err != nil {
+		t.Fatalf("runAppPromote: %v", err)
 	}
-	if !strings.Contains(err.Error(), "astro app deploy --env") {
-		t.Errorf("promote error should point at the deploy workaround: %v", err)
+	input, _ := captured.Variables["input"].(map[string]interface{})
+	if input == nil || input["appSlug"] != "web" ||
+		input["sourceEnvironmentName"] != "staging" || input["targetEnvironmentName"] != "production" {
+		t.Errorf("promote input = %v, want web staging→production", captured.Variables["input"])
+	}
+	if !strings.Contains(out.String(), "Promotion started:  dep-prom") ||
+		!strings.Contains(out.String(), "staging → production") {
+		t.Errorf("promote output wrong:\n%s", out.String())
+	}
+}
+
+func TestAppPromoteRequiresFromTo(t *testing.T) {
+	client := api.NewClient("http://unused", "tok", false)
+	cmd, _ := appTestCmd()
+	if err := runAppPromote(cmd, context.Background(), client, "web", "", "production"); err == nil ||
+		!strings.Contains(err.Error(), "--from and --to are required") {
+		t.Fatalf("expected --from/--to required error, got %v", err)
 	}
 }
 

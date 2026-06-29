@@ -15,8 +15,8 @@
 //     (items oldest-first, [since,until] inclusive); --follow polls
 //     it (there is no SSE/subscription log stream the CLI drives)
 //   - exec     → thin wrapper over runExec (cmd/exec.go, #1040)
-//
-// `app promote` has no backend mutation yet — see appPromoteCmd.
+//   - promote  → promoteDeployment(input: PromoteDeploymentInput!) (#1041;
+//     --from/--to env names; reuses the #63 promotion policy)
 //
 // Issues: calliopeai/astrolift-cli#39, #40
 package cmd
@@ -138,6 +138,14 @@ const startDeploymentMutation = `mutation($input: StartDeploymentInput!) {
 
 const rollbackDeploymentMutation = `mutation($input: DeploymentByIdInput!) {
   rollbackDeployment(input: $input) {
+    ok
+    errors { code message field }
+    data { id status environmentName imageTag registeredAppSlug triggerKind createdAt }
+  }
+}`
+
+const promoteDeploymentMutation = `mutation($input: PromoteDeploymentInput!) {
+  promoteDeployment(input: $input) {
     ok
     errors { code message field }
     data { id status environmentName imageTag registeredAppSlug triggerKind createdAt }
@@ -744,21 +752,72 @@ func findRunningDeployment(ctx context.Context, client *api.Client, slug, env st
 
 // ---- astro app promote -----------------------------------------------------
 
+var (
+	appPromoteFrom string
+	appPromoteTo   string
+)
+
 var appPromoteCmd = &cobra.Command{
 	Use:   "promote",
 	Short: "Promote a deployment from one environment to another",
-	Long: `Promote a deployment's exact image from one environment to another.
+	Long: `Promote the source environment's currently-running deployment — its exact
+image and config — into a target environment, via the promoteDeployment
+mutation. The control plane records the lineage (promoted_from) and honors the
+target environment's approval gate.
 
-NOTE: the control plane exposes no promote mutation yet (spec 14 §15 /
-portability_surfacing), so this command is not available. Tracked upstream in
-calliopeai/astrolift-app.`,
+  astro app promote --from staging --to production [--app <slug>]`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return fmt.Errorf(
-			"`astro app promote` is not available: the control plane exposes no " +
-				"promote mutation yet (spec 14 §15 / portability_surfacing, tracked in " +
-				"calliopeai/astrolift-app). To deploy a known image to another " +
-				"environment, run: astro app deploy --env <target> --image-tag <tag>")
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		if err != nil {
+			return err
+		}
+		slug, err := resolveAppSlug(cmd, "")
+		if err != nil {
+			return err
+		}
+		return runAppPromote(cmd, cmd.Context(), client, slug, appPromoteFrom, appPromoteTo)
 	},
+}
+
+func runAppPromote(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, fromEnv, toEnv string) error {
+	from := strings.TrimSpace(fromEnv)
+	to := strings.TrimSpace(toEnv)
+	if from == "" || to == "" {
+		return fmt.Errorf("--from and --to are required (source and target environment names)")
+	}
+
+	promoteCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	var resp struct {
+		Result deploymentMutationResult `json:"promoteDeployment"`
+	}
+	if err := client.GraphQL(promoteCtx, promoteDeploymentMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"appSlug":               slug,
+			"sourceEnvironmentName": from,
+			"targetEnvironmentName": to,
+		},
+	}, &resp); err != nil {
+		return fmt.Errorf("promoting: %w", err)
+	}
+	if !resp.Result.Ok {
+		return fmt.Errorf("promote failed: %s", firstDeployError(resp.Result.Errors))
+	}
+	d := resp.Result.Data
+	if d == nil {
+		return fmt.Errorf("promote succeeded but the server returned no deployment record")
+	}
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, d)
+	}
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "Promotion started:  %s\n", d.ID)
+	fmt.Fprintf(out, "From → To:          %s → %s\n", from, to)
+	fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
+	fmt.Fprintf(out, "Image:              %s\n", d.ImageTag)
+	fmt.Fprintf(out, "Status:             %s\n", d.Status)
+	return nil
 }
 
 // ---- astro app logs --------------------------------------------------------
@@ -1067,6 +1126,10 @@ func init() {
 	// rollback
 	appRollbackCmd.Flags().StringVar(&appRollbackEnv, "env", "production", "Environment whose running deployment to roll back (when no id given)")
 	appRollbackCmd.Flags().BoolVarP(&appRollbackYes, "yes", "y", false, "Skip confirmation prompt")
+
+	// promote
+	appPromoteCmd.Flags().StringVar(&appPromoteFrom, "from", "", "Source environment whose running deployment to promote (required)")
+	appPromoteCmd.Flags().StringVar(&appPromoteTo, "to", "", "Target environment to promote into (required)")
 
 	// logs
 	appLogsCmd.Flags().StringVar(&appLogsEnv, "env", "", "Environment to read logs from (default: app default)")
