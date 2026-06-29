@@ -63,11 +63,11 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Allow brews/scoops to push to the calliopeai homebrew-tap
-          # and scoop-bucket repos. Set this org secret to a PAT with
-          # contents:write on those repos.
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.TAP_PUBLISH_TOKEN }}
-          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.TAP_PUBLISH_TOKEN }}
+          # brews/scoops push to the calliopeai homebrew-tap + scoop-bucket
+          # repos — a cross-repo write the default GITHUB_TOKEN can't do, so
+          # use the org-wide CI PAT (PAT_CALLIOPE_CI, visibility ALL).
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.PAT_CALLIOPE_CI }}
+          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.PAT_CALLIOPE_CI }}
 
   release-smoke:
     name: Release smoke (${{ matrix.os_label }})
