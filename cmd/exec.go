@@ -163,6 +163,9 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		"type":      "open",
 		"command":   command,
 		"container": container,
+		// Ask for a PTY only when we're interactive; piped/non-interactive
+		// runs get a plain pipe so output isn't echo-doubled or CRLF-mangled.
+		"tty": wantTTY,
 	}); err != nil {
 		return fmt.Errorf("sending open: %w", err)
 	}
