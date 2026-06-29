@@ -60,11 +60,10 @@ changelog:
       - "^test:"
       - "^chore:"
 
-# Homebrew tap + Scoop bucket are intentionally disabled for the
-# v0.1.x line: the upstream tap repos (calliopeai/homebrew-tap,
-# calliopeai/scoop-bucket) do not exist yet, and goreleaser fails
-# the whole release when their default-branch lookup 404s.
-#
+# Homebrew tap + Scoop bucket publish to calliopeai/homebrew-tap and
+# calliopeai/scoop-bucket (provisioned for #18/#19). The release needs
+# HOMEBREW_TAP_GITHUB_TOKEN + SCOOP_TAP_GITHUB_TOKEN in its env — a PAT
+# with write access to those two repos.
 brews:
   - name: astro
     repository:
