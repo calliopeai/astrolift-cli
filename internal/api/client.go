@@ -19,6 +19,7 @@ type Client struct {
 	httpClient *http.Client
 	baseURL    string
 	token      string
+	orgID      string
 	debug      bool
 }
 
@@ -43,6 +44,11 @@ func (c *Client) SetTimeout(d time.Duration) {
 // BaseURL returns the configured HTTP API base (no trailing slash). The
 // exec command derives its ws(s):// endpoint from this.
 func (c *Client) BaseURL() string { return c.baseURL }
+
+// SetOrg sets the organization GUID sent as the X-Astrolift-Organization
+// header on subsequent requests, so the server scopes tenant-aware queries
+// to that organization (the tenant middleware resolves the org by GUID).
+func (c *Client) SetOrg(orgID string) { c.orgID = orgID }
 
 // Token returns the bearer credential the client authenticates with, so
 // the WebSocket exec dialer can set the same Authorization header the
@@ -215,6 +221,9 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	}
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	if c.orgID != "" {
+		req.Header.Set("X-Astrolift-Organization", c.orgID)
 	}
 	req.Header.Set("User-Agent", "astro-cli/dev")
 	req.Header.Set("Accept", "application/json")
