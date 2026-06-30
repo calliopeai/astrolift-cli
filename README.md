@@ -158,12 +158,12 @@ the status note above.)
 | `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `rollback`, `promote`) plus sub-resources (secrets, services, domains, tokens, members, jobs, events, audit, previews). `deploy` needs `--image-tag`; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `promote --from <env> --to <env>` moves an env's running deployment (image+config) to another via `promoteDeployment`. |
 | `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
 | `astro agent` | Agent dispatch (`run`, `ls`, `logs`, `cancel`, `inspect`). |
-| `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. |
-| `astro org` / `astro team` / `astro project` | Org-scoped resource management. |
+| `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. `render` prints the manifests the platform would apply (`astroliftRenderedManifest`) for pre-merge review. |
+| `astro org` / `astro team` / `astro project` | Org-scoped resource management. `org list`/`org show`, `team list`/`team create`, `project list`/`project create` (`project create` needs `--team <slug>`; both creates take `--name`/`--description`). |
 | `astro operator` | Operator (admin) cluster, provider, and federation management. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
-| `astro scm` / `astro alert` | Source-control webhooks and alert rules. |
-| `astro status` | Platform status snapshot. |
+| `astro scm` / `astro alert` | `scm list` (configured source-control connections) and `alert list` (alert rules; `--all` includes inactive). |
+| `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
 | `astro docs` | Open the platform docs in your browser. |
 | `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. |
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
@@ -198,8 +198,9 @@ Environment variables take precedence over the config file (CI mode):
 |---|---|
 | `ASTROLIFT_API_URL` | overrides `current_server`'s API URL |
 | `ASTROLIFT_DEPLOY_TOKEN` | bypasses stored credentials (CI tokens) |
-| `ASTROLIFT_APP_SLUG` | required by `astro ci deploy` |
+| `ASTROLIFT_APP_SLUG` | required by `astro ci deploy` + `astro ci render` |
 | `ASTROLIFT_IMAGE_TAGS` | required by `astro ci deploy` (JSON map workload→tag) |
+| `ASTROLIFT_IMAGE_TAG` | optional, `astro ci render` (single tag to render against) |
 | `ASTROLIFT_ENVIRONMENT` | optional, default `production` |
 | `ASTROLIFT_BRANCH` | optional, default `main` |
 | `ASTROLIFT_COMMIT_SHA` | optional, falls back to `git rev-parse HEAD` |
