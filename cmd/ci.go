@@ -156,13 +156,77 @@ var ciStatusCmd = &cobra.Command{
 
 var ciRenderCmd = &cobra.Command{
 	Use:   "render",
-	Short: "Render the local astrolift.toml as platform-side manifests for review",
+	Short: "Render the registered app's manifests as the platform would deploy them",
+	Long: `Runs the manifest renderer server-side (astroliftRenderedManifest) and
+prints the k8s resources the platform would apply, for CI pre-merge review.
+
+Required env: ASTROLIFT_API_URL, ASTROLIFT_DEPLOY_TOKEN, ASTROLIFT_APP_SLUG.
+Optional env: ASTROLIFT_ENVIRONMENT, ASTROLIFT_IMAGE_TAG.
+Exit codes: 0 success, 1 render error, 2 config error.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Calls /api/cli/v1/apps/<slug>/render/ which executes
-		// the manifest renderer server-side and returns the
-		// k8s YAML the platform would commit. Useful for CI
-		// pre-merge review.
-		return notImplemented(cmd, "ci render")
+		apiURL := os.Getenv("ASTROLIFT_API_URL")
+		token := os.Getenv("ASTROLIFT_DEPLOY_TOKEN")
+		slug := os.Getenv("ASTROLIFT_APP_SLUG")
+		if apiURL == "" || token == "" || slug == "" {
+			return configErr(errors.New(
+				"ASTROLIFT_API_URL, ASTROLIFT_DEPLOY_TOKEN, ASTROLIFT_APP_SLUG required",
+			))
+		}
+
+		client := api.NewClient(apiURL, token, false)
+		ctx, cancel := context.WithTimeout(cmd.Context(), 60*time.Second)
+		defer cancel()
+
+		vars := map[string]interface{}{"appSlug": slug}
+		if env := os.Getenv("ASTROLIFT_ENVIRONMENT"); env != "" {
+			vars["environmentName"] = env
+		}
+		if tag := os.Getenv("ASTROLIFT_IMAGE_TAG"); tag != "" {
+			vars["imageTag"] = tag
+		}
+
+		query := `query($appSlug: String!, $environmentName: String, $imageTag: String) {
+  astroliftRenderedManifest(appSlug: $appSlug, environmentName: $environmentName, imageTag: $imageTag) {
+    appSlug environmentName imageTag namespace resources error errorPath errorLine errorColumn
+  }
+}`
+		var resp struct {
+			Rendered *struct {
+				AppSlug         string          `json:"appSlug"`
+				EnvironmentName string          `json:"environmentName"`
+				ImageTag        string          `json:"imageTag"`
+				Namespace       string          `json:"namespace"`
+				Resources       json.RawMessage `json:"resources"`
+				Error           *string         `json:"error"`
+				ErrorPath       *string         `json:"errorPath"`
+				ErrorLine       *int            `json:"errorLine"`
+			} `json:"astroliftRenderedManifest"`
+		}
+		if err := client.GraphQL(ctx, query, vars, &resp); err != nil {
+			return deployErr(fmt.Errorf("rendering manifest: %w", err))
+		}
+		if resp.Rendered == nil {
+			return deployErr(fmt.Errorf("app %q not found or has no manifest to render", slug))
+		}
+		r := resp.Rendered
+		if r.Error != nil && *r.Error != "" {
+			loc := ""
+			if r.ErrorPath != nil && *r.ErrorPath != "" {
+				loc = " (" + *r.ErrorPath
+				if r.ErrorLine != nil {
+					loc += fmt.Sprintf(":%d", *r.ErrorLine)
+				}
+				loc += ")"
+			}
+			return deployErr(fmt.Errorf("manifest render error%s: %s", loc, *r.Error))
+		}
+
+		pretty, err := json.MarshalIndent(r.Resources, "", "  ")
+		if err != nil {
+			pretty = r.Resources
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), string(pretty))
+		return nil
 	},
 }
 
