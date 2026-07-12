@@ -271,7 +271,7 @@ Community standards: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — fork + PR flow + style
 - **[SECURITY.md](SECURITY.md)** — vulnerability disclosure
 - **[CLAUDE.md](CLAUDE.md)** / **[AGENTS.md](AGENTS.md)** /
-  **[GEMINI.md](GEMINI.md)** / **[CODEX.md](CODEX.md)** — agent shims
+  **[CODEX.md](CODEX.md)** — agent shims
   (all point at `bootstrap.md`)
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — community standards
 - **[LICENSE](LICENSE)** — MIT
