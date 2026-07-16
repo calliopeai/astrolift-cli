@@ -17,6 +17,12 @@
 //   - exec     → thin wrapper over runExec (cmd/exec.go, #1040)
 //   - promote  → promoteDeployment(input: PromoteDeploymentInput!) (#1041;
 //     --from/--to env names; reuses the #63 promotion policy)
+//   - deregister → previewAstroliftDeregister(appSlug) (the resource
+//     inventory shown before confirming), then
+//     deregisterAstroliftApp(input: DeregisterAppInput!) (#392; kicks the
+//     async DeregisterAppWorkflow — a ~5-minute grace window precedes the
+//     first destructive activity, cancellable via cancelAstroliftDeregister
+//     with the returned workflow id, #436)
 //
 // Issues: calliopeai/astrolift-cli#39, #40
 package cmd
@@ -53,6 +59,8 @@ var (
 	appLogsFollow bool
 	appLogsLevel  string
 	appLogsSearch string
+
+	appDeregisterYes bool
 )
 
 // appDeployPollInterval / appLogsPollInterval are the cadences --wait and
@@ -175,6 +183,33 @@ const astroliftDeploymentsQuery = `query($appSlug: String, $environmentName: Str
   }
 }`
 
+// previewAstroliftDeregisterQuery is the pre-flight resource inventory the
+// deregister command prints before (and instead of, without --yes) mutating.
+// It also carries the app's display name — the typed-confirmation value
+// DeregisterAppInput.confirmName must match exactly.
+const previewAstroliftDeregisterQuery = `query($appSlug: String!) {
+  previewAstroliftDeregister(appSlug: $appSlug) {
+    appSlug
+    appName
+    totalResourceCount
+    k8sObjects { clusterSlug namespace kind name }
+    managedServices { name kind variant environmentName status }
+    secretRefs { bundleSlug environmentName prefix }
+    deployTokens { name last4 environmentName }
+    identityRoles { clusterSlug kind roleArnOrPrincipal }
+    sourceWebhook { installed repo }
+    registryRepoUri
+  }
+}`
+
+const deregisterAstroliftAppMutation = `mutation($input: DeregisterAppInput!) {
+  deregisterAstroliftApp(input: $input) {
+    ok
+    errors { code message field }
+    data { workflowId stillLiveResources }
+  }
+}`
+
 const astroliftAppLogsQuery = `query($appSlug: String!, $since: DateTime!, $until: DateTime!, $environmentName: String, $workloadSlug: String, $level: String, $search: String, $limit: Int!, $cursor: String) {
   astroliftAppLogs(appSlug: $appSlug, since: $since, until: $until, environmentName: $environmentName, workloadSlug: $workloadSlug, level: $level, search: $search, limit: $limit, cursor: $cursor) {
     items { podName container timestamp message level stream }
@@ -271,6 +306,58 @@ type deploymentMutationResult struct {
 	Ok     bool               `json:"ok"`
 	Errors []mutationError    `json:"errors"`
 	Data   *deploymentSummary `json:"data"`
+}
+
+// deregisterPreview mirrors AstroliftDeregisterPreview — the per-category
+// inventory of what the teardown workflow will destroy.
+type deregisterPreview struct {
+	AppSlug            string `json:"appSlug"`
+	AppName            string `json:"appName"`
+	TotalResourceCount int    `json:"totalResourceCount"`
+	K8sObjects         []struct {
+		ClusterSlug string `json:"clusterSlug"`
+		Namespace   string `json:"namespace"`
+		Kind        string `json:"kind"`
+		Name        string `json:"name"`
+	} `json:"k8sObjects"`
+	ManagedServices []struct {
+		Name            string `json:"name"`
+		Kind            string `json:"kind"`
+		Variant         string `json:"variant"`
+		EnvironmentName string `json:"environmentName"`
+		Status          string `json:"status"`
+	} `json:"managedServices"`
+	SecretRefs []struct {
+		BundleSlug      string `json:"bundleSlug"`
+		EnvironmentName string `json:"environmentName"`
+		Prefix          string `json:"prefix"`
+	} `json:"secretRefs"`
+	DeployTokens []struct {
+		Name            string  `json:"name"`
+		Last4           string  `json:"last4"`
+		EnvironmentName *string `json:"environmentName"`
+	} `json:"deployTokens"`
+	IdentityRoles []struct {
+		ClusterSlug        string `json:"clusterSlug"`
+		Kind               string `json:"kind"`
+		RoleArnOrPrincipal string `json:"roleArnOrPrincipal"`
+	} `json:"identityRoles"`
+	SourceWebhook *struct {
+		Installed bool   `json:"installed"`
+		Repo      string `json:"repo"`
+	} `json:"sourceWebhook"`
+	RegistryRepoURI string `json:"registryRepoUri"`
+}
+
+// deregisterMutationResult is the AstroliftDeregisterAppPayloadMutationResult
+// envelope: the workflow id of the async teardown run.
+type deregisterMutationResult struct {
+	Ok     bool            `json:"ok"`
+	Errors []mutationError `json:"errors"`
+	Data   *struct {
+		WorkflowID         string   `json:"workflowId"`
+		StillLiveResources []string `json:"stillLiveResources"`
+	} `json:"data"`
 }
 
 type appLogLine struct {
@@ -826,6 +913,139 @@ func runAppPromote(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 	return nil
 }
 
+// ---- astro app deregister ----------------------------------------------------
+
+var appDeregisterCmd = &cobra.Command{
+	Use:   "deregister <app-slug>",
+	Short: "Permanently deregister an app and tear down its cloud resources",
+	Long: `Deregisters an app (#392): kicks the async DeregisterAppWorkflow that
+destroys every per-app cloud resource — k8s objects, managed services,
+secrets, deploy tokens, identity roles, the source webhook, and the
+registry repo.
+
+Without --yes, only the previewAstroliftDeregister inventory is printed
+(what the teardown would destroy) and nothing is changed — there is no
+interactive prompt, so the flag is the confirmation (CI-safe).
+
+Teardown does not start immediately: a ~5-minute grace window precedes the
+first destructive activity. Within it the run can be cancelled via the
+cancelAstroliftDeregister mutation with the printed workflow id (#436).
+After the window, teardown is monotonic — a partial failure is retried by
+re-running deregister, not rolled back.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		if err != nil {
+			return err
+		}
+		return runAppDeregister(cmd, cmd.Context(), client, args[0])
+	},
+}
+
+func runAppDeregister(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
+	previewCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var previewResp struct {
+		Preview *deregisterPreview `json:"previewAstroliftDeregister"`
+	}
+	if err := client.GraphQL(previewCtx, previewAstroliftDeregisterQuery,
+		map[string]interface{}{"appSlug": slug}, &previewResp); err != nil {
+		return fmt.Errorf("previewing deregister: %w", err)
+	}
+	p := previewResp.Preview
+	if p == nil {
+		return fmt.Errorf("app %q not found", slug)
+	}
+
+	printDeregisterPreview(cmd.OutOrStdout(), p)
+
+	if !appDeregisterYes {
+		return fmt.Errorf("refusing to deregister %q without --yes (nothing was changed)", slug)
+	}
+
+	deregCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	// confirmName is the backend's typed-confirmation guard: it must equal
+	// the app's display name exactly. --yes is the CLI's confirmation, so
+	// the name from the preview is passed through.
+	var resp struct {
+		Result deregisterMutationResult `json:"deregisterAstroliftApp"`
+	}
+	if err := client.GraphQL(deregCtx, deregisterAstroliftAppMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"appSlug":     slug,
+			"confirmName": p.AppName,
+		},
+	}, &resp); err != nil {
+		return fmt.Errorf("deregistering app: %w", err)
+	}
+	if !resp.Result.Ok {
+		return fmt.Errorf("deregister failed: %s", firstDeployError(resp.Result.Errors))
+	}
+	d := resp.Result.Data
+	if d == nil {
+		return fmt.Errorf("deregister accepted but the server returned no workflow record")
+	}
+
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, d)
+	}
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "\nDeregister workflow started: %s\n", d.WorkflowID)
+	for _, r := range d.StillLiveResources {
+		fmt.Fprintf(out, "  still live: %s\n", r)
+	}
+	fmt.Fprintln(out, "\nTeardown begins after a ~5-minute grace window; within it the run can be")
+	fmt.Fprintln(out, "cancelled (cancelAstroliftDeregister mutation with the workflow id above).")
+	fmt.Fprintln(out, "Re-running deregister retries any partially-failed teardown.")
+	return nil
+}
+
+// printDeregisterPreview renders the AstroliftDeregisterPreview inventory —
+// what the teardown workflow will destroy — before anything is mutated.
+func printDeregisterPreview(out io.Writer, p *deregisterPreview) {
+	fmt.Fprintf(out, "App:                  %s (%s)\n", p.AppName, p.AppSlug)
+	fmt.Fprintf(out, "Resources to destroy: %d\n", p.TotalResourceCount)
+	if len(p.K8sObjects) > 0 {
+		fmt.Fprintf(out, "  k8s objects (%d):\n", len(p.K8sObjects))
+		for _, o := range p.K8sObjects {
+			fmt.Fprintf(out, "    %s/%s %s/%s\n", o.ClusterSlug, o.Namespace, o.Kind, o.Name)
+		}
+	}
+	if len(p.ManagedServices) > 0 {
+		fmt.Fprintf(out, "  managed services (%d) — data is destroyed:\n", len(p.ManagedServices))
+		for _, s := range p.ManagedServices {
+			fmt.Fprintf(out, "    %s (%s/%s, env %s, %s)\n", s.Name, s.Kind, s.Variant, s.EnvironmentName, s.Status)
+		}
+	}
+	if len(p.SecretRefs) > 0 {
+		fmt.Fprintf(out, "  secret refs (%d):\n", len(p.SecretRefs))
+		for _, s := range p.SecretRefs {
+			fmt.Fprintf(out, "    %s (env %s, prefix %s)\n", s.BundleSlug, s.EnvironmentName, s.Prefix)
+		}
+	}
+	if len(p.DeployTokens) > 0 {
+		fmt.Fprintf(out, "  deploy tokens (%d):\n", len(p.DeployTokens))
+		for _, tok := range p.DeployTokens {
+			fmt.Fprintf(out, "    %s (…%s)\n", tok.Name, tok.Last4)
+		}
+	}
+	if len(p.IdentityRoles) > 0 {
+		fmt.Fprintf(out, "  identity roles (%d):\n", len(p.IdentityRoles))
+		for _, r := range p.IdentityRoles {
+			fmt.Fprintf(out, "    %s %s %s\n", r.ClusterSlug, r.Kind, r.RoleArnOrPrincipal)
+		}
+	}
+	if p.SourceWebhook != nil && p.SourceWebhook.Installed {
+		fmt.Fprintf(out, "  source webhook:       %s\n", p.SourceWebhook.Repo)
+	}
+	if p.RegistryRepoURI != "" {
+		fmt.Fprintf(out, "  registry repo:        %s\n", p.RegistryRepoURI)
+	}
+}
+
 // ---- astro app logs --------------------------------------------------------
 
 var appLogsCmd = &cobra.Command{
@@ -1136,6 +1356,9 @@ func init() {
 	// promote
 	appPromoteCmd.Flags().StringVar(&appPromoteFrom, "from", "", "Source environment whose running deployment to promote (required)")
 	appPromoteCmd.Flags().StringVar(&appPromoteTo, "to", "", "Target environment to promote into (required)")
+
+	// deregister
+	appDeregisterCmd.Flags().BoolVarP(&appDeregisterYes, "yes", "y", false, "Confirm the deregistration (required to proceed; without it only the preview is printed)")
 
 	// logs
 	appLogsCmd.Flags().StringVar(&appLogsEnv, "env", "", "Environment to read logs from (default: app default)")

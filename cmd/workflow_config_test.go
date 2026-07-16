@@ -596,3 +596,77 @@ func TestWorkflowImportSurfacesErrorEnvelope(t *testing.T) {
 		t.Fatalf("expected envelope error surfaced, got %v", err)
 	}
 }
+
+// ---- delete / definition-delete -----------------------------------------------
+
+func TestWorkflowDeleteRefusesWithoutYes(t *testing.T) {
+	workflowDeleteYes = false
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, _, _ := workflowTestCmd()
+	err := runWorkflowDelete(cmd, context.Background(), client, "nightly-report")
+	if err == nil || !strings.Contains(err.Error(), "--yes") {
+		t.Fatalf("expected refusal mentioning --yes, got: %v", err)
+	}
+	if captured.Query != "" {
+		t.Errorf("a request was sent without --yes:\n%s", captured.Query)
+	}
+}
+
+func TestWorkflowDeleteHappyPath(t *testing.T) {
+	workflowDeleteYes = true
+	defer func() { workflowDeleteYes = false }()
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"deleteWorkflow": map[string]interface{}{"ok": true, "errors": []interface{}{}},
+	}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out, _ := workflowTestCmd()
+	if err := runWorkflowDelete(cmd, context.Background(), client, "nightly-report"); err != nil {
+		t.Fatalf("runWorkflowDelete: %v", err)
+	}
+	if !strings.Contains(captured.Query, "deleteWorkflow(slug: $slug)") {
+		t.Errorf("query did not call deleteWorkflow:\n%s", captured.Query)
+	}
+	if captured.Variables["slug"] != "nightly-report" {
+		t.Errorf("slug var = %v, want nightly-report", captured.Variables["slug"])
+	}
+	if !strings.Contains(out.String(), "Deleted workflow: nightly-report") {
+		t.Errorf("output wrong:\n%s", out.String())
+	}
+}
+
+func TestWorkflowDefinitionDeleteSurfacesProtectError(t *testing.T) {
+	workflowDefDeleteYes = true
+	defer func() { workflowDefDeleteYes = false }()
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"deleteWorkflowDefinition": map[string]interface{}{
+			"ok": false,
+			"errors": []map[string]interface{}{
+				{"field": "slug", "messages": []string{
+					`Cannot delete workflow definition "ooda" — 2 configured Workflow(s) still use it. Delete those first.`,
+				}},
+			},
+		},
+	}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, _, _ := workflowTestCmd()
+	err := runWorkflowDefinitionDelete(cmd, context.Background(), client, "ooda")
+	if err == nil || !strings.Contains(err.Error(), "still use it") {
+		t.Fatalf("expected PROTECT refusal surfaced, got: %v", err)
+	}
+	if !strings.Contains(captured.Query, "deleteWorkflowDefinition(slug: $slug)") {
+		t.Errorf("query did not call deleteWorkflowDefinition:\n%s", captured.Query)
+	}
+}
