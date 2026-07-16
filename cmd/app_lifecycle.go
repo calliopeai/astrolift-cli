@@ -159,6 +159,7 @@ const astroliftDeploymentQuery = `query($id: String!) {
     status
     environmentName
     imageTag
+    abortedReason
   }
 }`
 
@@ -202,6 +203,8 @@ type deploymentSummary struct {
 	EnvironmentName string `json:"environmentName"`
 	ImageTag        string `json:"imageTag"`
 	CreatedAt       string `json:"createdAt"`
+	// Populated on failed/aborted deployments; empty otherwise.
+	AbortedReason string `json:"abortedReason"`
 }
 
 type appListItem struct {
@@ -629,6 +632,9 @@ func waitForDeployment(cmd *cobra.Command, ctx context.Context, client *api.Clie
 			if done, ok := deploymentTerminal(status); done {
 				fmt.Fprintf(out, "Final status: %s\n", status)
 				if !ok {
+					if reason := resp.Deployment.AbortedReason; reason != "" {
+						fmt.Fprintf(out, "Reason: %s\n", reason)
+					}
 					return fmt.Errorf("deployment ended in %q", status)
 				}
 				return nil
