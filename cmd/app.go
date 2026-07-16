@@ -221,7 +221,7 @@ func init() {
 
 	appCmd.AddCommand(
 		appInitCmd, appRegisterCmd, appDeployCmd,
-		appRollbackCmd, appPromoteCmd,
+		appRollbackCmd, appPromoteCmd, appDeregisterCmd,
 		appListCmd, appShowCmd,
 		appSecretsCmd, appServicesCmd, appDomainsCmd,
 		appTokensCmd, appMembersCmd, appJobsCmd,

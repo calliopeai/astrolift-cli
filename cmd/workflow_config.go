@@ -10,6 +10,8 @@
 //   - run         — start a configured Workflow's run (tier 3)
 //   - runs        — list a Workflow's runs; --watch polls until terminal
 //   - import      — importWorkflowManifest (--preview to validate only)
+//   - delete      — soft-delete a configured Workflow (+ schedule teardown)
+//   - definition-delete — soft-delete an org-owned WorkflowDefinition
 //
 // GraphQL operations (field names per backend/schema.graphql):
 //   - definitions → workflowDefinitions → [WorkflowDefinitionSummary]
@@ -20,6 +22,8 @@
 //   - run         → workflow(slug) then runWorkflow(workflowId, inputs)
 //   - runs        → workflow(slug) then workflowRuns(workflowId)
 //   - import      → importWorkflowManifest(toml, preview)
+//   - delete      → deleteWorkflow(slug) → MutationResult
+//   - definition-delete → deleteWorkflowDefinition(slug) → MutationResult
 //
 // All commands are org-scoped: the working org (resolveOrg) is sent as the
 // X-Astrolift-Organization header, which the tenant middleware resolves into
@@ -64,6 +68,9 @@ var (
 	workflowRunsWatch bool
 
 	workflowImportPreview bool
+
+	workflowDeleteYes    bool
+	workflowDefDeleteYes bool
 )
 
 // workflowRunsPollIntervalForTest is the cadence --watch re-queries
@@ -143,6 +150,20 @@ const importWorkflowManifestMutation = `mutation($toml: String!, $preview: Boole
       definition { slug name pattern description }
       stages { order kind role agent skills onFailure timeout fanOut prompt approvers }
     }
+  }
+}`
+
+const deleteWorkflowMutation = `mutation($slug: String!) {
+  deleteWorkflow(slug: $slug) {
+    ok
+    errors { field messages }
+  }
+}`
+
+const deleteWorkflowDefinitionMutation = `mutation($slug: String!) {
+  deleteWorkflowDefinition(slug: $slug) {
+    ok
+    errors { field messages }
   }
 }`
 
@@ -792,6 +813,87 @@ func runWorkflowImport(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	return nil
 }
 
+// ---- astro workflow delete -----------------------------------------------------
+
+var workflowDeleteCmd = &cobra.Command{
+	Use:   "delete <workflow-slug>",
+	Short: "Soft-delete a configured Workflow",
+	Long: `Soft-deletes a configured Workflow (tier 2) via the deleteWorkflow
+GraphQL mutation and tears down its Temporal schedule. Past runs are kept.
+
+There is no interactive prompt: --yes is the confirmation (CI-safe).
+Without it, nothing is changed.`,
+	Args: cobra.ExactArgs(1),
+	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
+		return runWorkflowDelete(cmd, ctx, client, args[0])
+	}),
+}
+
+func runWorkflowDelete(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
+	if !workflowDeleteYes {
+		return fmt.Errorf("refusing to delete workflow %q without --yes (nothing was changed)", slug)
+	}
+	if err := execWorkflowMutationResult(ctx, client, deleteWorkflowMutation, "deleteWorkflow", slug); err != nil {
+		return fmt.Errorf("deleting workflow: %w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow: %s (schedule torn down; past runs kept)\n", slug)
+	return nil
+}
+
+// ---- astro workflow definition-delete --------------------------------------------
+
+var workflowDefinitionDeleteCmd = &cobra.Command{
+	Use:   "definition-delete <slug>",
+	Short: "Soft-delete an org-owned workflow definition",
+	Long: `Soft-deletes an org-owned WorkflowDefinition by slug via the
+deleteWorkflowDefinition GraphQL mutation.
+
+Global/catalogue definitions are read-only and refuse deletion. A definition
+still referenced by live configured Workflows or enabled webhook triggers
+also refuses (PROTECT) — delete/disable those first (see
+` + "`astro workflow list`" + `).
+
+There is no interactive prompt: --yes is the confirmation (CI-safe).
+Without it, nothing is changed.`,
+	Args: cobra.ExactArgs(1),
+	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
+		return runWorkflowDefinitionDelete(cmd, ctx, client, args[0])
+	}),
+}
+
+func runWorkflowDefinitionDelete(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
+	if !workflowDefDeleteYes {
+		return fmt.Errorf("refusing to delete workflow definition %q without --yes (nothing was changed)", slug)
+	}
+	if err := execWorkflowMutationResult(ctx, client, deleteWorkflowDefinitionMutation, "deleteWorkflowDefinition", slug); err != nil {
+		return fmt.Errorf("deleting definition: %w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow definition: %s\n", slug)
+	return nil
+}
+
+// execWorkflowMutationResult runs a slug-keyed mutation returning the bare
+// MutationResult { ok, errors } envelope and folds a refusal (global
+// definition, PROTECT on live references, not found) into one error.
+func execWorkflowMutationResult(ctx context.Context, client *api.Client, mutation, field, slug string) error {
+	execCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var resp map[string]struct {
+		Ok     bool             `json:"ok"`
+		Errors validationErrors `json:"errors"`
+	}
+	if err := client.GraphQL(execCtx, mutation,
+		map[string]interface{}{"slug": slug}, &resp); err != nil {
+		return err
+	}
+	result := resp[field]
+	if !result.Ok {
+		return fmt.Errorf("%s", firstValidationError(result.Errors))
+	}
+	return nil
+}
+
 // ---- shared RunE wrapper -----------------------------------------------------
 
 // workflowOrgScopedRunE wraps a run-func with the shared preamble every
@@ -837,10 +939,15 @@ func init() {
 	// import
 	workflowImportCmd.Flags().BoolVar(&workflowImportPreview, "preview", false, "Validate server-side only; persist nothing")
 
+	// delete / definition-delete
+	workflowDeleteCmd.Flags().BoolVarP(&workflowDeleteYes, "yes", "y", false, "Confirm the deletion (required to proceed)")
+	workflowDefinitionDeleteCmd.Flags().BoolVarP(&workflowDefDeleteYes, "yes", "y", false, "Confirm the deletion (required to proceed)")
+
 	workflowCmd.AddCommand(
 		workflowDefinitionsCmd, workflowDefinitionCmd, workflowCloneCmd,
 		workflowListCmd, workflowCreateCmd,
 		workflowRunConfigCmd, workflowRunsCmd,
 		workflowImportCmd,
+		workflowDeleteCmd, workflowDefinitionDeleteCmd,
 	)
 }
