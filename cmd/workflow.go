@@ -28,7 +28,14 @@ GraphQL surface.
   validate  check a manifest's shape locally, or --server for authoritative
             validation via previewWorkflowManifest (WORKFLOW_READ)
   pull      export an existing/global definition's TOML via
-            exportWorkflowManifest (WORKFLOW_READ)
+            exportWorkflowManifest (WORKFLOW_READ) — alias: export
+  import    persist a manifest as an org definition (--preview to dry-run)
+
+Tier-2 configured workflows (spec 40 §2/§3):
+
+  definitions / definition / clone   browse and copy the visible catalogue
+  list / create                      the org's configured Workflows
+  run / runs                         start runs and watch them
 
 ` + "`astro workflow push`/`register` is deferred with repo-registration (spec 40 §8).",
 }
@@ -301,8 +308,9 @@ func previewErrorLocation(p workflowManifestPreview) string {
 var workflowPullOut string
 
 var workflowPullCmd = &cobra.Command{
-	Use:   "pull <slug>",
-	Short: "Export a workflow definition's TOML (exportWorkflowManifest)",
+	Use:     "pull <slug>",
+	Aliases: []string{"export"},
+	Short:   "Export a workflow definition's TOML (exportWorkflowManifest)",
 	Long: `Fetch a visible WorkflowDefinition — the caller's org UNION the global
 catalogue — and emit its canonical §5.4 TOML, to stdout or to -o <file>.
 
