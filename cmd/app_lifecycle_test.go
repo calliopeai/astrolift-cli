@@ -814,3 +814,106 @@ func TestAppLogsFollowPrintsOnlyNewLines(t *testing.T) {
 		t.Errorf("follow de-dup wrong, got:\n%q", out.String())
 	}
 }
+
+// ---- app deregister ----------------------------------------------------------
+
+func deregisterPreviewData() map[string]interface{} {
+	return map[string]interface{}{
+		"appSlug": "web", "appName": "Web App", "totalResourceCount": 3,
+		"k8sObjects": []map[string]interface{}{
+			{"clusterSlug": "prd", "namespace": "app-web", "kind": "Deployment", "name": "web"},
+		},
+		"managedServices": []map[string]interface{}{
+			{"name": "web-db", "kind": "postgres", "variant": "rds", "environmentName": "production", "status": "ready"},
+		},
+		"secretRefs":    []map[string]interface{}{},
+		"deployTokens":  []map[string]interface{}{{"name": "ci", "last4": "ab12", "environmentName": nil}},
+		"identityRoles": []map[string]interface{}{},
+		"sourceWebhook": nil, "registryRepoUri": "123.dkr.ecr/web",
+	}
+}
+
+func TestAppDeregisterRefusesWithoutYes(t *testing.T) {
+	appDeregisterYes = false
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"previewAstroliftDeregister": deregisterPreviewData(),
+	}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out := appTestCmd()
+	err := runAppDeregister(cmd, context.Background(), client, "web")
+	if err == nil || !strings.Contains(err.Error(), "--yes") {
+		t.Fatalf("expected refusal mentioning --yes, got: %v", err)
+	}
+	// Only the preview query fired — never the mutation.
+	if strings.Contains(captured.Query, "deregisterAstroliftApp") {
+		t.Errorf("mutation was sent without --yes:\n%s", captured.Query)
+	}
+	// The preview (what would be destroyed) was printed.
+	if !strings.Contains(out.String(), "Resources to destroy: 3") ||
+		!strings.Contains(out.String(), "web-db") {
+		t.Errorf("preview inventory not printed:\n%s", out.String())
+	}
+}
+
+func TestAppDeregisterSendsMutationWithYes(t *testing.T) {
+	appDeregisterYes = true
+	defer func() { appDeregisterYes = false }()
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"previewAstroliftDeregister": deregisterPreviewData(),
+		"deregisterAstroliftApp": map[string]interface{}{
+			"ok": true, "errors": []interface{}{},
+			"data": map[string]interface{}{
+				"workflowId":         "DeregisterAppWorkflow-guid-1",
+				"stillLiveResources": []string{},
+			},
+		},
+	}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out := appTestCmd()
+	if err := runAppDeregister(cmd, context.Background(), client, "web"); err != nil {
+		t.Fatalf("runAppDeregister: %v", err)
+	}
+
+	// The mutation carried the slug and the preview's appName as the
+	// typed-confirmation value.
+	input, _ := captured.Variables["input"].(map[string]interface{})
+	if input == nil || input["appSlug"] != "web" || input["confirmName"] != "Web App" {
+		t.Errorf("deregister input = %v, want appSlug=web confirmName=Web App", captured.Variables["input"])
+	}
+	if !strings.Contains(out.String(), "DeregisterAppWorkflow-guid-1") ||
+		!strings.Contains(out.String(), "grace window") {
+		t.Errorf("workflow id / grace-window note missing:\n%s", out.String())
+	}
+}
+
+func TestAppDeregisterSurfacesEnvelopeError(t *testing.T) {
+	appDeregisterYes = true
+	defer func() { appDeregisterYes = false }()
+
+	srv := gqlServer(t, map[string]interface{}{
+		"previewAstroliftDeregister": deregisterPreviewData(),
+		"deregisterAstroliftApp": map[string]interface{}{
+			"ok": false,
+			"errors": []map[string]interface{}{
+				{"code": "VALIDATION", "message": "confirm_name must match the app's name exactly", "field": "confirmName"},
+			},
+			"data": nil,
+		},
+	}, nil)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, _ := appTestCmd()
+	err := runAppDeregister(cmd, context.Background(), client, "web")
+	if err == nil || !strings.Contains(err.Error(), "confirm_name must match") {
+		t.Fatalf("expected envelope error surfaced, got: %v", err)
+	}
+}
