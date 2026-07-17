@@ -126,6 +126,18 @@ var scmListCmd = &cobra.Command{
 		return runScmList(cmd, cmd.Context(), client)
 	},
 }
+var scmDisconnectCmd = &cobra.Command{
+	Use: "disconnect <connection-id>", Aliases: []string{"rm", "remove"},
+	Short: "Disconnect (remove) an SCM connection by id (from `scm list`)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		if err != nil {
+			return err
+		}
+		return runScmDisconnect(cmd, cmd.Context(), client, args[0])
+	},
+}
 
 // ---- #14: alert rule commands ----
 
@@ -180,7 +192,7 @@ func init() {
 	projectCreateCmd.Flags().StringVar(&projectCreateName, "name", "", "Display name (defaults to the slug)")
 	projectCreateCmd.Flags().StringVar(&projectCreateDesc, "description", "", "Optional description")
 	operatorCmd.AddCommand(operatorClusterCmd, operatorProviderCmd, operatorFederationCmd)
-	scmCmd.AddCommand(scmListCmd)
+	scmCmd.AddCommand(scmListCmd, scmDisconnectCmd)
 	alertCmd.AddCommand(alertListCmd)
 	alertListCmd.Flags().BoolVar(&alertListAll, "all", false, "Include inactive rules")
 
@@ -420,6 +432,38 @@ func runScmList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 			c.Kind, dashIfEmpty(c.AccountLogin), dashIfEmpty(name), scope, yesNo(c.IsActive), c.ID)
 	}
 	return w.Flush()
+}
+
+// ---- scm disconnect (disconnectSource) -------------------------------------
+
+func runScmDisconnect(cmd *cobra.Command, ctx context.Context, client *api.Client, id string) error {
+	mutation := `mutation($input: DisconnectSourceInput!) {
+  disconnectSource(input: $input) {
+    ok
+    errors { code message field }
+    data { id }
+  }
+}`
+	var resp struct {
+		Result struct {
+			Ok     bool            `json:"ok"`
+			Errors []mutationError `json:"errors"`
+			Data   *struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		} `json:"disconnectSource"`
+	}
+	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": map[string]interface{}{"id": id}}, &resp); err != nil {
+		return fmt.Errorf("disconnecting SCM connection: %w", err)
+	}
+	if !resp.Result.Ok {
+		return fmt.Errorf("disconnect failed: %s", firstDeployError(resp.Result.Errors))
+	}
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, resp.Result.Data)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Disconnected SCM connection %s\n", id)
+	return nil
 }
 
 // ---- alert list (astroliftAlertRules) --------------------------------------

@@ -164,7 +164,7 @@ the status note above.)
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `org list`/`org show`, `team list`/`team create`, `project list`/`project create` (`project create` needs `--team <slug>`; both creates take `--name`/`--description`). |
 | `astro operator` | Operator (admin) cluster, provider, and federation management. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
-| `astro scm` / `astro alert` | `scm list` (configured source-control connections) and `alert list` (alert rules; `--all` includes inactive). |
+| `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
 | `astro docs` | Open the platform docs in your browser. |
 | `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. |
