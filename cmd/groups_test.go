@@ -222,6 +222,42 @@ func TestRunScmList(t *testing.T) {
 	}
 }
 
+func TestRunScmDisconnect(t *testing.T) {
+	srv := gqlServer(t, map[string]interface{}{
+		"disconnectSource": map[string]interface{}{
+			"ok": true, "errors": []interface{}{}, "data": map[string]interface{}{"id": "c-1"},
+		},
+	}, nil)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out := groupsTestCmd()
+	if err := runScmDisconnect(cmd, context.Background(), client, "c-1"); err != nil {
+		t.Fatalf("runScmDisconnect: %v", err)
+	}
+	if !strings.Contains(out.String(), "Disconnected SCM connection c-1") {
+		t.Errorf("disconnect missing confirmation:\n%s", out.String())
+	}
+}
+
+func TestRunScmDisconnectSurfacesError(t *testing.T) {
+	srv := gqlServer(t, map[string]interface{}{
+		"disconnectSource": map[string]interface{}{
+			"ok":     false,
+			"errors": []interface{}{map[string]interface{}{"code": "NOT_FOUND", "message": "connection not found"}},
+			"data":   nil,
+		},
+	}, nil)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, _ := groupsTestCmd()
+	err := runScmDisconnect(cmd, context.Background(), client, "missing")
+	if err == nil || !strings.Contains(err.Error(), "connection not found") {
+		t.Fatalf("expected disconnect error surfaced, got %v", err)
+	}
+}
+
 // ---- alert list ------------------------------------------------------------
 
 func TestRunAlertList(t *testing.T) {
