@@ -21,10 +21,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/gorilla/websocket"
@@ -183,14 +181,9 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 	}
 	sendResize()
 	if wantTTY {
-		winch := make(chan os.Signal, 1)
-		signal.Notify(winch, syscall.SIGWINCH)
-		defer signal.Stop(winch)
-		go func() {
-			for range winch {
-				sendResize()
-			}
-		}()
+		// SIGWINCH is Unix-only, so the resize watcher lives in
+		// platform-tagged files (no-op on Windows). See exec_resize_*.go.
+		defer watchResize(sendResize)()
 	}
 
 	// stdin → stdin frames (best-effort; ends on EOF/error with a close).
