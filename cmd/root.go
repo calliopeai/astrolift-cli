@@ -2,14 +2,20 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// Version is set at build time via -ldflags.
-var Version = "dev"
+// Version, Commit, and Date are injected at build time via -ldflags (see
+// .goreleaser.yaml, the Makefile, and Dockerfile.source). Plain `go build` /
+// `go install` source builds keep these defaults, so a released binary is
+// always distinguishable from an un-stamped source build.
+var (
+	Version = "dev"
+	Commit  = "none"
+	Date    = "unknown"
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "astro",
@@ -48,8 +54,14 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the CLI version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(os.Stdout, "astro %s\n", Version)
+		fmt.Fprintln(cmd.OutOrStdout(), versionString())
 	},
+}
+
+// versionString is the single-line build stamp. Commit and Date make binary
+// staleness visible even when the version tag alone is ambiguous.
+func versionString() string {
+	return fmt.Sprintf("astro %s (commit %s, built %s)", Version, Commit, Date)
 }
 
 func initConfig() error {
