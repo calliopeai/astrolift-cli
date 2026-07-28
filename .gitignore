@@ -25,3 +25,6 @@ Thumbs.db
 
 # Build artifacts
 *.prof
+
+# Navegador graph DB
+.navegador/
