@@ -475,9 +475,9 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 var agentCancelCmd = &cobra.Command{
 	Use:   "cancel <task-id>",
 	Short: "Cancel an AgentTask",
-	Long: `Cancels an AgentTask via the cancelTask GraphQL mutation. Only
-DRAFT / QUEUED / PROVISIONING tasks cancel directly; a RUNNING task needs a
-stop signal to the Dispatcher and is rejected as a precondition failure.
+	Long: `Cancels an AgentTask via the cancelTask GraphQL mutation. For a
+RUNNING or PROVISIONING Kubernetes task, the control plane deletes the Job and
+its pod before recording the task as CANCELLED.
 
 Prompts for confirmation unless --yes is given.`,
 	Args: cobra.ExactArgs(1),
