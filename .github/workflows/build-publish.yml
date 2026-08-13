@@ -43,6 +43,7 @@ jobs:
         with:
           repository: calliopeai/astrolift-docs
           path: canonical-docs
+          token: ${{ secrets.PAT_CALLIOPE_CI }}
 
       - uses: actions/setup-go@v5
         with:
