@@ -29,6 +29,7 @@ jobs:
         with:
           repository: calliopeai/astrolift-docs
           path: canonical-docs
+          token: ${{ secrets.PAT_CALLIOPE_CI }}
 
       - name: Verify release-matched snapshot
         working-directory: cli
