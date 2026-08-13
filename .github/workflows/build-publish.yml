@@ -53,6 +53,16 @@ jobs:
           test -s build/docs/commands/astro.md
           test -s build/docs/man/man1/astro.1
 
+      - name: Lint generated man pages
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y mandoc
+          output="$(mandoc -T lint build/docs/man/man1/*.1 2>&1)"
+          if [ -n "$output" ]; then
+            printf '%s\n' "$output"
+            exit 1
+          fi
+
   release:
     name: GoReleaser (tagged release)
     needs: verify

@@ -193,7 +193,74 @@ func generateManTree(destination string) error {
 	if err := doc.GenManTree(rootCmd, header, destination); err != nil {
 		return fmt.Errorf("generating man pages: %w", err)
 	}
-	return nil
+	return normalizeManTree(destination, headerDate)
+}
+
+// normalizeManTree fixes portability issues in Cobra's generated roff. Its
+// month-only date is rejected by mandoc, and go-md2man's flag layout emits
+// redundant paragraphs plus tab-indented text. Converting those flag blocks to
+// standard tagged paragraphs keeps the pages quiet under mandoc and readable
+// across BSD and GNU man implementations.
+func normalizeManTree(destination string, generatedAt time.Time) error {
+	return filepath.WalkDir(destination, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".1" {
+			return nil
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading generated man page %s: %w", path, err)
+		}
+		lines := strings.Split(string(body), "\n")
+		normalized := make([]string, 0, len(lines))
+		oldDate := `"` + generatedAt.Format("Jan 2006") + `"`
+		newDate := `"` + generatedAt.Format("2006-01-02") + `"`
+		noFill := false
+		for index := 0; index < len(lines); index++ {
+			line := lines[index]
+			if strings.HasPrefix(line, ".TH ") {
+				line = strings.Replace(line, oldDate, newDate, 1)
+			}
+			if line == ".PP" && index+2 < len(lines) &&
+				strings.HasPrefix(lines[index+1], `\fB`) &&
+				strings.HasPrefix(lines[index+2], "\t") {
+				normalized = append(normalized, ".TP", lines[index+1])
+				normalized = appendWrappedRoff(normalized, strings.TrimPrefix(lines[index+2], "\t"), noFill)
+				index += 2
+				continue
+			}
+			if line == ".PP" && len(normalized) > 0 && strings.HasPrefix(normalized[len(normalized)-1], ".SH ") {
+				continue
+			}
+			normalized = appendWrappedRoff(normalized, line, noFill)
+			if line == ".nf" {
+				noFill = true
+			} else if line == ".fi" {
+				noFill = false
+			}
+		}
+		if err := os.WriteFile(path, []byte(strings.Join(normalized, "\n")), 0o644); err != nil {
+			return fmt.Errorf("normalizing generated man page %s: %w", path, err)
+		}
+		return nil
+	})
+}
+
+func appendWrappedRoff(lines []string, line string, noFill bool) []string {
+	if noFill || strings.HasPrefix(line, ".") {
+		return append(lines, line)
+	}
+	for len(line) > 64 {
+		cut := strings.LastIndex(line[:65], " ")
+		if cut <= 0 {
+			break
+		}
+		lines = append(lines, strings.TrimRight(line[:cut], " "))
+		line = strings.TrimLeft(line[cut+1:], " ")
+	}
+	return append(lines, line)
 }
 
 func buildDate() time.Time {

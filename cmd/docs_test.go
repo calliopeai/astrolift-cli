@@ -58,4 +58,22 @@ func TestExportManPages(t *testing.T) {
 	if !strings.Contains(string(body), "Astrolift CLI Manual") {
 		t.Fatalf("astro.1 has an unexpected header:\n%s", body)
 	}
+	text := string(body)
+	for _, unwanted := range []string{"\n.PP\n\\fB", "\n\t"} {
+		if strings.Contains(text, unwanted) {
+			t.Errorf("astro.1 contains non-portable roff %q", unwanted)
+		}
+	}
+	header := strings.SplitN(text, "\n", 3)
+	if len(header) < 2 || !strings.Contains(header[1], `"202`) {
+		t.Fatalf("astro.1 does not use an ISO date header:\n%s", text)
+	}
+	if !strings.Contains(text, "\n.TP\n") {
+		t.Fatalf("astro.1 does not use tagged paragraphs for options:\n%s", text)
+	}
+	for lineNumber, line := range strings.Split(text, "\n") {
+		if !strings.HasPrefix(line, ".") && len(line) > 64 {
+			t.Errorf("astro.1 line %d is longer than 64 bytes: %q", lineNumber+1, line)
+		}
+	}
 }
