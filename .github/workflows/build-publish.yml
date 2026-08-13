@@ -34,6 +34,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pull requests may intentionally update the embedded snapshot alongside
+      # an unmerged canonical-docs PR. Main builds and tags have no such excuse:
+      # the release-matched offline guides must byte-match canonical main.
+      - name: Checkout canonical documentation
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          repository: calliopeai/astrolift-docs
+          path: canonical-docs
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
@@ -42,8 +52,12 @@ jobs:
       - name: Test
         run: go test ./...
 
-      - name: Verify embedded documentation
+      - name: Verify embedded documentation is complete
         run: make vendor-docs-check
+
+      - name: Verify embedded documentation matches canonical main
+        if: ${{ github.event_name != 'pull_request' }}
+        run: make vendor-docs-check DOCS_SRC=canonical-docs/docs
 
       - name: Export portable documentation and man pages
         run: |

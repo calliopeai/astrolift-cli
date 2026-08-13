@@ -1,0 +1,44 @@
+name: Portable docs drift
+
+# The CLI embeds a deliberately bounded snapshot of the canonical public docs.
+# This job catches cross-repository drift even when no CLI change happens. A
+# repository_dispatch sender can make the check immediate once the docs repo
+# has a cross-repository GitHub App/PAT; the weekday schedule is the fallback.
+on:
+  schedule:
+    - cron: '17 9 * * 1-5'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [canonical-docs-updated]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Compare embedded guides with canonical docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CLI
+        uses: actions/checkout@v4
+        with:
+          path: cli
+
+      - name: Checkout canonical documentation
+        uses: actions/checkout@v4
+        with:
+          repository: calliopeai/astrolift-docs
+          path: canonical-docs
+
+      - name: Verify release-matched snapshot
+        working-directory: cli
+        run: make vendor-docs-check DOCS_SRC=../canonical-docs/docs
+
+      - name: Explain the refresh path
+        if: ${{ failure() }}
+        run: |
+          printf '%s\n' \
+            'Canonical docs changed without refreshing the CLI snapshot.' \
+            'From the metarepo, run:' \
+            '  make -C astrolift-cli vendor-docs' \
+            'Then commit the generated files with the normal signed/DCO flow.'

@@ -184,6 +184,11 @@ astro docs man ./man/man1
 `docs export` also creates `llms.txt`, generated Markdown for the live command
 tree, and section-1 man pages. Homebrew installs the generated man pages with
 the binary. The canonical public site is [astrolift.dev](https://astrolift.dev).
+CLI main builds and tagged releases byte-compare the embedded guide subset with
+canonical docs main. A weekday drift workflow performs the same cross-repo
+check even when the CLI has not changed. Refresh intentional docs changes with
+`make vendor-docs` from the metarepo, then commit the snapshot through the
+normal signed/DCO review flow.
 
 ---
 
