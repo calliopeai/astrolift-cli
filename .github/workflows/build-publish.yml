@@ -10,6 +10,7 @@ name: Build and Publish
 #   - dispatch     -> manual run.
 
 on:
+  pull_request:
   push:
     branches: [main]
     tags: ['v*']
@@ -25,8 +26,36 @@ env:
   IMAGE: calliopeai/astrolift-cli
 
 jobs:
+  verify:
+    name: Test and portable docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Verify embedded documentation
+        run: make vendor-docs-check
+
+      - name: Export portable documentation and man pages
+        run: |
+          make docs
+          test -s build/docs/llms.txt
+          test -s build/docs/guides/manifest.md
+          test -s build/docs/commands/astro.md
+          test -s build/docs/man/man1/astro.1
+
   release:
     name: GoReleaser (tagged release)
+    needs: verify
     if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
     runs-on: ubuntu-latest
     steps:
@@ -183,7 +212,8 @@ jobs:
 
   main-image:
     name: Main image (${{ matrix.suffix }})
-    if: ${{ github.ref_type != 'tag' }}
+    needs: verify
+    if: ${{ github.event_name != 'pull_request' && github.ref_type != 'tag' }}
     # Native arm64 runner avoids QEMU emulation overhead.
     runs-on: ${{ matrix.runner }}
     permissions:
