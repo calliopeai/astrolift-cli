@@ -110,7 +110,8 @@ func TestWorkflowDefinitionShowsStages(t *testing.T) {
 		},
 		"workflowStages": []map[string]interface{}{
 			{"order": 0, "kind": "agent_dispatch", "onFailure": "retry", "timeoutSeconds": 600,
-				"fanOutCount": fanOut, "agentDefinitionName": "observer"},
+				"fanOutCount": fanOut, "agentDefinitionName": "observer",
+				"environmentSpecSlug": "observer-prod", "outputKey": "observations"},
 			{"order": 1, "kind": "human_gate", "onFailure": "fail", "timeoutSeconds": 86400,
 				"fanOutCount": nil, "agentDefinitionName": nil},
 		},
@@ -126,6 +127,7 @@ func TestWorkflowDefinitionShowsStages(t *testing.T) {
 	for _, want := range []string{
 		"OODA (ooda)", "Pattern:     chained", "Scope:       global",
 		"[0] agent_dispatch on_failure=retry timeout=600s fan_out=3 agent=observer",
+		"environment_spec=observer-prod", "output_key=observations",
 		"[1] human_gate on_failure=fail timeout=86400s",
 	} {
 		if !strings.Contains(got, want) {

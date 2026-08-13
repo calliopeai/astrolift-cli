@@ -8,19 +8,10 @@
 apps, deploy, manage secrets, and inspect runtime state. Operators use it to
 register clusters and configure providers against an Astrolift control plane.
 
-> **Status posture.** This CLI is early — pre-1.0 and only a handful of
-> commits in. The command tree is structured (every group has its
-> subcommands wired in Cobra) but several command bodies still surface
-> `not yet wired to the API` until the matching backend resolvers
-> ship. The wired surfaces today are: `astro server *`, `astro auth *`,
-> `astro app` (`init`, `register`, `deploy`, `list`, `show`, `logs`,
-> `exec`, `rollback`, `promote`), `astro exec`, `astro agent *`,
-> `astro workflow` (`init`, `validate`, `pull`), `astro ci
-> deploy` / `astro ci status`, `astro version-check` / `astro self-update`,
-> `astro version`, `astro docs`, and `astro cluster bootstrap`. The `astro
-> app` sub-resource groups (secrets, services, domains, …) are still
-> scaffolded. Subcommand surface, flag names, and exit codes may shift
-> before 1.0 — pin a tagged release in CI rather than tracking `main`.
+> **Status posture.** The CLI is pre-1.0. Pin a tagged release in CI rather
+> than tracking `main`; command and API surfaces may still evolve before 1.0.
+> Run `astro <command> --help` or `astro docs show cli` for the exact surface
+> shipped by your installed release.
 
 ---
 
@@ -44,10 +35,10 @@ scoop install astro
 ### `curl | sh` installer
 
 ```bash
-curl -fsSL https://astrolift.app/cli/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/calliopeai/astrolift-cli/main/scripts/install.sh | sh
 ```
 
-The installer detects your OS / arch, fetches the matching tarball from
+The installer detects your OS / arch, fetches and checksum-verifies the matching tarball from
 [GitHub Releases](https://github.com/calliopeai/astrolift-cli/releases),
 and drops `astro` into `/usr/local/bin` (or `~/.local/bin` if the system
 dir isn't writable). See [`scripts/install.sh`](scripts/install.sh).
@@ -61,9 +52,9 @@ the `astro` binary, and place it on your `PATH`.
 ### Docker
 
 ```bash
-docker pull ghcr.io/calliopeai/astro:latest
+docker pull ghcr.io/calliopeai/astrolift-cli:latest
 docker run --rm -v "${HOME}/.config/astrolift:/home/nonroot/.config/astrolift" \
-    ghcr.io/calliopeai/astro:latest version
+    ghcr.io/calliopeai/astrolift-cli:latest version
 ```
 
 The image is `gcr.io/distroless/static-debian12:nonroot`; mount your
@@ -159,14 +150,14 @@ the status note above.)
 | `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `rollback`, `promote`) plus sub-resources (secrets, services, domains, tokens, members, jobs, events, audit, previews). `deploy` needs `--image-tag`; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `promote --from <env> --to <env>` moves an env's running deployment (image+config) to another via `promoteDeployment`. |
 | `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
 | `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <workflow-slug>` is the distinct WorkflowDefinition seam (`runWorkflowDefinition`). |
-| `astro workflow` | Author + round-trip the declarative workflow manifest TOML (spec 40 §5.4). `init [--pattern chained] [-o workflow.toml]` scaffolds a starter manifest (client-side; patterns: chained, single, review_loop, fan_out, supervisor_worker). `validate <file.toml>` checks shape locally; `--server` runs authoritative validation via `previewWorkflowManifest`. `pull <slug> [--org <id>] [-o file]` exports a definition's TOML (org ∪ global catalogue) via `exportWorkflowManifest` — the way to start from a global like `ooda`/`rasd`. All server ops are `WORKFLOW_READ`-gated server-side. `push`/`register` is deferred with repo-registration (§8). |
+| `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, and delete organization workflows. `validate --server` is authoritative for the selected install. Repository registration separately reconciles `workflows/**/*.toml`. |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. `render` prints the manifests the platform would apply (`astroliftRenderedManifest`) for pre-merge review. |
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `org list`/`org show`, `team list`/`team create`, `project list`/`project create` (`project create` needs `--team <slug>`; both creates take `--name`/`--description`). |
 | `astro operator` | Operator (admin) cluster, provider, and federation management. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
-| `astro docs` | Open the platform docs in your browser. |
+| `astro docs` | Open public docs, read embedded release-matched topics, or export portable Markdown and man pages. |
 | `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. |
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
 
@@ -177,6 +168,27 @@ to stderr; data goes to stdout.
 
 Run `astro <command> --help` for the full flag set; the help text is
 the source of truth.
+
+### Documentation for humans and agents
+
+The binary includes a release-matched, network-free reference for the CLI,
+control API, MCP, `astrolift.toml`, agent packages, and workflow TOML:
+
+```bash
+astro docs list
+astro docs show manifest
+astro docs export ./astrolift-docs
+astro docs man ./man/man1
+```
+
+`docs export` also creates `llms.txt`, generated Markdown for the live command
+tree, and section-1 man pages. Homebrew installs the generated man pages with
+the binary. The canonical public site is [astrolift.dev](https://astrolift.dev).
+CLI main builds and tagged releases byte-compare the embedded guide subset with
+canonical docs main. A weekday drift workflow performs the same cross-repo
+check even when the CLI has not changed. Refresh intentional docs changes with
+`make vendor-docs` from the metarepo, then commit the snapshot through the
+normal signed/DCO review flow.
 
 ---
 
@@ -237,6 +249,8 @@ make build              # compile ./astro with version ldflag
 make test               # go test ./... -v -count=1
 make fmt                # gofmt + goimports
 make lint               # golangci-lint run ./...
+make vendor-docs        # refresh the committed offline docs snapshot
+make docs               # build a complete portable docs tree under build/
 make clean              # remove ./astro, clear test cache
 ```
 
@@ -249,7 +263,7 @@ goreleaser release --snapshot --clean
 ```
 
 CI runs the same on tags, plus produces Homebrew tap + Scoop bucket
-updates and a Docker image at `ghcr.io/calliopeai/astro`.
+updates and a Docker image at `ghcr.io/calliopeai/astrolift-cli`.
 
 ---
 

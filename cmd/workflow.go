@@ -59,15 +59,17 @@ type workflowDef struct {
 }
 
 type workflowStage struct {
-	Kind      string      `toml:"kind"`
-	Role      string      `toml:"role"`
-	Agent     string      `toml:"agent"`
-	Skills    []string    `toml:"skills"`
-	OnFailure string      `toml:"on_failure"`
-	Timeout   int         `toml:"timeout"`
-	FanOut    interface{} `toml:"fan_out"` // tri-state: 0/N (int) or "dynamic"
-	Prompt    string      `toml:"prompt"`
-	Approvers []string    `toml:"approvers"`
+	Kind                string      `toml:"kind"`
+	Role                string      `toml:"role"`
+	Agent               string      `toml:"agent"`
+	EnvironmentSpecSlug string      `toml:"environment_spec_slug"`
+	Skills              []string    `toml:"skills"`
+	OnFailure           string      `toml:"on_failure"`
+	Timeout             int         `toml:"timeout"`
+	FanOut              interface{} `toml:"fan_out"` // tri-state: 0/N (int) or "dynamic"
+	Prompt              string      `toml:"prompt"`
+	OutputKey           string      `toml:"output_key"`
+	Approvers           []string    `toml:"approvers"`
 }
 
 // Valid value sets mirror the backend models (WorkflowDefinition.PatternKind,
@@ -111,6 +113,19 @@ func validateWorkflowManifestShape(m *workflowManifest) error {
 		}
 		if fo, ok := s.FanOut.(string); ok && fo != "dynamic" {
 			return fmt.Errorf("stage[%d].fan_out string must be \"dynamic\", got %q", i, fo)
+		}
+		effectiveOutputKey := s.OutputKey
+		if effectiveOutputKey == "" {
+			effectiveOutputKey = fmt.Sprintf("stage_%d", i)
+		}
+		for previous := 0; previous < i; previous++ {
+			previousKey := m.Stages[previous].OutputKey
+			if previousKey == "" {
+				previousKey = fmt.Sprintf("stage_%d", previous)
+			}
+			if previousKey == effectiveOutputKey {
+				return fmt.Errorf("stage output_key values must be unique: %q", effectiveOutputKey)
+			}
 		}
 	}
 	return nil
@@ -215,7 +230,10 @@ const previewWorkflowManifestQuery = `query($toml: String!) {
     errorLine
     errorColumn
     definition { slug name pattern description }
-    stages { order kind role agent skills onFailure timeout fanOut prompt approvers }
+    stages {
+      order kind role agent environmentSpecSlug skills onFailure timeout
+      fanOut prompt outputKey approvers
+    }
   }
 }`
 
@@ -227,16 +245,18 @@ type workflowPreviewDef struct {
 }
 
 type workflowPreviewStage struct {
-	Order     int      `json:"order"`
-	Kind      string   `json:"kind"`
-	Role      string   `json:"role"`
-	Agent     *string  `json:"agent"`
-	Skills    []string `json:"skills"`
-	OnFailure string   `json:"onFailure"`
-	Timeout   int      `json:"timeout"`
-	FanOut    string   `json:"fanOut"`
-	Prompt    *string  `json:"prompt"`
-	Approvers []string `json:"approvers"`
+	Order               int      `json:"order"`
+	Kind                string   `json:"kind"`
+	Role                string   `json:"role"`
+	Agent               *string  `json:"agent"`
+	EnvironmentSpecSlug *string  `json:"environmentSpecSlug"`
+	Skills              []string `json:"skills"`
+	OnFailure           string   `json:"onFailure"`
+	Timeout             int      `json:"timeout"`
+	FanOut              string   `json:"fanOut"`
+	Prompt              *string  `json:"prompt"`
+	OutputKey           *string  `json:"outputKey"`
+	Approvers           []string `json:"approvers"`
 }
 
 type workflowManifestPreview struct {
@@ -275,8 +295,16 @@ func runWorkflowValidateServer(cmd *cobra.Command, ctx context.Context, client *
 		if s.Agent != nil && *s.Agent != "" {
 			agent = " agent=" + *s.Agent
 		}
-		fmt.Fprintf(out, "  [%d] %s role=%s%s on_failure=%s timeout=%d fan_out=%s\n",
-			s.Order, s.Kind, s.Role, agent, s.OnFailure, s.Timeout, s.FanOut)
+		environment := ""
+		if s.EnvironmentSpecSlug != nil && *s.EnvironmentSpecSlug != "" {
+			environment = " environment_spec=" + *s.EnvironmentSpecSlug
+		}
+		outputKey := ""
+		if s.OutputKey != nil && *s.OutputKey != "" {
+			outputKey = " output_key=" + *s.OutputKey
+		}
+		fmt.Fprintf(out, "  [%d] %s role=%s%s%s%s on_failure=%s timeout=%d fan_out=%s\n",
+			s.Order, s.Kind, s.Role, agent, environment, outputKey, s.OnFailure, s.Timeout, s.FanOut)
 	}
 	return nil
 }

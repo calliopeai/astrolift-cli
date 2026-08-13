@@ -93,6 +93,7 @@ const workflowDefinitionDetailQuery = `query($slug: String!) {
   }
   workflowStages(workflowSlug: $slug) {
     order kind onFailure timeoutSeconds fanOutCount agentDefinitionName
+    environmentSpecSlug outputKey
   }
 }`
 
@@ -148,7 +149,10 @@ const importWorkflowManifestMutation = `mutation($toml: String!, $preview: Boole
     createdSlug
     manifest {
       definition { slug name pattern description }
-      stages { order kind role agent skills onFailure timeout fanOut prompt approvers }
+      stages {
+        order kind role agent environmentSpecSlug skills onFailure timeout
+        fanOut prompt outputKey approvers
+      }
     }
   }
 }`
@@ -197,6 +201,8 @@ type workflowStageRow struct {
 	TimeoutSeconds      int     `json:"timeoutSeconds"`
 	FanOutCount         *int    `json:"fanOutCount"`
 	AgentDefinitionName *string `json:"agentDefinitionName"`
+	EnvironmentSpecSlug string  `json:"environmentSpecSlug"`
+	OutputKey           string  `json:"outputKey"`
 }
 
 type configuredWorkflow struct {
@@ -297,7 +303,7 @@ var workflowDefinitionCmd = &cobra.Command{
 	Short: "Show one workflow definition and its stages",
 	Long: `Fetches a visible WorkflowDefinition by slug (workflowDefinition) plus
 its ordered stages (workflowStages): kind, on-failure policy, timeout,
-fan-out, and the bound agent definition if any.`,
+fan-out, environment recipe, output key, and the bound agent definition if any.`,
 	Args: cobra.ExactArgs(1),
 	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
 		return runWorkflowDefinition(cmd, ctx, client, args[0])
@@ -341,6 +347,12 @@ func runWorkflowDefinition(cmd *cobra.Command, ctx context.Context, client *api.
 		}
 		if s.AgentDefinitionName != nil && *s.AgentDefinitionName != "" {
 			line += " agent=" + *s.AgentDefinitionName
+		}
+		if s.EnvironmentSpecSlug != "" {
+			line += " environment_spec=" + s.EnvironmentSpecSlug
+		}
+		if s.OutputKey != "" {
+			line += " output_key=" + s.OutputKey
 		}
 		fmt.Fprintln(out, line)
 	}

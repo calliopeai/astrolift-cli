@@ -10,6 +10,7 @@ name: Build and Publish
 #   - dispatch     -> manual run.
 
 on:
+  pull_request:
   push:
     branches: [main]
     tags: ['v*']
@@ -25,8 +26,60 @@ env:
   IMAGE: calliopeai/astrolift-cli
 
 jobs:
+  verify:
+    name: Test and portable docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pull requests may intentionally update the embedded snapshot alongside
+      # an unmerged canonical-docs PR. Main builds and tags have no such excuse:
+      # the release-matched offline guides must byte-match canonical main.
+      - name: Checkout canonical documentation
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          repository: calliopeai/astrolift-docs
+          path: canonical-docs
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Verify embedded documentation is complete
+        run: make vendor-docs-check
+
+      - name: Verify embedded documentation matches canonical main
+        if: ${{ github.event_name != 'pull_request' }}
+        run: make vendor-docs-check DOCS_SRC=canonical-docs/docs
+
+      - name: Export portable documentation and man pages
+        run: |
+          make docs
+          test -s build/docs/llms.txt
+          test -s build/docs/guides/manifest.md
+          test -s build/docs/commands/astro.md
+          test -s build/docs/man/man1/astro.1
+
+      - name: Lint generated man pages
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y mandoc
+          output="$(mandoc -T lint build/docs/man/man1/*.1 2>&1)"
+          if [ -n "$output" ]; then
+            printf '%s\n' "$output"
+            exit 1
+          fi
+
   release:
     name: GoReleaser (tagged release)
+    needs: verify
     if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
     runs-on: ubuntu-latest
     steps:
@@ -36,7 +89,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
           cache: true
 
       - uses: docker/setup-qemu-action@v3
@@ -183,7 +236,8 @@ jobs:
 
   main-image:
     name: Main image (${{ matrix.suffix }})
-    if: ${{ github.ref_type != 'tag' }}
+    needs: verify
+    if: ${{ github.event_name != 'pull_request' && github.ref_type != 'tag' }}
     # Native arm64 runner avoids QEMU emulation overhead.
     runs-on: ${{ matrix.runner }}
     permissions:
