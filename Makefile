@@ -61,6 +61,23 @@ vendor-docs-check:
 	@for file in client.md cli.md api.md mcp.md manifest.md agents.md workflows.md llms.txt; do \
 		test -s "$(DOCS_DST)/$$file" || { echo "missing $(DOCS_DST)/$$file — run \`make vendor-docs\`"; exit 1; }; \
 	done
+	@if [ -d "$(DOCS_SRC)" ]; then \
+		for pair in \
+			"guides/clients.md:client.md" \
+			"reference/cli.md:cli.md" \
+			"reference/api.md:api.md" \
+			"reference/mcp.md:mcp.md" \
+			"reference/astrolift-toml.md:manifest.md" \
+			"reference/agent-packages.md:agents.md" \
+			"reference/workflow-toml.md:workflows.md" \
+			"llms.txt:llms.txt"; do \
+			source="$${pair%%:*}"; destination="$${pair#*:}"; \
+			cmp -s "$(DOCS_SRC)/$$source" "$(DOCS_DST)/$$destination" || { \
+				echo "stale $(DOCS_DST)/$$destination — run \`make vendor-docs\`"; \
+				exit 1; \
+			}; \
+		done; \
+	fi
 
 # Refresh the vendored astrolift-prereqs chart from the metarepo. Run this
 # whenever the source chart bumps; commit the result. Skips silently when
