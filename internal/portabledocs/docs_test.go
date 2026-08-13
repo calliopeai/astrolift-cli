@@ -22,10 +22,13 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
+		"astrolift-toml": "manifest",
 		"astrolift.toml": "manifest",
 		"toml":           "manifest",
 		"agent-package":  "agents",
+		"agent-packages": "agents",
 		"workflow":       "workflows",
+		"workflow-toml":  "workflows",
 	} {
 		topic, err := Resolve(alias)
 		if err != nil {

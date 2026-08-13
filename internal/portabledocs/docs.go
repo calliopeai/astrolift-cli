@@ -35,6 +35,7 @@ var aliases = map[string]string{
 	"agent":          "agents",
 	"agent-package":  "agents",
 	"agent-packages": "agents",
+	"astrolift-toml": "manifest",
 	"astrolift.toml": "manifest",
 	"toml":           "manifest",
 	"workflow":       "workflows",
