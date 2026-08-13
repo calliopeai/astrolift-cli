@@ -173,14 +173,6 @@ var statusCmd = &cobra.Command{
 	},
 }
 
-var docsCmd = &cobra.Command{
-	Use:   "docs",
-	Short: "Open the platform docs in your browser (#15)",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return openBrowser("https://docs.astrolift.app")
-	},
-}
-
 func init() {
 	orgCmd.AddCommand(orgListCmd, orgShowCmd, orgSecretBundlesCmd,
 		orgWebhooksCmd, orgTokensCmd, orgEventsCmd, orgAuditCmd,
@@ -197,7 +189,7 @@ func init() {
 	alertListCmd.Flags().BoolVar(&alertListAll, "all", false, "Include inactive rules")
 
 	rootCmd.AddCommand(orgCmd, teamCmd, projectCmd, operatorCmd,
-		scmCmd, alertCmd, statusCmd, docsCmd)
+		scmCmd, alertCmd, statusCmd)
 }
 
 // ---- team list / create (astroliftTeams / createTeam) ----------------------

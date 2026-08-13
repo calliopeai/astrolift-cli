@@ -78,6 +78,7 @@ brews:
     license: "MIT"
     install: |
       bin.install "astro"
+      system bin/"astro", "docs", "man", man1
     test: |
       system "#{bin}/astro version"
 

@@ -132,6 +132,8 @@ func TestWorkflowValidateLocalCatchesMalformed(t *testing.T) {
 		{"bad pattern", "[workflow]\nslug = \"x\"\nname = \"X\"\npattern = \"spiral\"\n", "pattern \"spiral\" is invalid"},
 		{"bad stage kind", "[workflow]\nslug = \"x\"\nname = \"X\"\n\n[[stage]]\nkind = \"teleport\"\n", "kind \"teleport\" is invalid"},
 		{"bad fan_out", "[workflow]\nslug = \"x\"\nname = \"X\"\n\n[[stage]]\nkind = \"agent_dispatch\"\nfan_out = \"sometimes\"\n", "fan_out string must be"},
+		{"duplicate explicit output key", "[workflow]\nslug = \"x\"\nname = \"X\"\n\n[[stage]]\nkind = \"agent_dispatch\"\noutput_key = \"result\"\n\n[[stage]]\nkind = \"aggregation\"\noutput_key = \"result\"\n", "output_key values must be unique"},
+		{"default output key collision", "[workflow]\nslug = \"x\"\nname = \"X\"\n\n[[stage]]\nkind = \"agent_dispatch\"\n\n[[stage]]\nkind = \"aggregation\"\noutput_key = \"stage_0\"\n", "output_key values must be unique"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -172,6 +174,7 @@ func previewData(ok bool) map[string]interface{} {
 			},
 			"stages": []map[string]interface{}{
 				{"order": 0, "kind": "agent_dispatch", "role": "implementer", "agent": "my-coder",
+					"environmentSpecSlug": "coder-prod", "outputKey": "implementation",
 					"skills": []string{"write-tests"}, "onFailure": "retry", "timeout": 600, "fanOut": "0",
 					"prompt": nil, "approvers": []string{}},
 				{"order": 1, "kind": "human_gate", "role": "reviewer", "agent": nil,
@@ -199,7 +202,7 @@ func TestWorkflowValidateServerHitsPreview(t *testing.T) {
 		t.Errorf("toml var not forwarded: %v", captured.Variables["toml"])
 	}
 	got := out.String()
-	for _, want := range []string{"OK (server validation)", "Feature Dev (feature-dev)", "pattern=chained", "agent=my-coder", "human_gate", "fan_out=0"} {
+	for _, want := range []string{"OK (server validation)", "Feature Dev (feature-dev)", "pattern=chained", "agent=my-coder", "environment_spec=coder-prod", "output_key=implementation", "human_gate", "fan_out=0"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("server validate output missing %q:\n%s", want, got)
 		}

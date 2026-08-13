@@ -1,11 +1,10 @@
 #!/usr/bin/env sh
 # Astrolift CLI curl|sh installer (#17).
 #
-# Usage: curl -fsSL https://astrolift.app/cli/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/calliopeai/astrolift-cli/main/scripts/install.sh | sh
 #
-# Detects OS + architecture, fetches the latest GitHub release
-# tarball/zip, extracts the binary, and drops it in either
-# /usr/local/bin (when writable) or ~/.local/bin.
+# Detects OS + architecture, verifies the latest GitHub release archive,
+# and installs the binary in ASTRO_INSTALL_DIR, /usr/local/bin, or ~/.local/bin.
 
 set -e
 
@@ -16,50 +15,60 @@ USER_BIN="${HOME}/.local/bin"
 
 err() { printf '%s\n' "error: $*" >&2; exit 1; }
 
-# Detect OS
+# Detect OS (GoReleaser asset names are lower-case).
 case "$(uname -s)" in
-    Linux*)  OS=Linux ;;
-    Darwin*) OS=Darwin ;;
+    Linux*)  OS=linux ;;
+    Darwin*) OS=darwin ;;
     *)       err "unsupported OS: $(uname -s) (use the binary download from GitHub releases)" ;;
 esac
 
 # Detect architecture
 case "$(uname -m)" in
-    x86_64|amd64) ARCH=x86_64 ;;
+    x86_64|amd64) ARCH=amd64 ;;
     arm64|aarch64) ARCH=arm64 ;;
     *)            err "unsupported architecture: $(uname -m)" ;;
 esac
 
-# Pick install dir — prefer system if writable, else user-local
-if [ -w "${INSTALL_DIR_DEFAULT}" ]; then
+# Pick install dir — explicit override, then writable system dir, then user-local.
+if [ -n "${ASTRO_INSTALL_DIR:-}" ]; then
+    INSTALL_DIR="${ASTRO_INSTALL_DIR}"
+elif [ -w "${INSTALL_DIR_DEFAULT}" ]; then
     INSTALL_DIR="${INSTALL_DIR_DEFAULT}"
 else
     INSTALL_DIR="${USER_BIN}"
-    mkdir -p "${INSTALL_DIR}"
 fi
+mkdir -p "${INSTALL_DIR}"
 
-# Resolve latest version (GitHub redirects /releases/latest to the latest tag)
-VERSION="$(curl -fsSL -o /dev/null -w '%{redirect_url}' \
-    "https://github.com/${REPO}/releases/latest" \
-    | sed 's|.*/tag/v\?||')"
-[ -n "${VERSION}" ] || err "couldn't resolve latest CLI version"
+ARCHIVE="${BINARY}-${OS}-${ARCH}.tar.gz"
+BASE_URL="${ASTRO_INSTALL_BASE_URL:-https://github.com/${REPO}/releases/latest/download}"
+URL="${BASE_URL}/${ARCHIVE}"
+CHECKSUM_URL="${BASE_URL}/${BINARY}-checksums.txt"
 
-ARCHIVE="${BINARY}_${VERSION}_${OS}_${ARCH}.tar.gz"
-URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
-
-TMPDIR="$(mktemp -d)"
-trap 'rm -rf "${TMPDIR}"' EXIT
+ASTRO_INSTALL_TMP="$(mktemp -d)"
+trap 'rm -rf "${ASTRO_INSTALL_TMP}"' EXIT
 
 echo "Fetching ${URL}..."
-curl -fsSL "${URL}" -o "${TMPDIR}/${ARCHIVE}" || err "download failed"
+curl -fSL --retry 3 --retry-delay 2 "${URL}" -o "${ASTRO_INSTALL_TMP}/${ARCHIVE}" || err "download failed"
+curl -fSL --retry 3 --retry-delay 2 "${CHECKSUM_URL}" -o "${ASTRO_INSTALL_TMP}/${BINARY}-checksums.txt" || err "checksum download failed"
 
-cd "${TMPDIR}"
+EXPECTED="$(awk -v archive="${ARCHIVE}" '$2 == archive { print $1; exit }' "${ASTRO_INSTALL_TMP}/${BINARY}-checksums.txt")"
+[ -n "${EXPECTED}" ] || err "release checksum does not list ${ARCHIVE}"
+if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL="$(sha256sum "${ASTRO_INSTALL_TMP}/${ARCHIVE}" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+    ACTUAL="$(shasum -a 256 "${ASTRO_INSTALL_TMP}/${ARCHIVE}" | awk '{print $1}')"
+else
+    err "sha256sum or shasum is required to verify the release"
+fi
+[ "${ACTUAL}" = "${EXPECTED}" ] || err "checksum mismatch for ${ARCHIVE}"
+
+cd "${ASTRO_INSTALL_TMP}"
 tar -xzf "${ARCHIVE}"
+[ -f "${BINARY}" ] || err "archive does not contain ${BINARY}"
 
-mv "${BINARY}" "${INSTALL_DIR}/${BINARY}"
-chmod +x "${INSTALL_DIR}/${BINARY}"
+install -m 0755 "${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
-echo "Installed astro ${VERSION} to ${INSTALL_DIR}/${BINARY}"
+echo "Installed to ${INSTALL_DIR}/${BINARY}"
 if [ "${INSTALL_DIR}" = "${USER_BIN}" ]; then
     case ":${PATH}:" in
         *":${USER_BIN}:"*) ;;
