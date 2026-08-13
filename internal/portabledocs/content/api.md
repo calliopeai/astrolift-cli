@@ -67,6 +67,24 @@ by that server. The platform repository also publishes `schema.graphql` for
 client generation. Prefer generated types or committed operations over building
 query strings from user input.
 
+## Generated contracts and drift checks
+
+The release source publishes the [GraphQL SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
+and the [MCP capability superset](https://github.com/calliopeai/astrolift-app/blob/main/backend/contracts/mcp-tools.json).
+Replace `main` in those URLs with an immutable backend tag or commit SHA when
+pinning a client build.
+
+Platform contributors regenerate both artifacts with `make contracts` and
+verify them with `make contracts-check`. CI assembles the full-feature
+Strawberry schema, byte-compares the backend/frontend SDL, validates every MCP
+input JSON Schema, checks MCP metadata against live handlers, regenerates
+frontend GraphQL types, and rejects any diff.
+
+This is not yet a generated catch-all OpenAPI document. Most focused REST
+routes still define payloads imperatively, so route introspection would publish
+names without truthful request, response, and authorization schemas. REST
+OpenAPI will be generated as those endpoints adopt shared typed contracts.
+
 ## Compatibility
 
 - Query server capabilities before assuming an optional module exists.

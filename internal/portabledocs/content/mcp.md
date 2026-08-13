@@ -45,6 +45,11 @@ the installation operator.
 ## Tools
 
 The server filters `tools/list` to operations allowed by both scope and RBAC.
+The checked-in [generated capability document](https://github.com/calliopeai/astrolift-app/blob/main/backend/contracts/mcp-tools.json)
+is the caller-independent superset used for release tooling and documentation.
+Pin a tag or commit instead of `main` for reproducible generation. It includes
+the required token scopes, RBAC permissions, and input JSON Schemas; it does
+not imply that a particular caller may invoke every listed tool.
 
 | Tool | Required scope | Purpose |
 |---|---|---|

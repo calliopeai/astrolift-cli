@@ -57,6 +57,13 @@ identity is read by the CLI registration flow; include both. Unknown TOML keys
 may be retained for forward compatibility, but do not assume they affect the
 runtime unless documented here.
 
+There is not yet a generated JSON Schema for this filename. App manifests and
+agent configuration/includes are two related parser families, and validation
+also depends on cross-field rules, source paths, chroot boundaries, provider
+capabilities, and organization policy. Treat target-server validation as
+authoritative until those parsers consume shared typed contracts that can emit
+separate app and agent schemas plus a dispatcher schema.
+
 `[environments.<name>]` tables declare environment names that registration and
 repo resync can bootstrap, as the empty `production` table above does. Manage
 the environment's cluster binding and runtime configuration through the
