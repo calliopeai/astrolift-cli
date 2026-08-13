@@ -24,14 +24,13 @@ docker run --rm -it \
 
 Credentials live at `~/.config/astrolift/credentials/<server>.yaml` (mode `0600`).
 
-## Other install methods
+## Native binary install
 
-| Method | Command |
-|--------|---------|
-| Homebrew | `brew install calliopeai/tap/astro` |
-| Scoop (Windows) | `scoop bucket add calliopeai https://github.com/calliopeai/scoop-bucket && scoop install astro` |
-| curl \| sh | `curl -fsSL https://astrolift.app/install.sh \| sh` |
-| Direct binary | [GitHub Releases](https://github.com/calliopeai/astrolift-cli/releases) |
+Native archives are in the private GitHub release repository. Authorized users
+can download them with `gh release download --repo
+calliopeai/astrolift-cli`. Homebrew, Scoop, anonymous `curl`, and direct browser
+downloads are not supported until those archives have a public distribution
+channel. See the [CLI install reference](https://astrolift.dev/reference/cli/#install).
 
 ## Tags
 

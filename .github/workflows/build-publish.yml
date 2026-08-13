@@ -2,7 +2,7 @@ name: Build and Publish
 
 # astrolift-cli release pipeline.
 #   - Tag v*       -> goreleaser builds binaries (Linux/macOS/Win, amd64/arm64),
-#                     Homebrew tap, Scoop bucket, and Docker images on
+#                     authenticated GitHub release assets, and Docker images on
 #                     docker.io/calliopeai/astrolift-cli + ghcr.io/calliopeai/astrolift-cli
 #                     (multi-arch manifest, :version + :latest).
 #   - main push    -> from-source multi-arch image tagged
@@ -117,17 +117,12 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # brews/scoops push to the calliopeai homebrew-tap + scoop-bucket
-          # repos — a cross-repo write the default GITHUB_TOKEN can't do, so
-          # use the org-wide CI PAT (PAT_CALLIOPE_CI, visibility ALL).
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.PAT_CALLIOPE_CI }}
-          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.PAT_CALLIOPE_CI }}
 
   release-smoke:
     name: Release smoke (${{ matrix.os_label }})
-    # Runs the exact curl one-liner the downloads page advertises,
-    # against the release we just cut. Catches asset-naming and
-    # checksum-publishing regressions before any user does.
+    # Downloads through the authenticated GitHub API because this source and
+    # release repository is private. Catches asset naming, executability,
+    # version injection, and checksum regressions before any user does.
     needs: release
     if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
     runs-on: ${{ matrix.runner }}
@@ -169,6 +164,7 @@ jobs:
 
       - name: Download, extract, and run astro
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
           ASSET: ${{ matrix.asset }}
         run: |
@@ -179,22 +175,18 @@ jobs:
           # the runner workspace or with the downloaded tarball.
           WORK="$(mktemp -d)"
           cd "$WORK"
-          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
-          echo "Fetching $URL into $WORK"
-          # Download to a file first so curl errors print stderr +
-          # HTTP code, and tar failures aren't conflated with curl
-          # failures via pipefail. --retry rides out the brief window
-          # where the release API has the asset but the SAS URL on
-          # release-assets.githubusercontent.com is still propagating.
-          curl -fSL --retry 5 --retry-delay 3 --retry-all-errors \
-               -o "$ASSET" \
-               -w "http_code=%{http_code} size=%{size_download} url_effective=%{url_effective}\n" \
-               "$URL"
+          echo "Fetching $ASSET into $WORK"
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "$ASSET" \
+            --dir "$WORK"
           ls -la "$ASSET"
           file "$ASSET" || true
           tar -xzvf "$ASSET"
           ls -la
           test -x ./astro || { echo "astro binary missing or non-executable" >&2; ls -la; exit 1; }
+          test -s share/man/man1/astro.1 || { echo "astro man page missing" >&2; exit 1; }
+          test -s share/doc/astrolift/llms.txt || { echo "portable docs index missing" >&2; exit 1; }
           # `astro version` is the Cobra subcommand; `--version` is
           # not wired up on the root command (rootCmd.Version is empty
           # so the flag exits 1 with no output).
@@ -211,16 +203,19 @@ jobs:
 
       - name: Verify SHA-256 against astro-checksums.txt
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
           ASSET: ${{ matrix.asset }}
           SHA_CMD: ${{ matrix.sha_cmd }}
         run: |
           set -Eeuo pipefail
           trap 'rc=$?; echo "::error::sha verify failed at line $LINENO with exit code $rc (cmd: $BASH_COMMAND)" >&2; exit $rc' ERR
-          CHK_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/astro-checksums.txt"
-          ASSET_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
-          curl -fSL --retry 5 --retry-delay 3 --retry-all-errors -o astro-checksums.txt "$CHK_URL"
-          curl -fSL --retry 5 --retry-delay 3 --retry-all-errors -o "$ASSET" "$ASSET_URL"
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern astro-checksums.txt \
+            --pattern "$ASSET" \
+            --dir . \
+            --clobber
           EXPECTED="$(grep -E "  ${ASSET}\$" astro-checksums.txt | awk '{print $1}')"
           if [ -z "$EXPECTED" ]; then
             echo "no checksum line for $ASSET in astro-checksums.txt" >&2
