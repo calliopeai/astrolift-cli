@@ -12,7 +12,13 @@ LDFLAGS  := -ldflags "-X $(MODULE)/cmd.Version=$(VERSION) -X $(MODULE)/cmd.Commi
 PREREQS_SRC ?= ../astrolift-opscode/helm/astrolift-prereqs
 PREREQS_DST := internal/charts/astrolift-prereqs
 
-.PHONY: build test fmt lint clean vendor-charts vendor-charts-check
+# Canonical public documentation lives in astrolift-docs. A deliberately
+# small release-matched snapshot is committed here so `astro docs` and the
+# generated man pages work without a network connection or sibling checkout.
+DOCS_SRC ?= ../astrolift-docs/docs
+DOCS_DST := internal/portabledocs/content
+
+.PHONY: build test fmt lint clean docs manpages vendor-docs vendor-docs-check vendor-charts vendor-charts-check
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
@@ -30,6 +36,31 @@ lint:
 clean:
 	rm -f $(BINARY)
 	go clean -testcache
+
+docs: build
+	./$(BINARY) docs export build/docs --force
+
+manpages: build
+	./$(BINARY) docs man build/man/man1 --force
+
+# Refresh the offline snapshot from the public docs repository. The explicit
+# mapping is the contract: do not embed the entire website in the CLI.
+vendor-docs:
+	@test -d "$(DOCS_SRC)" || (echo "missing $(DOCS_SRC)" && exit 1)
+	@mkdir -p "$(DOCS_DST)"
+	cp "$(DOCS_SRC)/guides/clients.md" "$(DOCS_DST)/client.md"
+	cp "$(DOCS_SRC)/reference/cli.md" "$(DOCS_DST)/cli.md"
+	cp "$(DOCS_SRC)/reference/api.md" "$(DOCS_DST)/api.md"
+	cp "$(DOCS_SRC)/reference/mcp.md" "$(DOCS_DST)/mcp.md"
+	cp "$(DOCS_SRC)/reference/astrolift-toml.md" "$(DOCS_DST)/manifest.md"
+	cp "$(DOCS_SRC)/reference/agent-packages.md" "$(DOCS_DST)/agents.md"
+	cp "$(DOCS_SRC)/reference/workflow-toml.md" "$(DOCS_DST)/workflows.md"
+	cp "$(DOCS_SRC)/llms.txt" "$(DOCS_DST)/llms.txt"
+
+vendor-docs-check:
+	@for file in client.md cli.md api.md mcp.md manifest.md agents.md workflows.md llms.txt; do \
+		test -s "$(DOCS_DST)/$$file" || { echo "missing $(DOCS_DST)/$$file — run \`make vendor-docs\`"; exit 1; }; \
+	done
 
 # Refresh the vendored astrolift-prereqs chart from the metarepo. Run this
 # whenever the source chart bumps; commit the result. Skips silently when

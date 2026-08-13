@@ -1,0 +1,34 @@
+# Astrolift documentation
+
+> Astrolift is a multi-tenant control plane for applications, agents, workflows, and portable Kubernetes deployments.
+
+Use these plain-Markdown references as the current public contract. The target installation's GraphQL schema and server-side validators remain authoritative.
+
+## Start here
+
+- [Choose a client](https://astrolift.dev/guides/clients/): dashboard, CLI, API, and MCP decision guide
+- [Platform reference](https://astrolift.dev/reference/): reference index and versioning rules
+- [Getting started](https://astrolift.dev/getting-started/): install, authenticate, register, and deploy
+
+## Client contracts
+
+- [CLI](https://astrolift.dev/reference/cli/): commands, auth, CI, offline docs, Markdown export, and man pages
+- [Control API](https://astrolift.dev/reference/api/): GraphQL endpoint, REST boundaries, bearer auth, tenancy, and errors
+- [MCP](https://astrolift.dev/reference/mcp/): Streamable HTTP endpoint, scopes, tools, resources, and protocol checks
+
+## Declarative formats
+
+- [astrolift.toml](https://astrolift.dev/reference/astrolift-toml/): app and workload schema, monorepos, and validation
+- [Agent packages](https://astrolift.dev/reference/agent-packages/): briefs, skills, tools, payload slices, imports, and federation
+- [Workflow TOML](https://astrolift.dev/reference/workflow-toml/): ordered stages, agent binding, outputs, and repo reconciliation
+
+## Operational guides
+
+- [Working with apps](https://astrolift.dev/working-with-apps/)
+- [Running an organization](https://astrolift.dev/running-an-org/)
+- [Operator quickstart](https://astrolift.dev/operators/quickstart/)
+- [Install Astrolift](https://astrolift.dev/operators/install/)
+
+## Portable release-matched copy
+
+The astro CLI embeds a release-matched Markdown snapshot. Run `astro docs list`, `astro docs show <topic>`, or `astro docs export <directory>`. Generated CLI Markdown and man pages come from the executing command tree.

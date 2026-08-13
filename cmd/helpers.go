@@ -178,35 +178,40 @@ func scaffoldManifest(path string, cmd *cobra.Command) error {
 	}
 
 	content := fmt.Sprintf(`# astrolift.toml — Astrolift app manifest
-# Spec ref: spec 05 (manifest)
+# Reference: https://astrolift.dev/reference/astrolift-toml/
 %s
 #
 # Run `+"`astro app register`"+` after editing to register this app
 # on the platform.
 
+astrolift_version = 1
+name = %q
+
 [app]
 slug = %q
 display_name = %q
 
-[[environments]]
-name = "production"
+[environments.production]
 
 [[workloads]]
 name = "web"
 kind = "deployment"
 replicas = 1
+cpu_request = "100m"
+cpu_limit = %q
+memory_request = "128Mi"
+memory_limit = %q
 
   [[workloads.containers]]
   name = "web"
   is_primary = true
   port = %d
 
-  [workloads.containers.resources]
-  cpu_request  = "100m"
-  cpu_limit    = %q
-  memory_request = "128Mi"
-  memory_limit   = %q
-`, fwNote, appSlug, appSlug, port, cpuLimit, memLimit)
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = %d
+`, fwNote, appSlug, appSlug, appSlug, cpuLimit, memLimit, port, port)
 
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)
