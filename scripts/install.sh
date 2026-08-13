@@ -1,10 +1,14 @@
 #!/usr/bin/env sh
-# Astrolift CLI curl|sh installer (#17).
+# Astrolift CLI authenticated release installer (#17).
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/calliopeai/astrolift-cli/main/scripts/install.sh | sh
+# Usage from an authenticated source checkout:
+#   gh auth login
+#   ./scripts/install.sh
 #
 # Detects OS + architecture, verifies the latest GitHub release archive,
 # and installs the binary in ASTRO_INSTALL_DIR, /usr/local/bin, or ~/.local/bin.
+# Set ASTRO_INSTALL_TAG to pin a release. ASTRO_INSTALL_BASE_URL remains
+# available for an authenticated/public mirror or offline test fixture.
 
 set -e
 
@@ -40,16 +44,29 @@ fi
 mkdir -p "${INSTALL_DIR}"
 
 ARCHIVE="${BINARY}-${OS}-${ARCH}.tar.gz"
-BASE_URL="${ASTRO_INSTALL_BASE_URL:-https://github.com/${REPO}/releases/latest/download}"
-URL="${BASE_URL}/${ARCHIVE}"
-CHECKSUM_URL="${BASE_URL}/${BINARY}-checksums.txt"
-
 ASTRO_INSTALL_TMP="$(mktemp -d)"
 trap 'rm -rf "${ASTRO_INSTALL_TMP}"' EXIT
 
-echo "Fetching ${URL}..."
-curl -fSL --retry 3 --retry-delay 2 "${URL}" -o "${ASTRO_INSTALL_TMP}/${ARCHIVE}" || err "download failed"
-curl -fSL --retry 3 --retry-delay 2 "${CHECKSUM_URL}" -o "${ASTRO_INSTALL_TMP}/${BINARY}-checksums.txt" || err "checksum download failed"
+if [ -n "${ASTRO_INSTALL_BASE_URL:-}" ]; then
+    URL="${ASTRO_INSTALL_BASE_URL}/${ARCHIVE}"
+    CHECKSUM_URL="${ASTRO_INSTALL_BASE_URL}/${BINARY}-checksums.txt"
+    echo "Fetching ${URL}..."
+    curl -fSL --retry 3 --retry-delay 2 "${URL}" -o "${ASTRO_INSTALL_TMP}/${ARCHIVE}" || err "download failed"
+    curl -fSL --retry 3 --retry-delay 2 "${CHECKSUM_URL}" -o "${ASTRO_INSTALL_TMP}/${BINARY}-checksums.txt" || err "checksum download failed"
+else
+    command -v gh >/dev/null 2>&1 || err "GitHub CLI is required to download private Astrolift releases"
+    gh auth status --hostname github.com >/dev/null 2>&1 || err "run 'gh auth login' with an account that can read ${REPO}"
+    TAG="${ASTRO_INSTALL_TAG:-}"
+    if [ -z "${TAG}" ]; then
+        TAG="$(gh release view --repo "${REPO}" --json tagName --jq .tagName)" || err "could not resolve the latest release"
+    fi
+    echo "Fetching ${ARCHIVE} from ${REPO} ${TAG}..."
+    gh release download "${TAG}" \
+        --repo "${REPO}" \
+        --pattern "${ARCHIVE}" \
+        --pattern "${BINARY}-checksums.txt" \
+        --dir "${ASTRO_INSTALL_TMP}" || err "authenticated release download failed"
+fi
 
 EXPECTED="$(awk -v archive="${ARCHIVE}" '$2 == archive { print $1; exit }' "${ASTRO_INSTALL_TMP}/${BINARY}-checksums.txt")"
 [ -n "${EXPECTED}" ] || err "release checksum does not list ${ARCHIVE}"
@@ -69,6 +86,12 @@ tar -xzf "${ARCHIVE}"
 install -m 0755 "${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
 echo "Installed to ${INSTALL_DIR}/${BINARY}"
+if [ -f "share/man/man1/${BINARY}.1" ]; then
+    MAN_DIR="${ASTRO_MAN_DIR:-$(dirname "${INSTALL_DIR}")/share/man/man1}"
+    mkdir -p "${MAN_DIR}"
+    install -m 0644 "share/man/man1/${BINARY}.1" "${MAN_DIR}/${BINARY}.1"
+    echo "Installed man page to ${MAN_DIR}/${BINARY}.1"
+fi
 if [ "${INSTALL_DIR}" = "${USER_BIN}" ]; then
     case ":${PATH}:" in
         *":${USER_BIN}:"*) ;;

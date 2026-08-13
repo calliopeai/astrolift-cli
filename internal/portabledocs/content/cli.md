@@ -5,23 +5,54 @@ the non-interactive client used in CI.
 
 ## Install
 
+The canonical CLI releases currently live in the private
+`calliopeai/astrolift-cli` repository. Authenticate GitHub CLI with an account
+that can read that repository:
+
 ```bash
-# macOS or Linux
-brew install calliopeai/tap/astro
-
-# Installer, with OS/architecture detection
-curl -fsSL https://raw.githubusercontent.com/calliopeai/astrolift-cli/main/scripts/install.sh | sh
-
-# Source build
-go install github.com/calliopeai/astrolift-cli@latest
+gh auth login
+gh auth status
 ```
 
-Windows users can install from Scoop:
+Find the current immutable tag and download both the archive and its checksum.
+For example, on Apple silicon:
 
-```powershell
-scoop bucket add calliopeai https://github.com/calliopeai/scoop-bucket
-scoop install astro
+```bash
+tag="$(gh release view --repo calliopeai/astrolift-cli \
+  --json tagName --jq .tagName)"
+asset=astro-darwin-arm64.tar.gz
+download_dir="$(mktemp -d)"
+gh release download "$tag" --repo calliopeai/astrolift-cli \
+  --pattern "$asset" \
+  --pattern 'astro-checksums.txt' \
+  --dir "$download_dir"
+
+(cd "$download_dir" && \
+  shasum -a 256 -c <(grep "  ${asset}$" astro-checksums.txt))
+tar -xzf "$download_dir/$asset" -C "$download_dir"
+mkdir -p "$HOME/.local/bin"
+install -m 0755 "$download_dir/astro" "$HOME/.local/bin/astro"
+astro version
 ```
+
+Add `~/.local/bin` to `PATH` when it is not already there. Use `sha256sum
+-c` instead of `shasum -a 256 -c` on Linux. Available archives are:
+
+| Platform | Release asset |
+|---|---|
+| macOS, Apple silicon | `astro-darwin-arm64.tar.gz` |
+| macOS, Intel | `astro-darwin-amd64.tar.gz` |
+| Linux, ARM64 | `astro-linux-arm64.tar.gz` |
+| Linux, x86-64 | `astro-linux-amd64.tar.gz` |
+| Windows, ARM64 | `astro-windows-arm64.zip` |
+| Windows, x86-64 | `astro-windows-amd64.zip` |
+
+The public Homebrew tap and Scoop bucket cannot authenticate downloads from a
+private GitHub release. Likewise, anonymous `curl` and `go install` cannot read
+the private source repository. Do not advertise those as install paths until
+the release assets are mirrored publicly or the repository visibility changes.
+Repository collaborators can build from source after `gh repo clone
+calliopeai/astrolift-cli` by running `make build`.
 
 ## Configure and authenticate
 
@@ -142,5 +173,5 @@ astro docs man "$HOME/.local/share/man/man1"
 man -M "$HOME/.local/share/man" astro
 ```
 
-Homebrew installs release man pages automatically. Packagers can run `astro
+Release archives include generated man pages. Packagers can also run `astro
 docs export` during packaging without network access.

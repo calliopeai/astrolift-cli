@@ -17,37 +17,37 @@ register clusters and configure providers against an Astrolift control plane.
 
 ## Install
 
-### Homebrew (macOS, Linux)
+### Authenticated release download
 
 ```bash
-brew install calliopeai/tap/astro
+gh auth login
+tag="$(gh release view --repo calliopeai/astrolift-cli --json tagName --jq .tagName)"
+gh release download "$tag" --repo calliopeai/astrolift-cli \
+  --pattern 'astro-darwin-arm64.tar.gz' \
+  --pattern 'astro-checksums.txt'
 ```
 
-(Tap published by [GoReleaser](.goreleaser.yaml) on each tagged release.)
+The release repository is private. Choose the archive matching your OS and
+architecture, verify it against `astro-checksums.txt`, extract `astro`, and put
+it on `PATH`. See the [CLI install reference](https://astrolift.dev/reference/cli/#install)
+for the complete platform matrix and commands.
 
-### Scoop (Windows)
+The public Homebrew tap and Scoop bucket cannot authenticate private GitHub
+release downloads. Anonymous `curl`, direct downloads, and `go install` have
+the same limitation. They are not supported install paths until a public
+binary distribution channel exists.
 
-```powershell
-scoop bucket add calliopeai https://github.com/calliopeai/scoop-bucket
-scoop install astro
-```
-
-### `curl | sh` installer
+### Installer from a source checkout
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/calliopeai/astrolift-cli/main/scripts/install.sh | sh
+gh repo clone calliopeai/astrolift-cli
+cd astrolift-cli
+./scripts/install.sh
 ```
 
-The installer detects your OS / arch, fetches and checksum-verifies the matching tarball from
-[GitHub Releases](https://github.com/calliopeai/astrolift-cli/releases),
-and drops `astro` into `/usr/local/bin` (or `~/.local/bin` if the system
-dir isn't writable). See [`scripts/install.sh`](scripts/install.sh).
-
-### Direct binary download
-
-Grab the platform-appropriate archive from
-[Releases](https://github.com/calliopeai/astrolift-cli/releases), extract
-the `astro` binary, and place it on your `PATH`.
+The installer uses the current GitHub CLI identity, detects the OS and
+architecture, checksum-verifies the matching archive, and installs `astro` in
+`/usr/local/bin` or `~/.local/bin`. Set `ASTRO_INSTALL_TAG=vX.Y.Z` to pin it.
 
 ### Docker
 
@@ -60,24 +60,15 @@ docker run --rm -v "${HOME}/.config/astrolift:/home/nonroot/.config/astrolift" \
 The image is `gcr.io/distroless/static-debian12:nonroot`; mount your
 config directory for stateful commands.
 
-### From source
+### From source (repository collaborators)
 
 ```bash
-git clone https://github.com/calliopeai/astrolift-cli
+gh auth login
+gh repo clone calliopeai/astrolift-cli
 cd astrolift-cli
 make build              # produces ./astro
 ./astro version
 ```
-
-Or, with `go install`:
-
-```bash
-go install github.com/calliopeai/astrolift-cli@latest
-```
-
-(Note: the Go module path is `github.com/calliopeai/astrolift-cli`; the
-GitHub repo is `calliopeai/astrolift-cli`. The two are intentional — the
-module path will follow the public repo on the next major.)
 
 ---
 
@@ -182,8 +173,8 @@ astro docs man ./man/man1
 ```
 
 `docs export` also creates `llms.txt`, generated Markdown for the live command
-tree, and section-1 man pages. Homebrew installs the generated man pages with
-the binary. The canonical public site is [astrolift.dev](https://astrolift.dev).
+tree, and section-1 man pages. Release archives include the generated man
+pages. The canonical public site is [astrolift.dev](https://astrolift.dev).
 CLI main builds and tagged releases byte-compare the embedded guide subset with
 canonical docs main. A weekday drift workflow performs the same cross-repo
 check even when the CLI has not changed. Refresh intentional docs changes with
@@ -262,8 +253,8 @@ locally:
 goreleaser release --snapshot --clean
 ```
 
-CI runs the same on tags, plus produces Homebrew tap + Scoop bucket
-updates and a Docker image at `ghcr.io/calliopeai/astrolift-cli`.
+CI runs the same on tags, plus publishes authenticated GitHub release archives
+and a Docker image at `ghcr.io/calliopeai/astrolift-cli`.
 
 ---
 
