@@ -13,6 +13,7 @@ import (
 	"github.com/calliopeai/astrolift-cli/internal/auth"
 	"github.com/calliopeai/astrolift-cli/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // loadActiveClient returns an authenticated API client for the
@@ -25,7 +26,19 @@ func loadActiveClient(ctx context.Context, debug bool) (*api.Client, *config.Con
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	overrideAPIURL := strings.TrimSpace(viper.GetString("api_url"))
+	explicitToken := strings.TrimSpace(viper.GetString("token"))
+	deployToken := strings.TrimSpace(os.Getenv("ASTROLIFT_DEPLOY_TOKEN"))
 	if cfg.CurrentServer == "" {
+		if overrideAPIURL != "" && (explicitToken != "" || deployToken != "") {
+			entry := config.ServerEntry{APIURL: overrideAPIURL, DisplayName: "ephemeral"}
+			token := explicitToken
+			if token == "" {
+				token = deployToken
+			}
+			client := api.NewClient(entry.APIURL, token, debug)
+			return client, cfg, &entry, nil
+		}
 		return nil, nil, nil, errors.New(
 			"no current server. run `astro server add <slug> <api-url>` and `astro auth login`",
 		)
@@ -34,10 +47,21 @@ func loadActiveClient(ctx context.Context, debug bool) (*api.Client, *config.Con
 	if !ok {
 		return nil, nil, nil, fmt.Errorf("current server %q missing from config", cfg.CurrentServer)
 	}
+	if overrideAPIURL != "" {
+		entry.APIURL = overrideAPIURL
+	}
+
+	// The global --token flag (and ASTROLIFT_TOKEN through Viper) is an
+	// explicit operator override. Honor it before CI/stored credentials as the
+	// root help and CLI precedence contract promise.
+	if explicitToken != "" {
+		client := api.NewClient(entry.APIURL, explicitToken, debug)
+		return client, cfg, &entry, nil
+	}
 
 	// CI mode: read token from env. Skip stored credentials.
-	if envToken := os.Getenv("ASTROLIFT_DEPLOY_TOKEN"); envToken != "" {
-		client := api.NewClient(entry.APIURL, envToken, debug)
+	if deployToken != "" {
+		client := api.NewClient(entry.APIURL, deployToken, debug)
 		return client, cfg, &entry, nil
 	}
 

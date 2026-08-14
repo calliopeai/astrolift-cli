@@ -69,8 +69,9 @@ variables, which override the config file.
 
 Global flags include `--api-url`, `--token`, `--org`, `--team`, `--project`,
 `--app`, `--json`, `--no-color`, `--no-prompt`, and `--debug`. Prefer
-`--token` or `ASTROLIFT_DEPLOY_TOKEN` only in ephemeral automation; do not put a
-token in a repository or command transcript.
+`--token`, `ASTROLIFT_TOKEN`, or `ASTROLIFT_DEPLOY_TOKEN` only in ephemeral
+automation; do not put a token in a repository or command transcript. An
+explicit `--token`/`ASTROLIFT_TOKEN` overrides stored credentials.
 
 ## Discover commands
 
@@ -135,6 +136,43 @@ astro workflow import workflows/triage.toml
 ```
 
 Agent-repo registration also reconciles every `workflows/**/*.toml` file.
+
+## Project shared resources
+
+Project resources are provider-managed services shared by apps and agents in a
+project. The selected cluster supplies the live catalogue; it includes both
+provisionable drivers and visible roadmap entries with an explanation and
+tracking issue.
+
+```bash
+astro project resources catalog --project emr-bug-triage --cluster production
+
+astro project resources add --project emr-bug-triage \
+  --cluster production \
+  --kind postgres \
+  --variant rds \
+  --name triage-db \
+  --size medium \
+  --config @database.json \
+  --agent emr-triage-intake
+
+astro project resources list --project emr-bug-triage
+astro project resources show triage-db --project emr-bug-triage
+astro project resources attach triage-db --project emr-bug-triage \
+  --app-env <app-environment-guid>
+astro project resources detach <attachment-guid> --project emr-bug-triage
+astro project resources update triage-db --project emr-bug-triage \
+  --config @database.json
+astro project resources reprovision triage-db --project emr-bug-triage
+astro project resources remove triage-db --project emr-bug-triage --delete-data
+```
+
+`--config` accepts a JSON object or `@file.json`; `--size` is a portable preset
+merged into that object. Use `--json` for automation. Planned or unavailable
+catalogue entries are deliberately shown but cannot be provisioned. Resource
+writes require both the caller's project RBAC grant and a token carrying the
+`project:write` scope; a newly approved `astro auth login` session includes the
+scope, but an older saved session must be refreshed or re-authenticated.
 
 ## CI
 
