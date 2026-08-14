@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Add project shared-resource catalogue, provisioning, inspection, update,
+  reprovision, attachment, detachment, and removal commands with JSON output.
+
 ### Changed
 
 - Clarify that cancelling an agent run hard-stops its Kubernetes workload.
@@ -10,3 +15,5 @@
 - Make `astro app init` emit the current server-accepted manifest shape.
 - Repair the release installer asset mapping and verify archive checksums before
   installation.
+- Honor `--api-url`/`ASTROLIFT_API_URL` with `--token`/`ASTROLIFT_TOKEN` as
+  explicit, config-free connection overrides.

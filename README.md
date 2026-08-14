@@ -143,7 +143,7 @@ the status note above.)
 | `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <workflow-slug>` is the distinct WorkflowDefinition seam (`runWorkflowDefinition`). |
 | `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, and delete organization workflows. `validate --server` is authoritative for the selected install. Repository registration separately reconciles `workflows/**/*.toml`. |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. `render` prints the manifests the platform would apply (`astroliftRenderedManifest`) for pre-merge review. |
-| `astro org` / `astro team` / `astro project` | Org-scoped resource management. `org list`/`org show`, `team list`/`team create`, `project list`/`project create` (`project create` needs `--team <slug>`; both creates take `--name`/`--description`). |
+| `astro org` / `astro team` / `astro project` | Org-scoped resource management. `project resources` discovers the selected cluster's full provider catalogue and manages project-owned shared services and their app/agent attachments. |
 | `astro operator` | Operator (admin) cluster, provider, and federation management. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
@@ -202,6 +202,7 @@ Environment variables take precedence over the config file (CI mode):
 | Var | Used by |
 |---|---|
 | `ASTROLIFT_API_URL` | overrides `current_server`'s API URL |
+| `ASTROLIFT_TOKEN` | explicit user API-token override (same precedence as `--token`) |
 | `ASTROLIFT_DEPLOY_TOKEN` | bypasses stored credentials (CI tokens) |
 | `ASTROLIFT_APP_SLUG` | required by `astro ci deploy` + `astro ci render` |
 | `ASTROLIFT_IMAGE_TAGS` | required by `astro ci deploy` (JSON map workload→tag) |
