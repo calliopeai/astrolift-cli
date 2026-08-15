@@ -38,6 +38,13 @@ make lint          # golangci-lint run ./...
 make clean         # remove the binary, clear test cache
 ```
 
+## Releasing
+
+Releases are deliberate, not automatic — merging to `main` does not publish
+one. See [`RELEASING.md`](RELEASING.md) for the cadence policy and the ship
+checklist. Cut a release whenever user-visible surface lands, so installed
+binaries do not drift behind the platform API.
+
 ## Code Style
 
 - `gofmt` + `goimports` formatting (run `make fmt`)

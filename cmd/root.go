@@ -24,6 +24,12 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		return initConfig()
 	},
+	// Advisory staleness hint (#46). Cobra skips PostRun when the command
+	// returned an error, which is what we want: never pile a version notice
+	// on top of a real failure.
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		maybeNotifyStale(cmd)
+	},
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }

@@ -2,11 +2,11 @@
 // resolved working org, and a shared resolver used by org-scoped commands.
 //
 // Org resolution precedence (resolveOrg):
-//   1. --org flag (slug or id)            — per-command override
-//   2. config DefaultOrg (`astro org use`) — persisted working org
-//   3. the only org, if exactly one        — single-org instances "just work"
-//   4. interactive picker                   — multi-org + a TTY + prompts on
-//   5. error                                — multi-org, non-interactive
+//  1. --org flag (slug or id)            — per-command override
+//  2. config DefaultOrg (`astro org use`) — persisted working org
+//  3. the only org, if exactly one        — single-org instances "just work"
+//  4. interactive picker                   — multi-org + a TTY + prompts on
+//  5. error                                — multi-org, non-interactive
 package cmd
 
 import (
