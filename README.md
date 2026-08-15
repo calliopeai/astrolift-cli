@@ -4,7 +4,7 @@
 [![Go](https://img.shields.io/badge/go-%3E%3D1.23-00ADD8.svg)](https://go.dev/)
 
 `astro` is the command-line client for the
-[Astrolift](https://astrolift.app) PaaS. App developers use it to register
+[Astrolift](https://astrolift.ai) PaaS. App developers use it to register
 apps, deploy, manage secrets, and inspect runtime state. Operators use it to
 register clusters and configure providers against an Astrolift control plane.
 
@@ -17,7 +17,69 @@ register clusters and configure providers against an Astrolift control plane.
 
 ## Install
 
-### Authenticated release download
+> **The binary is behind a token.** `calliopeai/astrolift-cli` is a private
+> repository, so release archives cannot be downloaded anonymously — GitHub
+> answers anonymous requests for a private repo with **404**, not 401, so an
+> unauthenticated attempt looks like a missing file rather than an auth error.
+> Homebrew, Scoop, anonymous `curl`, and `go install` cannot work until a
+> public binary channel exists. **The container image is public and needs no
+> credentials.** There is no `curl | sh` one-liner; any URL you may have seen
+> for one does not resolve.
+
+### Docker (no credentials required)
+
+```bash
+docker run --rm calliopeai/astrolift-cli:latest version
+```
+
+Both registries carry the same multi-arch image and are publicly pullable:
+
+```bash
+docker pull calliopeai/astrolift-cli:latest        # Docker Hub
+docker pull ghcr.io/calliopeai/astrolift-cli:latest # GHCR
+```
+
+For stateful commands, mount your config directory:
+
+```bash
+docker run --rm -it \
+    -v "${HOME}/.config/astrolift:/home/nonroot/.config/astrolift" \
+    calliopeai/astrolift-cli:latest app list
+```
+
+The image is `gcr.io/distroless/static-debian12:nonroot`. To copy the binary
+out into another image, pin the version:
+
+```dockerfile
+FROM calliopeai/astrolift-cli:0.3.0 AS astro-cli
+COPY --from=astro-cli /usr/local/bin/astro /usr/local/bin/astro
+```
+
+### Installer script (needs a GitHub credential)
+
+```bash
+gh repo clone calliopeai/astrolift-cli
+cd astrolift-cli
+./scripts/install.sh
+```
+
+The installer detects your OS and architecture, downloads the matching
+archive, **verifies it against `astro-checksums.txt`**, and installs `astro`
+into `/usr/local/bin` or `~/.local/bin`. It authenticates in this order:
+
+1. `ASTRO_INSTALL_BASE_URL` — a mirror you control, or an offline fixture
+2. an authenticated `gh` (whatever `gh auth login` is already using)
+3. `GITHUB_TOKEN` / `GH_TOKEN` / `ASTRO_GITHUB_TOKEN` — for containers and CI
+   images that have no `gh` binary:
+
+```bash
+GITHUB_TOKEN="$(gh auth token)" ./scripts/install.sh
+```
+
+Set `ASTRO_INSTALL_TAG=vX.Y.Z` to pin a release, `ASTRO_INSTALL_DIR` to choose
+the destination.
+
+### Manual release download
 
 ```bash
 gh auth login
@@ -27,38 +89,20 @@ gh release download "$tag" --repo calliopeai/astrolift-cli \
   --pattern 'astro-checksums.txt'
 ```
 
-The release repository is private. Choose the archive matching your OS and
-architecture, verify it against `astro-checksums.txt`, extract `astro`, and put
-it on `PATH`. See the [CLI install reference](https://astrolift.dev/reference/cli/#install)
-for the complete platform matrix and commands.
+Archives are named `astro-<os>-<arch>.tar.gz` (`.zip` on Windows) for
+`darwin`/`linux`/`windows` and `amd64`/`arm64`. Verify against
+`astro-checksums.txt`, extract `astro`, and put it on `PATH`. See the
+[CLI install reference](https://astrolift.dev/reference/cli/#install) for the
+full matrix.
 
-The public Homebrew tap and Scoop bucket cannot authenticate private GitHub
-release downloads. Anonymous `curl`, direct downloads, and `go install` have
-the same limitation. They are not supported install paths until a public
-binary distribution channel exists.
+### Staying current
 
-### Installer from a source checkout
-
-```bash
-gh repo clone calliopeai/astrolift-cli
-cd astrolift-cli
-./scripts/install.sh
-```
-
-The installer uses the current GitHub CLI identity, detects the OS and
-architecture, checksum-verifies the matching archive, and installs `astro` in
-`/usr/local/bin` or `~/.local/bin`. Set `ASTRO_INSTALL_TAG=vX.Y.Z` to pin it.
-
-### Docker
-
-```bash
-docker pull ghcr.io/calliopeai/astrolift-cli:latest
-docker run --rm -v "${HOME}/.config/astrolift:/home/nonroot/.config/astrolift" \
-    ghcr.io/calliopeai/astrolift-cli:latest version
-```
-
-The image is `gcr.io/distroless/static-debian12:nonroot`; mount your
-config directory for stateful commands.
+`astro version` prints the release, commit, and build date it was built from;
+an unstamped source build reports `astro dev`. `astro update` replaces the
+running binary with the latest release (it needs the same token as above).
+Once a day `astro` will note on stderr if a newer release exists; set
+`ASTROLIFT_NO_UPDATE_CHECK=1` to silence it. The hint never appears with
+`--json`, in CI, or on `dev` builds.
 
 ### From source (repository collaborators)
 
@@ -224,9 +268,9 @@ side**:
 - **[astrolift-opscode](https://github.com/calliopeai/astrolift-opscode)**
   — Terraform + Helm IaC for installing the platform on a cloud you
   control (AWS / GCP / Azure / vanilla k8s)
-- **astrolift platform / API** — the control plane the CLI talks to;
-  see [astrolift.app](https://astrolift.app) and the public docs (once
-  published)
+- **astrolift platform / API** — the control plane the CLI talks to; see
+  [astrolift.ai](https://astrolift.ai) and the developer docs at
+  [astrolift.dev](https://astrolift.dev)
 
 The CLI is a pure client of the platform API — it never re-implements
 business logic. Backend policy lives behind the GraphQL + REST surface;
@@ -255,7 +299,9 @@ goreleaser release --snapshot --clean
 ```
 
 CI runs the same on tags, plus publishes authenticated GitHub release archives
-and a Docker image at `ghcr.io/calliopeai/astrolift-cli`.
+and Docker images on Docker Hub and GHCR. Cutting a release is a deliberate,
+single-command act — see **[RELEASING.md](RELEASING.md)** for the ship
+checklist and the cadence policy.
 
 ---
 
@@ -278,6 +324,8 @@ Community standards: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - **[bootstrap.md](bootstrap.md)** — stack, directory layout,
   conventions, build commands, config + credentials model
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — fork + PR flow + style
+- **[RELEASING.md](RELEASING.md)** — release cadence, ship checklist,
+  distribution channels
 - **[SECURITY.md](SECURITY.md)** — vulnerability disclosure
 - **[CLAUDE.md](CLAUDE.md)** / **[AGENTS.md](AGENTS.md)** /
   **[CODEX.md](CODEX.md)** — agent shims
