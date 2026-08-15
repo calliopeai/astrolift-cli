@@ -1,0 +1,140 @@
+name: Cut Release
+
+# Tagging is deliberate, not automatic (#46).
+#
+# Merging to main does NOT publish a release: a README typo should not burn a
+# version number, and a release should be a decision someone makes rather than
+# a side effect of merging. This workflow is the one-button path from "main is
+# good" to "vX.Y.Z is tagged", with the checks that stop a bad tag from being
+# created in the first place. See RELEASING.md for the surrounding checklist.
+#
+# This workflow only creates and pushes the tag. build-publish.yml is what
+# reacts to the tag and runs GoReleaser, uploads the archives, and smoke-tests
+# the published assets.
+#
+# The tag is pushed with PAT_CALLIOPE_CI rather than the default GITHUB_TOKEN
+# on purpose: GitHub does not start new workflow runs from events raised by
+# GITHUB_TOKEN, so a tag pushed with it would sit there and never build
+# anything. That failure is silent, which is exactly the sort of thing that
+# produced #46 in the first place.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v (e.g. 0.4.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Validate only — do not create or push the tag"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  cut:
+    name: Validate and tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.PAT_CALLIOPE_CI }}
+
+      - name: Validate the version string
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          case "$VERSION" in
+            v*) echo "::error::pass the version without the leading 'v' (got '$VERSION')"; exit 1 ;;
+          esac
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::'$VERSION' is not a MAJOR.MINOR.PATCH version"
+            exit 1
+          fi
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+
+      - name: Refuse to reuse an existing tag
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::$TAG already exists. Releases are immutable — pick the next version."
+            exit 1
+          fi
+          LATEST="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          echo "latest existing tag: ${LATEST:-none}"
+          echo "cutting: $TAG"
+
+      - name: Require a changelog entry
+        run: |
+          set -euo pipefail
+          # Forces the maintainer to promote "## Unreleased" to the real
+          # version before tagging, so released notes are never empty.
+          if ! grep -Eq "^##+[[:space:]]+\[?v?${{ inputs.version }}\]?" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no heading for ${{ inputs.version }}."
+            echo "Rename the '## Unreleased' section to '## ${{ inputs.version }}' and merge that first."
+            exit 1
+          fi
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      # Verify before tagging. build-publish.yml also runs the suite on the
+      # tag, but by then the version number is already spent.
+      - name: Build, vet, and test
+        run: |
+          set -euo pipefail
+          go build ./...
+          go vet ./...
+          go test ./...
+
+      - name: Verify the release build stamps a real version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          # The exact ldflags .goreleaser.yaml uses. If `astro version` does
+          # not echo them back, the released binary would report 'dev' (#46)
+          # and staleness would be invisible again.
+          MODULE=github.com/calliopeai/astrolift-cli
+          go build -ldflags "-s -w \
+            -X ${MODULE}/cmd.Version=${VERSION} \
+            -X ${MODULE}/cmd.Commit=$(git rev-parse --short HEAD) \
+            -X ${MODULE}/cmd.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o /tmp/astro-stamp-check .
+          OUT="$(/tmp/astro-stamp-check version)"
+          echo "version stamp: $OUT"
+          printf '%s\n' "$OUT" | grep -qF "$VERSION" || {
+            echo "::error::release ldflags did not reach the binary: $OUT"
+            exit 1
+          }
+
+      - name: Create and push the annotated tag
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          git config user.name "calliope-ci"
+          git config user.email "ci@calliope.ai"
+          git tag -a "$TAG" -m "astro $TAG"
+          git push origin "$TAG"
+
+      - name: Summary
+        run: |
+          {
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "### Dry run — no tag created"
+              echo ""
+              echo "\`$TAG\` passed every check and is safe to cut."
+            else
+              echo "### Tagged \`$TAG\`"
+              echo ""
+              echo "**Build and Publish** is now running for the tag: archives,"
+              echo "checksums, Docker images, and the release smoke test."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
