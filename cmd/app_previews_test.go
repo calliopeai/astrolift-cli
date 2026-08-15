@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -32,6 +33,7 @@ func f64ptr(f float64) *float64 { return &f }
 
 // prPreview is a healthy running PR-triggered preview.
 func prPreview(pr int, branch string) previewEnvironment {
+	n := strconv.Itoa(pr)
 	return previewEnvironment{
 		ID:                 "guid-pr-" + branch,
 		RegisteredAppSlug:  "web",
@@ -39,26 +41,14 @@ func prPreview(pr int, branch string) previewEnvironment {
 		Branch:             branch,
 		CommitSha:          "deadbeef",
 		Status:             "running",
-		Hostname:           "pr-" + itoa(pr) + ".web.acme.example.com",
-		Namespace:          "acme-web-pr-" + itoa(pr),
+		Hostname:           "pr-" + n + ".web.acme.example.com",
+		Namespace:          "acme-web-pr-" + n,
 		LastDeployedAt:     strptr("2026-08-14T10:00:00.123456+00:00"),
 		TTLUntil:           "2026-08-21T10:00:00+00:00",
 		SourceURL:          "https://github.com/acme/web",
-		PRURL:              "https://github.com/acme/web/pull/" + itoa(pr),
+		PRURL:              "https://github.com/acme/web/pull/" + n,
 		AggregateResources: previewAggregateResources{CPUCores: 0.5, MemoryBytes: 536870912, PodCount: 1},
 	}
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	digits := ""
-	for n > 0 {
-		digits = string(rune('0'+n%10)) + digits
-		n /= 10
-	}
-	return digits
 }
 
 // previewRow renders a preview as the JSON map the GraphQL server returns.
