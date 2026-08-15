@@ -14,7 +14,7 @@ var appCmd = &cobra.Command{
 	Short: "App lifecycle and sub-resource management",
 	Long: `Commands for working with Astrolift apps: init, register, deploy,
 rollback, promote, plus sub-resource management (secrets, services,
-domains, tokens, members, jobs, events, audit).`,
+domains, tokens, members, jobs, events, audit, previews).`,
 }
 
 // ---- lifecycle ----
@@ -206,8 +206,7 @@ var appEventsCmd = newSubResourceCmd("events", "Show app event log (#12)")
 var appAuditCmd = newSubResourceCmd("audit", "Show app audit log (#12)")
 
 // app logs and app exec are wired in cmd/app_lifecycle.go.
-
-var appPreviewsCmd = newSubResourceCmd("previews", "Manage preview environments (#95)")
+// app previews is a real command group, wired in cmd/app_previews.go.
 
 func init() {
 	appRegisterCmd.Flags().StringVarP(&appRegisterFile, "file", "f", "astrolift.toml", "Path to the app manifest (default: astrolift.toml)")
