@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,11 +25,17 @@ func jsonDecode(r io.Reader, v interface{}) error {
 
 // githubRelease is a subset of the GitHub Releases API response.
 type githubRelease struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
-		Name               string `json:"name"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-	} `json:"assets"`
+	TagName string        `json:"tag_name"`
+	Assets  []githubAsset `json:"assets"`
+}
+
+type githubAsset struct {
+	Name string `json:"name"`
+	// URL is the api.github.com asset endpoint. It is the only one that
+	// accepts a bearer token, so it is the download URL for private releases.
+	URL string `json:"url"`
+	// BrowserDownloadURL only works for public releases.
+	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
 // updateCmd replaces the running binary with the latest release from GitHub.
@@ -53,7 +60,10 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 }
 
-const githubLatestURL = "https://api.github.com/repos/calliopeai/astrolift-cli/releases/latest"
+// latestReleaseURL is the release-metadata endpoint for the current API root.
+func latestReleaseURL() string {
+	return fmt.Sprintf("%s/repos/%s/releases/latest", githubAPIBaseURL(), releaseRepo)
+}
 
 func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -61,8 +71,13 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 
 	fmt.Fprintln(cmd.OutOrStdout(), "Checking for latest release…")
 
+	token := githubToken()
 	var release githubRelease
-	if err := fetchJSON(ctx, githubLatestURL, &release); err != nil {
+	if err := fetchJSON(ctx, latestReleaseURL(), token, &release); err != nil {
+		var accessErr *releaseAccessError
+		if errors.As(err, &accessErr) {
+			return err
+		}
 		return fmt.Errorf("checking latest release: %w", err)
 	}
 
@@ -86,19 +101,24 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Current: %s → Latest: %s\n", Version, release.TagName)
 
 	// Determine the correct asset name for this OS/arch
-	assetName := resolveAssetName(release.TagName)
+	assetName := resolveAssetName()
 	var downloadURL string
 	for _, a := range release.Assets {
 		if a.Name == assetName {
-			downloadURL = a.BrowserDownloadURL
+			// The bearer token only authenticates against the API asset
+			// endpoint; browser_download_url 404s on a private release.
+			downloadURL = a.URL
+			if downloadURL == "" || token == "" {
+				downloadURL = a.BrowserDownloadURL
+			}
 			break
 		}
 	}
 	if downloadURL == "" {
 		return fmt.Errorf(
 			"no release asset found for %s/%s (looked for %q). "+
-				"Download manually from https://github.com/calliopeai/astrolift-cli/releases/tag/%s",
-			runtime.GOOS, runtime.GOARCH, assetName, release.TagName,
+				"Download manually from https://github.com/%s/releases/tag/%s",
+			runtime.GOOS, runtime.GOARCH, assetName, releaseRepo, release.TagName,
 		)
 	}
 
@@ -126,7 +146,11 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	}
 	defer os.Remove(tmpFile.Name())
 
-	if err := downloadFile(ctx, downloadURL, tmpFile); err != nil {
+	if err := downloadFile(ctx, downloadURL, token, tmpFile); err != nil {
+		var accessErr *releaseAccessError
+		if errors.As(err, &accessErr) {
+			return err
+		}
 		return fmt.Errorf("downloading update: %w", err)
 	}
 	if err := tmpFile.Close(); err != nil {
@@ -163,54 +187,81 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	return nil
 }
 
-// resolveAssetName maps the current GOOS/GOARCH to a GitHub release asset filename.
-func resolveAssetName(version string) string {
-	goos := runtime.GOOS
-	goarch := runtime.GOARCH
-	if goarch == "amd64" {
-		goarch = "x86_64"
-	} else if goarch == "arm64" {
-		goarch = "arm64"
+// resolveAssetName maps the current GOOS/GOARCH to a GitHub release asset
+// filename.
+//
+// This MUST stay in lockstep with `archives.name_template` in
+// .goreleaser.yaml, which publishes `astro-{os}-{arch}` using raw GOOS/GOARCH
+// values: astro-linux-amd64.tar.gz, astro-darwin-arm64.tar.gz,
+// astro-windows-amd64.zip. There is no version segment in the name, the
+// separator is a hyphen, and nothing is capitalized or translated to x86_64
+// (#53). TestResolveAssetNameMatchesGoreleaserTemplate pins that contract.
+func resolveAssetName() string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("astro-%s-%s.zip", runtime.GOOS, runtime.GOARCH)
 	}
-	switch goos {
-	case "windows":
-		return fmt.Sprintf("astro_%s_Windows_%s.zip", strings.TrimPrefix(version, "v"), goarch)
-	case "darwin":
-		return fmt.Sprintf("astro_%s_Darwin_%s.tar.gz", strings.TrimPrefix(version, "v"), goarch)
-	default:
-		return fmt.Sprintf("astro_%s_Linux_%s.tar.gz", strings.TrimPrefix(version, "v"), goarch)
+	return fmt.Sprintf("astro-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+}
+
+// authorize applies the release-repo credential, if any.
+func authorize(req *http.Request, token string) {
+	req.Header.Set("User-Agent", "astrolift-cli/"+Version)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	}
 }
 
-func fetchJSON(ctx context.Context, url string, v interface{}) error {
+func fetchJSON(ctx context.Context, url, token string, v interface{}) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "astrolift-cli/"+Version)
+	authorize(req, token)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	if isReleaseAccessStatus(resp.StatusCode) {
+		return &releaseAccessError{
+			Status:    resp.StatusCode,
+			URL:       url,
+			HadToken:  token != "",
+			Operation: "cannot read the latest astro release",
+		}
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GitHub API returned %d", resp.StatusCode)
 	}
 	return jsonDecode(resp.Body, v)
 }
 
-func downloadFile(ctx context.Context, url string, dst *os.File) error {
+func downloadFile(ctx context.Context, url, token string, dst *os.File) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
+	// The API asset endpoint serves release metadata as JSON unless the
+	// caller explicitly asks for the bytes.
+	req.Header.Set("Accept", "application/octet-stream")
+	authorize(req, token)
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	if isReleaseAccessStatus(resp.StatusCode) {
+		return &releaseAccessError{
+			Status:    resp.StatusCode,
+			URL:       url,
+			HadToken:  token != "",
+			Operation: "cannot download the astro release archive",
+		}
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download returned %d", resp.StatusCode)
 	}
