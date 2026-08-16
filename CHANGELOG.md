@@ -17,6 +17,29 @@
   selects another): the control plane has no by-guid run resolver. Requires
   the `stageRole` / `stageApprovers` / `humanGateState` / `humanGateNote`
   fields from astrolift-app#1409.
+
+## 0.4.0 — 2026-08-16
+
+### Added
+
+- Add the `astro app previews` command group — `list`, `show`, `logs`, `open`
+  and `teardown` — so per-PR preview environments can be driven from the CLI.
+  Select one with `--pr <n>`, or `--branch <name>` for a manual preview, which
+  carries no PR number. `previews logs` is `app logs` pointed at the
+  environment the platform synthesized for the preview, resolved by matching
+  the preview hostname rather than guessing an environment name.
+- Add `astro agent workloads ls`, which enumerates the org's registered
+  `kind=agent` workloads. Each row carries both identifiers the dispatch
+  surface needs: the slug `agent dispatch` takes and the GUID
+  `workflow create --bind` takes.
+- Add `astro agent vnc <task-id>`, resolving a task to an absolute, openable
+  console URL. The stored `vnc_url` is a root-relative WebSocket relay path,
+  so it could previously only be shown as text.
+- Add `astro app pods`, listing the pods `astro exec` picks from, with the pod
+  name for `--pod` and container names for `-c`.
+- Add `astro workflow run-manifest <file.toml>`, collapsing
+  `import` → `create --bind` → `run` into one call and resolving each
+  `agent_dispatch` stage against the org's registered agent workloads.
 - Add `astro app previews pin` / `unpin`, the operator exemption from preview
   garbage collection. A pin covers both collection rules — TTL expiry and
   max-active eviction — which is what distinguishes it from extending a TTL,
