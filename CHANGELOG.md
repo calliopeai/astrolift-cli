@@ -4,6 +4,14 @@
 
 ### Added
 
+- Add `astro app previews pin` / `unpin`, the operator exemption from preview
+  garbage collection. A pin covers both collection rules — TTL expiry and
+  max-active eviction — which is what distinguishes it from extending a TTL,
+  and it holds until someone unpins. `pin --reason <text>` records why;
+  `unpin` clears the whole record and is a no-op on an unpinned preview.
+  `previews list` gains a PINNED column and `previews show` reports the pin
+  with who set it, when, and why. Requires the `setPreviewPinned` mutation
+  from astrolift-app#1407.
 - Add `astro agent send <task-id> <input>` to queue a follow-up prompt for a
   running agent task, with `--stdin` for multi-line input and `--json`. The
   message is applied at the agent's next turn boundary, so a send reports
