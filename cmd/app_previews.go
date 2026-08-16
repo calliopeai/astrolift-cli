@@ -18,23 +18,26 @@
 //     pagination / --follow plumbing.
 //   - teardown → tearDownPreview(input: TearDownPreviewInputGql!)
 //   - open     → no call; the URL is https://<hostname> off the row.
+//   - pin/unpin → setPreviewPinned(input: SetPreviewPinnedInput!), one setter
+//     behind two verbs: pin sends pinned: true, unpin sends pinned: false.
 //
-// pin / unpin are deliberately absent. The GC policy models a pin
-// (astrolift_workflows/preview_gc.py: PreviewSnapshot.is_pinned,
-// is_eligible_for_gc) and its docstring names this very command, but
-// PreviewEnvironment has no pin column, no resolver exposes one, and there
-// is no mutation to set one. extendPreviewTtl is not a substitute: it moves
-// ttl_until in capped 1/7/30-day steps, which addresses TTL eviction only —
-// max-active eviction ignores ttl_until — and it has no inverse for unpin.
-// Tracked as calliopeai/astrolift-app#1399.
+// The pin is the operator's exemption from garbage collection, and it covers
+// *both* rules the scheduled sweep applies (astrolift_workflows/preview_gc.py):
+// is_eligible_for_gc short-circuits on it so TTL expiry never fires, and
+// max-active eviction filters it out of the candidate list so a newer PR
+// cannot push it out. extendPreviewTtl is not the same thing: it only moves
+// ttl_until, in capped 1/7/30-day steps, on the TTL axis alone, and it has no
+// inverse. Unpin clears the whole pinned-at/by/reason trail so a stale
+// justification never reads as the current one; re-pinning refreshes it.
 //
-// Issue: calliopeai/astrolift-cli#64
+// Issues: calliopeai/astrolift-cli#64, calliopeai/astrolift-cli#67
 package cmd
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 	"text/tabwriter"
@@ -74,6 +77,11 @@ var (
 
 	previewsTeardownSel previewSelector
 	previewsTeardownYes bool
+
+	previewsPinSel    previewSelector
+	previewsPinReason string
+
+	previewsUnpinSel previewSelector
 )
 
 // ---- GraphQL operations -----------------------------------------------------
@@ -101,6 +109,10 @@ const previewEnvironmentsPageQuery = `query($appSlug: String, $limit: Int!, $aft
       lastDeployedAt
       tornDownAt
       ttlUntil
+      isPinned
+      pinnedAt
+      pinnedByEmail
+      pinReason
       sourceUrl
       prUrl
       aggregateResources { cpuCores memoryBytes podCount }
@@ -123,6 +135,39 @@ const tearDownPreviewMutation = `mutation($input: TearDownPreviewInputGql!) {
   tearDownPreview(input: $input) {
     ok
     errors { code message field }
+  }
+}`
+
+// setPreviewPinnedMutation is the single setter behind both pin and unpin.
+// The full row comes back so the reported reason is the stored, truncated one
+// rather than the flag text, and so --json hands back a record identical in
+// shape to what `previews show` emits.
+const setPreviewPinnedMutation = `mutation($input: SetPreviewPinnedInput!) {
+  setPreviewPinned(input: $input) {
+    ok
+    errors { code message field }
+    data {
+      id
+      registeredAppSlug
+      prNumber
+      isManual
+      branch
+      commitSha
+      status
+      hostname
+      namespace
+      lastDeployedAt
+      tornDownAt
+      ttlUntil
+      isPinned
+      pinnedAt
+      pinnedByEmail
+      pinReason
+      sourceUrl
+      prUrl
+      aggregateResources { cpuCores memoryBytes podCount }
+      estimatedDailyCostUsd
+    }
   }
 }`
 
@@ -150,6 +195,10 @@ type previewEnvironment struct {
 	LastDeployedAt        *string                   `json:"lastDeployedAt"`
 	TornDownAt            *string                   `json:"tornDownAt"`
 	TTLUntil              string                    `json:"ttlUntil"`
+	IsPinned              bool                      `json:"isPinned"`
+	PinnedAt              *string                   `json:"pinnedAt"`
+	PinnedByEmail         *string                   `json:"pinnedByEmail"`
+	PinReason             string                    `json:"pinReason"`
 	SourceURL             string                    `json:"sourceUrl"`
 	PRURL                 string                    `json:"prUrl"`
 	AggregateResources    previewAggregateResources `json:"aggregateResources"`
@@ -382,6 +431,29 @@ func previewCostLabel(usd *float64) string {
 	return fmt.Sprintf("$%.2f/day", *usd)
 }
 
+// writePreviewPinDetail renders the pin block for `show`.
+//
+// The pin is what decides whether the TTL line above it means anything, so it
+// is always printed, and the who/when/why lines only when a pin is actually in
+// force — unpin clears all three server-side, so rendering them unconditionally
+// would print a cleared trail as though it were current.
+func writePreviewPinDetail(out io.Writer, p previewEnvironment) {
+	if !p.IsPinned {
+		fmt.Fprintf(out, "Pinned:           %s\n", yesNo(false))
+		return
+	}
+	// pinnedByEmail is null when the account that set the pin has since been
+	// removed, which is not the same as a preview that was never pinned.
+	pinnedBy := ""
+	if p.PinnedByEmail != nil {
+		pinnedBy = *p.PinnedByEmail
+	}
+	fmt.Fprintf(out, "Pinned:           yes (exempt from TTL expiry and max-active eviction)\n")
+	fmt.Fprintf(out, "Pinned at:        %s\n", shortTime(p.PinnedAt))
+	fmt.Fprintf(out, "Pinned by:        %s\n", dashIfEmpty(pinnedBy))
+	fmt.Fprintf(out, "Pin reason:       %s\n", dashIfEmpty(p.PinReason))
+}
+
 // ---- transport --------------------------------------------------------------
 
 // fetchAppPreviews walks astroliftPreviewEnvironmentsPage for one app. The
@@ -470,10 +542,10 @@ The app slug comes from the positional argument, then --app, then the local
 astrolift.toml. Single-preview verbs take --pr <n>; manual previews have no
 PR number, so select those with --branch <name>.
 
-Note: 'pin' and 'unpin' are not available. The garbage collector has the
-policy for an operator pin, but the platform has nowhere to store one and no
-mutation to set it, and extendPreviewTtl does not cover max-active eviction.
-Tracked as calliopeai/astrolift-app#1399; the verbs land here once it ships.`,
+"pin" exempts a preview from garbage collection entirely — both from TTL
+expiry and from max-active eviction — until an operator runs "unpin". That
+is the difference from extending a TTL, which only defers the TTL clock and
+still leaves the preview evictable when a newer PR needs the slot.`,
 }
 
 // ---- astro app previews list ------------------------------------------------
@@ -484,9 +556,11 @@ var appPreviewsListCmd = &cobra.Command{
 	Long: `Lists the app's preview environments, newest first, via the
 astroliftPreviewEnvironmentsPage GraphQL query.
 
-Each row carries the PR number (or 'manual'), branch, status, hostname, when
-it last deployed, and the TTL the garbage collector reaps it at. Torn-down
-previews are hidden by default; pass --all to include them.`,
+Each row carries the PR number (or "manual"), branch, status, hostname, when
+it last deployed, the TTL the garbage collector reaps it at, and whether an
+operator has pinned it. A pinned preview is exempt from collection, so its
+TTL column is advisory. Torn-down previews are hidden by default; pass --all
+to include them.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slug, err := resolveAppSlug(cmd, firstArg(args))
@@ -532,11 +606,12 @@ func runAppPreviewsList(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "PR\tBRANCH\tSTATUS\tHOSTNAME\tLAST DEPLOYED\tTTL UNTIL")
+	fmt.Fprintln(w, "PR\tBRANCH\tSTATUS\tHOSTNAME\tLAST DEPLOYED\tTTL UNTIL\tPINNED")
 	for _, p := range rows {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			previewPRLabel(p), dashIfEmpty(p.Branch), dashIfEmpty(p.Status),
 			dashIfEmpty(p.Hostname), shortTime(p.LastDeployedAt), shortTime(&p.TTLUntil),
+			yesNo(p.IsPinned),
 		)
 	}
 	if err := w.Flush(); err != nil {
@@ -556,8 +631,9 @@ var appPreviewsShowCmd = &cobra.Command{
 	Use:   "show [app] --pr <n>",
 	Short: "Show one preview environment in detail",
 	Long: `Prints one preview environment's full record: its URL, status, branch and
-commit, the namespace it runs in, its TTL, the pull request that created it,
-and the aggregate resources and estimated daily cost it is consuming.
+commit, the namespace it runs in, its TTL, its garbage-collection pin, the
+pull request that created it, and the aggregate resources and estimated
+daily cost it is consuming.
 
 Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
 	Args: cobra.MaximumNArgs(1),
@@ -598,6 +674,7 @@ func runAppPreviewsShow(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	fmt.Fprintf(out, "Commit:           %s\n", dashIfEmpty(p.CommitSha))
 	fmt.Fprintf(out, "Last deployed:    %s\n", shortTime(p.LastDeployedAt))
 	fmt.Fprintf(out, "TTL until:        %s\n", shortTime(&p.TTLUntil))
+	writePreviewPinDetail(out, p)
 	if previewIsTornDown(p) {
 		fmt.Fprintf(out, "Torn down:        %s\n", shortTime(p.TornDownAt))
 	}
@@ -617,7 +694,7 @@ var appPreviewsLogsCmd = &cobra.Command{
 	Short: "Show logs for a preview environment's workloads",
 	Long: `Tails the log lines for one preview environment.
 
-This is 'astro app logs' pointed at the environment the platform synthesized
+This is "astro app logs" pointed at the environment the platform synthesized
 for the preview, so every log flag behaves identically: --since bounds the
 window, --tail caps the lines, --follow (-f) polls for new ones, and --level
 / --search filter. Use --workload to narrow to one workload.
@@ -816,6 +893,168 @@ func runAppPreviewsTeardown(cmd *cobra.Command, ctx context.Context, client *api
 	return nil
 }
 
+// ---- astro app previews pin / unpin ------------------------------------------
+
+var appPreviewsPinCmd = &cobra.Command{
+	Use:   "pin [app] --pr <n>",
+	Short: "Exempt a preview environment from garbage collection",
+	Long: `Pins a preview environment so the garbage collector leaves it alone.
+
+A pin covers both collection rules: the TTL never expires the preview, and
+max-active eviction skips it, so a newer PR cannot claim its slot. That is
+what makes this different from extending a TTL, which only defers the TTL
+clock and leaves the preview evictable under pressure. The pin holds until
+someone runs "unpin" — nothing expires it — so it keeps costing money.
+
+Pass --reason <text> to record why. The reason is stored with the pin and is
+shown by "previews show"; it is truncated to 512 characters. Re-pinning an
+already-pinned preview replaces the recorded actor, timestamp and reason, so
+what is on the record is always the justification currently in force — which
+means re-pinning without --reason clears the previous one.
+
+A torn-down preview cannot be pinned: its namespace is already gone, so the
+pin would protect nothing.
+
+Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sel := readPreviewSelector(cmd, previewsPinSel)
+		slug, err := resolveAppSlug(cmd, firstArg(args))
+		if err != nil {
+			return err
+		}
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		if err != nil {
+			return err
+		}
+		return runAppPreviewsSetPinned(cmd, cmd.Context(), client, slug, sel, true, previewsPinReason)
+	},
+}
+
+var appPreviewsUnpinCmd = &cobra.Command{
+	Use:   "unpin [app] --pr <n>",
+	Short: "Return a preview environment to garbage collection",
+	Long: `Removes a preview environment's pin, putting it back under the garbage
+collector: its TTL applies again, and max-active eviction can reclaim its
+slot for a newer PR.
+
+Unpinning clears the whole record of the pin — who set it, when, and why —
+so a justification that no longer applies never reads as the current one.
+Unpinning a preview that is not pinned succeeds and changes nothing.
+
+Unlike "pin", this works on a torn-down preview, so stale state can always
+be cleared.
+
+There is no --reason: the platform ignores a reason on an unpin, and a flag
+that silently does nothing is worse than no flag.
+
+Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sel := readPreviewSelector(cmd, previewsUnpinSel)
+		slug, err := resolveAppSlug(cmd, firstArg(args))
+		if err != nil {
+			return err
+		}
+		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		if err != nil {
+			return err
+		}
+		return runAppPreviewsSetPinned(cmd, cmd.Context(), client, slug, sel, false, "")
+	},
+}
+
+// runAppPreviewsSetPinned drives setPreviewPinned for both verbs.
+//
+// Deliberately no local torn-down guard on the pin path, unlike teardown: the
+// resolver already refuses it with a PRECONDITION whose wording is the
+// platform's, and a second local wording would drift from it the first time
+// the rule changes. Unpin on a torn-down preview is legal server-side and
+// stays legal here.
+func runAppPreviewsSetPinned(
+	cmd *cobra.Command,
+	ctx context.Context,
+	client *api.Client,
+	appSlug string,
+	sel previewSelector,
+	pinned bool,
+	reason string,
+) error {
+	p, err := loadPreview(ctx, client, appSlug, sel)
+	if err != nil {
+		return err
+	}
+
+	input := map[string]interface{}{"id": p.ID, "pinned": pinned}
+	// Omit the variable rather than sending "": the input defaults reason to
+	// null, and an empty string would read as "clear the recorded reason".
+	if trimmed := strings.TrimSpace(reason); trimmed != "" {
+		input["reason"] = trimmed
+	}
+
+	pinCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var resp struct {
+		Result struct {
+			Ok     bool                `json:"ok"`
+			Errors []mutationError     `json:"errors"`
+			Data   *previewEnvironment `json:"data"`
+		} `json:"setPreviewPinned"`
+	}
+	if err := client.GraphQL(pinCtx, setPreviewPinnedMutation,
+		map[string]interface{}{"input": input}, &resp); err != nil {
+		return fmt.Errorf("%s %s: %w", previewPinVerb(pinned), sel.label(), err)
+	}
+	if !resp.Result.Ok {
+		return fmt.Errorf("%s failed: %s", previewPinVerb(pinned), firstDeployError(resp.Result.Errors))
+	}
+	if resp.Result.Data == nil {
+		return fmt.Errorf("%s %s: the server returned no preview", previewPinVerb(pinned), sel.label())
+	}
+
+	updated := *resp.Result.Data
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, updated)
+	}
+
+	out := cmd.OutOrStdout()
+	if pinned {
+		fmt.Fprintf(out, "Pinned preview %s for %s (%s).\n",
+			previewPRLabel(updated), appSlug, dashIfEmpty(updated.Hostname))
+		// The reason comes off the returned row, not off the flag: the server
+		// truncates it to 512 characters, and echoing the flag would report a
+		// justification longer than the one on the record.
+		if updated.PinReason != "" {
+			fmt.Fprintf(out, "Reason: %s\n", updated.PinReason)
+		}
+		fmt.Fprintln(out, "It is exempt from TTL expiry and max-active eviction until it is unpinned.")
+		return nil
+	}
+	// Unpinning something that was never pinned is a no-op success server-side.
+	// The pre-mutation row is the only thing that distinguishes it from a real
+	// unpin, and claiming a state change that never happened is worse than
+	// saying nothing changed.
+	if !p.IsPinned {
+		fmt.Fprintf(out, "Preview %s for %s (%s) was not pinned; nothing changed.\n",
+			previewPRLabel(updated), appSlug, dashIfEmpty(updated.Hostname))
+		return nil
+	}
+	fmt.Fprintf(out, "Unpinned preview %s for %s (%s).\n",
+		previewPRLabel(updated), appSlug, dashIfEmpty(updated.Hostname))
+	fmt.Fprintf(out, "The garbage collector can reclaim it again; its TTL is %s.\n", shortTime(&updated.TTLUntil))
+	return nil
+}
+
+// previewPinVerb names the operation for error text, so a failure reads as
+// the verb the operator typed rather than as the shared setter.
+func previewPinVerb(pinned bool) string {
+	if pinned {
+		return "pin"
+	}
+	return "unpin"
+}
+
 // ---- wiring -----------------------------------------------------------------
 
 // firstArg returns the leading positional argument, or "" when none was given.
@@ -848,6 +1087,8 @@ func init() {
 	addPreviewSelectorFlags(appPreviewsLogsCmd, &previewsLogsSel)
 	addPreviewSelectorFlags(appPreviewsOpenCmd, &previewsOpenSel)
 	addPreviewSelectorFlags(appPreviewsTeardownCmd, &previewsTeardownSel)
+	addPreviewSelectorFlags(appPreviewsPinCmd, &previewsPinSel)
+	addPreviewSelectorFlags(appPreviewsUnpinCmd, &previewsUnpinSel)
 
 	// logs — bind the same vars runAppLogs reads, as `app exec` does with the
 	// exec target vars, so the shared implementation needs no changes.
@@ -862,11 +1103,18 @@ func init() {
 
 	appPreviewsTeardownCmd.Flags().BoolVarP(&previewsTeardownYes, "yes", "y", false, "Skip the confirmation prompt")
 
+	// unpin takes no --reason: the platform ignores a reason when clearing a
+	// pin, so the flag would accept text and drop it.
+	appPreviewsPinCmd.Flags().StringVar(&previewsPinReason, "reason", "",
+		"Why the preview is pinned (recorded with the pin, truncated to 512 characters)")
+
 	appPreviewsCmd.AddCommand(
 		appPreviewsListCmd,
 		appPreviewsShowCmd,
 		appPreviewsLogsCmd,
 		appPreviewsOpenCmd,
 		appPreviewsTeardownCmd,
+		appPreviewsPinCmd,
+		appPreviewsUnpinCmd,
 	)
 }
