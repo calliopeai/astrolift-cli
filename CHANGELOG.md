@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add `astro workflow run-cancel` and `astro workflow run-show`, control and
+  stage-level detail for a run that is already in flight. `run-cancel` is
+  cooperative by default, so a run that owns external resources tears them
+  down; `--terminate --reason <text>` escalates to a hard kill for a wedged
+  run. A run that is already terminal is refused before anything is sent, and
+  an RBAC denial reads as "not permitted" rather than a transport error.
+  `run-show` prints each stage's order, kind, role, status, attempt, and
+  timings, and for a `human_gate` its gate state plus the approvers the stage
+  declares — "waiting on approval, and on whom" as read-only platform truth.
+  Both take the workflow slug and default to the newest run (`--run <guid>`
+  selects another): the control plane has no by-guid run resolver. Requires
+  the `stageRole` / `stageApprovers` / `humanGateState` / `humanGateNote`
+  fields from astrolift-app#1409.
+
 ## 0.4.0 — 2026-08-16
 
 ### Added
