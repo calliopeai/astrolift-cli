@@ -542,8 +542,8 @@ The app slug comes from the positional argument, then --app, then the local
 astrolift.toml. Single-preview verbs take --pr <n>; manual previews have no
 PR number, so select those with --branch <name>.
 
-'pin' exempts a preview from garbage collection entirely — both from TTL
-expiry and from max-active eviction — until an operator runs 'unpin'. That
+"pin" exempts a preview from garbage collection entirely — both from TTL
+expiry and from max-active eviction — until an operator runs "unpin". That
 is the difference from extending a TTL, which only defers the TTL clock and
 still leaves the preview evictable when a newer PR needs the slot.`,
 }
@@ -556,7 +556,7 @@ var appPreviewsListCmd = &cobra.Command{
 	Long: `Lists the app's preview environments, newest first, via the
 astroliftPreviewEnvironmentsPage GraphQL query.
 
-Each row carries the PR number (or 'manual'), branch, status, hostname, when
+Each row carries the PR number (or "manual"), branch, status, hostname, when
 it last deployed, the TTL the garbage collector reaps it at, and whether an
 operator has pinned it. A pinned preview is exempt from collection, so its
 TTL column is advisory. Torn-down previews are hidden by default; pass --all
@@ -694,7 +694,7 @@ var appPreviewsLogsCmd = &cobra.Command{
 	Short: "Show logs for a preview environment's workloads",
 	Long: `Tails the log lines for one preview environment.
 
-This is 'astro app logs' pointed at the environment the platform synthesized
+This is "astro app logs" pointed at the environment the platform synthesized
 for the preview, so every log flag behaves identically: --since bounds the
 window, --tail caps the lines, --follow (-f) polls for new ones, and --level
 / --search filter. Use --workload to narrow to one workload.
@@ -904,10 +904,10 @@ A pin covers both collection rules: the TTL never expires the preview, and
 max-active eviction skips it, so a newer PR cannot claim its slot. That is
 what makes this different from extending a TTL, which only defers the TTL
 clock and leaves the preview evictable under pressure. The pin holds until
-someone runs 'unpin' — nothing expires it — so it keeps costing money.
+someone runs "unpin" — nothing expires it — so it keeps costing money.
 
 Pass --reason <text> to record why. The reason is stored with the pin and is
-shown by 'previews show'; it is truncated to 512 characters. Re-pinning an
+shown by "previews show"; it is truncated to 512 characters. Re-pinning an
 already-pinned preview replaces the recorded actor, timestamp and reason, so
 what is on the record is always the justification currently in force — which
 means re-pinning without --reason clears the previous one.
@@ -942,7 +942,7 @@ Unpinning clears the whole record of the pin — who set it, when, and why —
 so a justification that no longer applies never reads as the current one.
 Unpinning a preview that is not pinned succeeds and changes nothing.
 
-Unlike 'pin', this works on a torn-down preview, so stale state can always
+Unlike "pin", this works on a torn-down preview, so stale state can always
 be cleared.
 
 There is no --reason: the platform ignores a reason on an unpin, and a flag
