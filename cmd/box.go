@@ -25,6 +25,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -79,6 +80,21 @@ const listBoxesQuery = `query($orgId: ID!, $includeEnded: Boolean!) {
 
 const getBoxQuery = `query($slug: String!) {
   agentBox(slug: $slug) {` + boxFields + `
+  }
+}`
+
+// agentBoxPodsQuery resolves a box's pod. A box's pods used to answer to
+// `astroliftAppPods` as well; astrolift-app#1482 removed that on purpose,
+// because a second door into them gated on `app.read_logs` outlived its
+// reason and leaked box pods into an unrelated workload breakdown. This
+// field is gated on `agent_box.attach` — the same grant that authorizes the
+// attach itself, so a role that may reach a box may also find it.
+const agentBoxPodsQuery = `query($slug: String!) {
+  agentBoxPods(slug: $slug) {
+    name
+    phase
+    ready
+    containerStatuses { name }
   }
 }`
 
@@ -559,14 +575,77 @@ func runBoxAttach(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 		command = []string{"tmux", "new-session", "-A", "-s", session}
 	}
 
+	pod, container, err := resolveBoxPod(ctx, client, box)
+	if err != nil {
+		return err
+	}
+
 	// runExec reads its target from the package-level exec flags. Point them at
 	// the box and restore them after, so `box attach` can't leak state into a
 	// later `exec` in the same process (the test binary, mainly).
 	prevApp, prevPod, prevContainer := execApp, execPod, execContainer
 	defer func() { execApp, execPod, execContainer = prevApp, prevPod, prevContainer }()
-	execApp, execPod, execContainer = box.Slug, box.PodName, ""
+	execApp, execPod, execContainer = box.Slug, pod, container
 
 	return runExec(cmd, ctx, client, command)
+}
+
+// resolveBoxPod finds the pod to dial, tolerating both sides of a control
+// plane that may or may not carry astrolift-app#1482.
+//
+// Three steps, cheapest first:
+//
+//  1. The row's own `podName`. A server that stamps it (post-#1482) makes this
+//     the normal case and costs no query at all.
+//  2. `agentBoxPods`, gated on the same grant as the attach itself.
+//  3. Nothing — leave the pod blank and let `runExec` resolve it the way it
+//     always has, which is what works against a server predating #1482.
+//
+// Step 3 is the one worth keeping. Before #1482 a box answered to
+// `astroliftAppPods`; after it, that door is closed and `agentBoxPods` is the
+// only one. A CLI that assumed either shape would break against half the
+// installs in the field, and the failure would look like a broken box rather
+// than a version difference.
+func resolveBoxPod(ctx context.Context, client *api.Client, box *agentBox) (string, string, error) {
+	if box.PodName != "" {
+		return box.PodName, "", nil
+	}
+
+	podCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var resp struct {
+		Pods []execPodInfo `json:"agentBoxPods"`
+	}
+	if err := client.GraphQL(podCtx, agentBoxPodsQuery,
+		map[string]interface{}{"slug": box.Slug}, &resp); err != nil {
+		if errors.Is(err, api.ErrSchemaMismatch) {
+			// A control plane without astrolift-app#1482. Blank pod means
+			// runExec resolves it the way it always has, which is what still
+			// answers a box slug there.
+			return "", "", nil
+		}
+		return "", "", fmt.Errorf("resolving the box pod: %w", err)
+	}
+
+	if len(resp.Pods) == 0 {
+		return "", "", fmt.Errorf(
+			"box %s is %s but has no pod yet — it may still be starting; check `astro box ls`",
+			box.Slug, box.Status)
+	}
+
+	pick := resp.Pods[0]
+	for _, candidate := range resp.Pods {
+		if candidate.Ready && strings.EqualFold(candidate.Phase, "Running") {
+			pick = candidate
+			break
+		}
+	}
+	container := ""
+	if len(pick.ContainerStatuses) > 0 {
+		container = pick.ContainerStatuses[0].Name
+	}
+	return pick.Name, container, nil
 }
 
 // ---- output ----------------------------------------------------------------

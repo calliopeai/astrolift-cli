@@ -110,7 +110,11 @@ func (c *Client) GraphQL(ctx context.Context, query string, variables map[string
 		for i, e := range envelope.Errors {
 			msgs[i] = e.Message
 		}
-		return fmt.Errorf("graphql errors: %s", strings.Join(msgs, "; "))
+		joined := strings.Join(msgs, "; ")
+		if isSchemaMismatch(msgs) {
+			return fmt.Errorf("%w: %s", ErrSchemaMismatch, joined)
+		}
+		return fmt.Errorf("graphql errors: %s", joined)
 	}
 	if target != nil && len(envelope.Data) > 0 {
 		if err := json.Unmarshal(envelope.Data, target); err != nil {
@@ -123,6 +127,71 @@ func (c *Client) GraphQL(ctx context.Context, query string, variables map[string
 // ErrUnauthorized signals the token is missing or invalid; callers
 // should prompt the user to re-login.
 var ErrUnauthorized = errors.New("unauthorized: run `astro auth login`")
+
+// ErrSchemaMismatch signals the server does not have a field, argument or type
+// the query asked for — the CLI and the control plane were built against
+// different schemas.
+//
+// Worth a sentinel rather than a string match at each call site, for two
+// reasons. It is classified here, where the GraphQL error array is already
+// parsed, instead of by re-parsing a message this package formatted. And a
+// server rejects the *whole* query on an unknown selection rather than
+// returning a partial result, so a caller cannot discover a field's absence by
+// inspecting the response — recognising the failure is the only way, and every
+// caller that wants to adapt would otherwise reimplement the same fragile
+// matching.
+//
+// Callers adapt with errors.Is:
+//
+//	if err := client.GraphQL(ctx, newQuery, vars, &out); err != nil {
+//	    if errors.Is(err, api.ErrSchemaMismatch) {
+//	        // fall back, or degrade to a narrower feature
+//	    }
+//	    return err
+//	}
+//
+// It exists to decouple this repo's release from the control plane's: a CLI
+// that adapts can ship before or after the server change that motivated it,
+// with no cutover to choreograph. It is deliberately NOT a way to paper over a
+// real failure — a permission denial or a transport error must never be
+// mistaken for it, which is what the narrow matching below protects.
+var ErrSchemaMismatch = errors.New("server schema does not have what this query asked for")
+
+// schemaMismatchMarkers are the phrasings a GraphQL server uses when a query
+// names something its schema does not define. Deliberately narrow: broadening
+// these would let a genuine failure be swallowed by a fallback path, which is
+// worse than the version skew they exist to absorb.
+var schemaMismatchMarkers = []string{
+	"cannot query field",
+	"unknown field",
+	"unknown argument",
+	"unknown type",
+	"is not defined by type",
+	"field is not defined",
+}
+
+func isSchemaMismatch(msgs []string) bool {
+	// Every message must be a schema complaint. One real error alongside a
+	// schema one still has to surface as an error, or a fallback path would
+	// silently discard it.
+	if len(msgs) == 0 {
+		return false
+	}
+	for _, msg := range msgs {
+		lowered := strings.ToLower(msg)
+		matched := false
+		for _, marker := range schemaMismatchMarkers {
+			if strings.Contains(lowered, marker) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
 
 // Get performs an authenticated GET request against the REST API and
 // decodes the JSON response body into target.
