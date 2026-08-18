@@ -129,7 +129,17 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 			case http.StatusUnauthorized:
 				return fmt.Errorf("exec unauthorized — run `astro auth login`")
 			case http.StatusForbidden:
-				return fmt.Errorf("exec denied — you need the app.exec_pod permission")
+				// The relay closes before accepting the WebSocket on every
+				// rejection, so all of its close codes reach us as one HTTP
+				// 403 — "no such target in your org" and "you lack the grant"
+				// are indistinguishable from here. Naming a single cause would
+				// be a guess, and the wrong guess sends someone auditing RBAC
+				// over a typo (or the reverse).
+				return fmt.Errorf(
+					"exec rejected for %q — either nothing by that name exists in your "+
+						"organization, or you lack the permission to exec into it "+
+						"(app.exec_pod for an app, agent_box.attach for an agent-box). "+
+						"The relay does not distinguish the two", execApp)
 			}
 		}
 		return fmt.Errorf("connecting exec socket (%s): %w", wsURL, err)
