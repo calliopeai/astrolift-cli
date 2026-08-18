@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add the `astro box` command group — `ensure`, `ls`, `rm`, `attach` — for
+  agent-boxes, the warm containers an interactive agent session attaches to.
+  Unlike `agent dispatch`, which starts a batch run that ends, a box holds a
+  tmux session open and waits, so the agent survives a dropped connection, an
+  IDE restart, or a closed laptop.
+
+  `ensure` is idempotent rather than a create: it is what a button calls, so
+  pressing it twice attaches to the box you already have instead of starting a
+  rival one on a second node, and a box that was idle-reaped restarts under the
+  same slug so a stored address keeps working. Name what to run with `--agent`
+  (a registered agent whose run mode is `persistent`) or `--env-spec` (the
+  image and the secret packet). `--idle-timeout` accepts `90m`, a number of
+  seconds, or `never`; an unset flag sends nothing rather than a zero, because
+  zero is the never-reap sentinel and inventing one would quietly pin a node.
+  `ls` shows warm boxes only, `--all` includes settled ones.
+
+  `attach` cannot work end to end yet: the control-plane exec relay admits
+  registered apps only, and a box is not one, so a healthy box surfaces as a
+  permission error. `attach` detects that case and prints the `kubectl exec`
+  route instead of leaving the reader auditing their own grants. Tracked in
+  calliopeai/astrolift#128.
+
+  Requires the `ensureAgentBox` / `destroyAgentBox` / `agentBoxes` / `agentBox`
+  surface from astrolift-app#1475.
+
 ## 0.5.0 — 2026-08-16
 
 ### Added
