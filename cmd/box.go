@@ -155,12 +155,12 @@ var boxCmd = &cobra.Command{
 	Short: "Manage agent-boxes: warm containers you attach an interactive agent to",
 	Long: `An agent-box is a long-lived pod whose purpose is to be attached to.
 
-Unlike 'astro agent dispatch', which starts a batch run that ends, a box holds
+Unlike "astro agent dispatch", which starts a batch run that ends, a box holds
 a tmux session open and waits. That is what lets an agent survive a dropped
 connection, an IDE restart, or a closed laptop, and what lets more than one
 person watch the same session.
 
-Start with 'astro box ensure'. It is idempotent: run it again and you attach to
+Start with "astro box ensure". It is idempotent: run it again and you attach to
 the box you already have rather than paying for a second one.`,
 }
 
@@ -180,10 +180,10 @@ Name what to run with --agent (a registered agent whose run mode is
 persistent), with --env-spec (an environment spec, which is where the image and
 the secret packet come from), or both.
 
---idle-timeout takes a duration ('90m', '4h'), a bare number of seconds, or
-'never'. It is measured from the last pane activity rather than the last
-attach, so an agent working while you are away keeps its box. 'never' holds the
-node until you destroy it.
+--idle-timeout takes a duration ("90m", "4h"), a bare number of seconds, or
+"never". It is measured from the last pane activity rather than the last
+attach, so an agent working while you are away keeps its box. "never" holds
+the node until you destroy it.
 
 Examples:
   astro box ensure --env-spec claude-dev
@@ -597,7 +597,7 @@ func init() {
 	boxEnsureCmd.Flags().StringVar(&boxEnsureAgent, "agent", "", "Registered agent slug (run mode must be persistent)")
 	boxEnsureCmd.Flags().StringVar(&boxEnsureSpec, "env-spec", "", "Agent environment spec slug (image + secret packet)")
 	boxEnsureCmd.Flags().StringVar(&boxEnsureName, "name", "", "Human-readable name (defaults to the agent or spec name)")
-	boxEnsureCmd.Flags().StringVar(&boxEnsureIdle, "idle-timeout", "", "Reap after this much inactivity: '90m', seconds, or 'never'")
+	boxEnsureCmd.Flags().StringVar(&boxEnsureIdle, "idle-timeout", "", "Reap after this much inactivity: 90m, seconds, or never")
 	boxEnsureCmd.Flags().BoolVar(&boxEnsureWait, "wait", false, "Block until the box is attachable")
 	boxEnsureCmd.Flags().BoolVar(&boxEnsureJSON, "json", false, "Output the box record as JSON")
 
@@ -608,7 +608,7 @@ func init() {
 
 	boxAttachCmd.Flags().StringVar(&boxAttachAgent, "agent", "", "Registered agent slug, when ensuring a box to attach to")
 	boxAttachCmd.Flags().StringVar(&boxAttachSpec, "env-spec", "", "Environment spec slug, when ensuring a box to attach to")
-	boxAttachCmd.Flags().StringVar(&boxAttachIdle, "idle-timeout", "", "Reap after this much inactivity: '90m', seconds, or 'never'")
+	boxAttachCmd.Flags().StringVar(&boxAttachIdle, "idle-timeout", "", "Reap after this much inactivity: 90m, seconds, or never")
 
 	boxCmd.AddCommand(boxEnsureCmd, boxListCmd, boxRmCmd, boxAttachCmd)
 	rootCmd.AddCommand(boxCmd)
