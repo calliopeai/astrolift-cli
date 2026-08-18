@@ -566,37 +566,7 @@ func runBoxAttach(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	defer func() { execApp, execPod, execContainer = prevApp, prevPod, prevContainer }()
 	execApp, execPod, execContainer = box.Slug, box.PodName, ""
 
-	if err := runExec(cmd, ctx, client, command); err != nil {
-		return annotateBoxExecError(box, err)
-	}
-	return nil
-}
-
-// annotateBoxExecError explains the one failure a user cannot diagnose.
-//
-// The exec relay gates on the slug naming a RegisteredApp, and a box is an
-// AgentBox row, so today it closes the handshake on a perfectly healthy box.
-// Left bare that surfaces as a permission error, which sends the reader
-// looking at their own grants for a gap that is the platform's.
-func annotateBoxExecError(box *agentBox, err error) error {
-	msg := err.Error()
-	if !strings.Contains(msg, "app.exec_pod") && !strings.Contains(msg, "denied") {
-		return err
-	}
-	return fmt.Errorf(
-		"%w\n\nThe box is up (%s in %s), but the control-plane exec relay only\n"+
-			"admits registered apps, and a box is not one — see calliopeai/astrolift#128.\n"+
-			"Until that lands, reach the session directly:\n"+
-			"  kubectl -n %s exec -it %s -- %s",
-		err, box.Status, box.Namespace,
-		box.Namespace, podOrPlaceholder(box), strings.Join(box.AttachCommand, " "))
-}
-
-func podOrPlaceholder(box *agentBox) string {
-	if box.PodName != "" {
-		return box.PodName
-	}
-	return "<pod>"
+	return runExec(cmd, ctx, client, command)
 }
 
 // ---- output ----------------------------------------------------------------

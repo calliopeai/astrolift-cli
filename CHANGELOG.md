@@ -21,10 +21,12 @@
   `ls` shows warm boxes only, `--all` includes settled ones.
 
   `attach` cannot work end to end yet: the control-plane exec relay admits
-  registered apps only, and a box is not one, so a healthy box surfaces as a
-  permission error. `attach` detects that case and prints the `kubectl exec`
-  route instead of leaving the reader auditing their own grants. Tracked in
-  calliopeai/astrolift#128.
+  registered apps only, and a box is not one, so a healthy box fails as a
+  permission error. Tracked in calliopeai/astrolift#129. The failure is left
+  raw deliberately — an earlier revision explained the gap and offered a
+  `kubectl exec` fallback, which reads correctly today and becomes a lie the
+  moment #129 lands, telling someone with a genuine permission denial that the
+  platform does not support boxes. Unhelpful beats confidently wrong.
 
   Requires the `ensureAgentBox` / `destroyAgentBox` / `agentBoxes` / `agentBox`
   surface from astrolift-app#1475.

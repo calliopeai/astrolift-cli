@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -72,10 +71,6 @@ func gqlServerFunc(t *testing.T, respond func(gqlRequest) map[string]interface{}
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": respond(req)})
 	}))
 }
-
-// errFromString builds a plain error for the annotation tests, which are about
-// how a message is rewritten rather than about where it came from.
-func errFromString(msg string) error { return errors.New(msg) }
 
 func TestBoxEnsureSendsMutationAndPrintsAttachHint(t *testing.T) {
 	resetBoxFlags()
@@ -461,38 +456,5 @@ func TestBoxAttachRejectsAnUnknownSlug(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("error should say the box was not found: %v", err)
-	}
-}
-
-// The exec relay admits registered apps only, and a box is not one, so a
-// healthy box surfaces as a permission error. Left bare it sends the reader
-// auditing their own grants for a gap that is the platform's.
-func TestBoxAttachExplainsTheExecRelayGap(t *testing.T) {
-	box := &agentBox{
-		Slug:          "box-claude-dev",
-		Status:        "running",
-		Namespace:     "astrolift-agents-acme",
-		PodName:       "agent-box-abc-xyz",
-		AttachCommand: []string{"tmux", "new-session", "-A", "-s", "astrolift"},
-	}
-	annotated := annotateBoxExecError(box, errFromString("exec denied — you need the app.exec_pod permission"))
-
-	msg := annotated.Error()
-	if !strings.Contains(msg, "astrolift#128") {
-		t.Errorf("annotation should point at the platform gap:\n%s", msg)
-	}
-	// And it must leave the reader a way in right now.
-	if !strings.Contains(msg, "kubectl -n astrolift-agents-acme exec -it agent-box-abc-xyz") {
-		t.Errorf("annotation should offer the direct route:\n%s", msg)
-	}
-}
-
-// An unrelated exec failure must pass through untouched rather than acquire a
-// misleading explanation.
-func TestBoxAttachLeavesUnrelatedExecErrorsAlone(t *testing.T) {
-	box := &agentBox{Slug: "box-claude-dev", Status: "running"}
-	original := errFromString("connecting exec socket: dial tcp: i/o timeout")
-	if got := annotateBoxExecError(box, original); got != original {
-		t.Errorf("unrelated error was rewritten: %v", got)
 	}
 }
