@@ -2,27 +2,40 @@
 
 ## Unreleased
 
+### Added
+
+- `api.ErrSchemaMismatch`: a sentinel for "the server's schema does not have
+  what this query asked for", classified where the GraphQL error array is
+  already parsed rather than by re-parsing a formatted message at each call
+  site. Callers adapt with `errors.Is`.
+
+  It exists because a GraphQL server rejects the *whole* query on an unknown
+  selection instead of returning a partial result, so a client cannot discover
+  a field's absence by inspecting the response — recognising the failure is the
+  only way, and every caller that wants to adapt would otherwise reimplement
+  the same fragile string matching. Having it lets this repo's releases and the
+  control plane's move independently, with no cutover to choreograph.
+
+  Deliberately narrow, and tested for the narrowness: a permission denial, a
+  not-found, or a transport failure must never wear it, and a batch mixing a
+  schema complaint with a real error is not a mismatch either — otherwise a
+  caller's fallback path would silently discard the real problem.
+
 ### Fixed
 
-- `astro box attach` now resolves a box's pod in a way that works against
-  control planes both older and newer than itself. Astrolift installs are
-  versioned independently, so a released CLI necessarily talks to both, and a
-  server rejects the whole query on an unknown field rather than returning a
-  partial result — a new field cannot be probed, only recognised in the error
-  and retried.
+- `astro box attach` resolves a box's pod in a way that survives the control
+  plane changing underneath it. Three steps, cheapest first: the row's own
+  `podName` when it carries one (free, and the normal case on a current
+  server); then `agentBoxPods`, gated on `agent_box.attach`, the same grant
+  that authorizes the attach; then a blank pod so the existing resolver runs.
 
-  Three steps, cheapest first: the row's own `podName` when it carries one
-  (free, and the normal case on a current server); then `agentBoxPods`, gated
-  on `agent_box.attach`, the same grant that authorizes the attach; then a
-  blank pod so the existing resolver runs, which is what still answers a box
-  slug on a server predating astrolift-app#1482.
+  astrolift-app#1482 closes the `astroliftAppPods` door that answered a box
+  slug — correctly, since a second door gated on `app.read_logs` was also
+  leaking box pods into an unrelated workload breakdown — but 0.6.0 relies on
+  it whenever `podName` is blank, which happens before the first sweep after a
+  pod comes up and whenever the best-effort stamp swallowed a failure.
 
-  Without this, `attach` breaks in one direction or the other depending on
-  which side upgrades first: #1482 closes the `astroliftAppPods` door that
-  0.6.0 relies on when `podName` is blank, and a CLI that simply switched to
-  the new field would fail against every install that has not taken #1482 yet.
-  A real permission or transport failure still surfaces rather than degrading
-  silently.
+  Also passes the resolved container name rather than an empty one.
 
 ## 0.6.0 — 2026-08-18
 

@@ -25,6 +25,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -96,25 +97,6 @@ const agentBoxPodsQuery = `query($slug: String!) {
     containerStatuses { name }
   }
 }`
-
-// unknownFieldError reports whether a GraphQL failure is "this server has
-// never heard of that field".
-//
-// Astrolift installs are independently versioned — one DNS zone and database
-// each, upgraded on their own schedule — so a released CLI talks to control
-// planes both older and newer than the surface it was built against. A server
-// rejects the *whole* query on an unknown selection rather than returning a
-// partial result, so a new field cannot be probed by inspecting the response:
-// it has to be recognised in the error and retried a different way.
-func unknownFieldError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "cannot query field") ||
-		strings.Contains(msg, "unknown field") ||
-		strings.Contains(msg, "field \"agentboxpods\"")
-}
 
 // ---- response shapes -------------------------------------------------------
 
@@ -637,9 +619,10 @@ func resolveBoxPod(ctx context.Context, client *api.Client, box *agentBox) (stri
 	}
 	if err := client.GraphQL(podCtx, agentBoxPodsQuery,
 		map[string]interface{}{"slug": box.Slug}, &resp); err != nil {
-		if unknownFieldError(err) {
-			// Older install: no such field. Blank pod means runExec falls back
-			// to the resolver, which still answers a box slug there.
+		if errors.Is(err, api.ErrSchemaMismatch) {
+			// A control plane without astrolift-app#1482. Blank pod means
+			// runExec resolves it the way it always has, which is what still
+			// answers a box slug there.
 			return "", "", nil
 		}
 		return "", "", fmt.Errorf("resolving the box pod: %w", err)

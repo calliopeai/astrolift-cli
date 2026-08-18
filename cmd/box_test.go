@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -557,30 +556,5 @@ func TestResolveBoxPodSurfacesARealFailure(t *testing.T) {
 	box := &agentBox{Slug: "box-claude-dev", Status: "running"}
 	if _, _, err := resolveBoxPod(context.Background(), api.NewClient(srv.URL, "tok", false), box); err == nil {
 		t.Fatal("a permission failure must surface, not degrade to the legacy path")
-	}
-}
-
-func TestUnknownFieldErrorDiscriminates(t *testing.T) {
-	skew := []string{
-		`Cannot query field "agentBoxPods" on type "Query".`,
-		`Unknown field agentBoxPods`,
-	}
-	for _, msg := range skew {
-		if !unknownFieldError(errors.New(msg)) {
-			t.Errorf("should read as version skew: %q", msg)
-		}
-	}
-	notSkew := []string{
-		"permission denied: agent_box.attach",
-		"dial tcp: i/o timeout",
-		"agent box not found",
-	}
-	for _, msg := range notSkew {
-		if unknownFieldError(errors.New(msg)) {
-			t.Errorf("should NOT read as version skew: %q", msg)
-		}
-	}
-	if unknownFieldError(nil) {
-		t.Error("nil is not an error")
 	}
 }
