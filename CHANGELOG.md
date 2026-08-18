@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `astro box attach` now resolves a box's pod in a way that works against
+  control planes both older and newer than itself. Astrolift installs are
+  versioned independently, so a released CLI necessarily talks to both, and a
+  server rejects the whole query on an unknown field rather than returning a
+  partial result — a new field cannot be probed, only recognised in the error
+  and retried.
+
+  Three steps, cheapest first: the row's own `podName` when it carries one
+  (free, and the normal case on a current server); then `agentBoxPods`, gated
+  on `agent_box.attach`, the same grant that authorizes the attach; then a
+  blank pod so the existing resolver runs, which is what still answers a box
+  slug on a server predating astrolift-app#1482.
+
+  Without this, `attach` breaks in one direction or the other depending on
+  which side upgrades first: #1482 closes the `astroliftAppPods` door that
+  0.6.0 relies on when `podName` is blank, and a CLI that simply switched to
+  the new field would fail against every install that has not taken #1482 yet.
+  A real permission or transport failure still surfaces rather than degrading
+  silently.
+
 ## 0.6.0 — 2026-08-18
 
 ### Added

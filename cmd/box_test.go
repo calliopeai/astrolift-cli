@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -456,5 +457,130 @@ func TestBoxAttachRejectsAnUnknownSlug(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("error should say the box was not found: %v", err)
+	}
+}
+
+// ---- pod resolution across control-plane versions --------------------------
+
+// The fast path: a server that stamps podName costs no query at all.
+func TestResolveBoxPodPrefersTheStampedName(t *testing.T) {
+	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+		t.Errorf("no query should have been sent; got: %s", req.Query)
+		return map[string]interface{}{}
+	})
+	defer srv.Close()
+
+	box := &agentBox{Slug: "box-claude-dev", Status: "running", PodName: "agent-box-abc-xyz"}
+	pod, _, err := resolveBoxPod(context.Background(), api.NewClient(srv.URL, "tok", false), box)
+	if err != nil {
+		t.Fatalf("resolveBoxPod: %v", err)
+	}
+	if pod != "agent-box-abc-xyz" {
+		t.Errorf("pod = %q, want the stamped name", pod)
+	}
+}
+
+// A blank podName on a current server goes to agentBoxPods, which is gated on
+// the same grant as the attach itself.
+func TestResolveBoxPodFallsBackToAgentBoxPods(t *testing.T) {
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"agentBoxPods": []interface{}{
+			map[string]interface{}{
+				"name": "agent-box-old", "phase": "Succeeded", "ready": false,
+				"containerStatuses": []interface{}{},
+			},
+			map[string]interface{}{
+				"name": "agent-box-live", "phase": "Running", "ready": true,
+				"containerStatuses": []interface{}{map[string]interface{}{"name": "agent-box"}},
+			},
+		},
+	}, &captured)
+	defer srv.Close()
+
+	box := &agentBox{Slug: "box-claude-dev", Status: "running"}
+	pod, container, err := resolveBoxPod(context.Background(), api.NewClient(srv.URL, "tok", false), box)
+	if err != nil {
+		t.Fatalf("resolveBoxPod: %v", err)
+	}
+	if !strings.Contains(captured.Query, "agentBoxPods(slug: $slug)") {
+		t.Errorf("did not call agentBoxPods:\n%s", captured.Query)
+	}
+	// A terminating leftover from a previous incarnation must never win over
+	// the pod that is actually up.
+	if pod != "agent-box-live" {
+		t.Errorf("pod = %q, want the ready/Running one", pod)
+	}
+	if container != "agent-box" {
+		t.Errorf("container = %q", container)
+	}
+}
+
+// The half that makes a released binary survive an older install: a server
+// predating astrolift-app#1482 rejects the whole query on the unknown field,
+// and that must degrade to the pre-existing resolver rather than surface as a
+// broken box.
+func TestResolveBoxPodDegradesOnAnOlderControlPlane(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"errors": []interface{}{
+				map[string]interface{}{"message": `Cannot query field "agentBoxPods" on type "Query".`},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	box := &agentBox{Slug: "box-claude-dev", Status: "running"}
+	pod, container, err := resolveBoxPod(context.Background(), api.NewClient(srv.URL, "tok", false), box)
+	if err != nil {
+		t.Fatalf("an unknown field must not be an error: %v", err)
+	}
+	// Blank means "let runExec resolve it the old way", which is what still
+	// answers a box slug on that server.
+	if pod != "" || container != "" {
+		t.Errorf("expected a blank pod so the legacy resolver runs; got %q/%q", pod, container)
+	}
+}
+
+// A real transport or permission failure is not version skew and must not be
+// swallowed into a silent fallback.
+func TestResolveBoxPodSurfacesARealFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"errors": []interface{}{
+				map[string]interface{}{"message": "permission denied: agent_box.attach"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	box := &agentBox{Slug: "box-claude-dev", Status: "running"}
+	if _, _, err := resolveBoxPod(context.Background(), api.NewClient(srv.URL, "tok", false), box); err == nil {
+		t.Fatal("a permission failure must surface, not degrade to the legacy path")
+	}
+}
+
+func TestUnknownFieldErrorDiscriminates(t *testing.T) {
+	skew := []string{
+		`Cannot query field "agentBoxPods" on type "Query".`,
+		`Unknown field agentBoxPods`,
+	}
+	for _, msg := range skew {
+		if !unknownFieldError(errors.New(msg)) {
+			t.Errorf("should read as version skew: %q", msg)
+		}
+	}
+	notSkew := []string{
+		"permission denied: agent_box.attach",
+		"dial tcp: i/o timeout",
+		"agent box not found",
+	}
+	for _, msg := range notSkew {
+		if unknownFieldError(errors.New(msg)) {
+			t.Errorf("should NOT read as version skew: %q", msg)
+		}
+	}
+	if unknownFieldError(nil) {
+		t.Error("nil is not an error")
 	}
 }
