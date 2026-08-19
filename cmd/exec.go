@@ -17,6 +17,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -282,6 +283,15 @@ func resolveExecPod(ctx context.Context, client *api.Client) (string, string, er
 		candidates = append(candidates, p)
 	}
 	if len(candidates) == 0 {
+		// Before reporting an app with no pods, check whether the slug names
+		// an agent-box. A box is not a RegisteredApp, so it resolves to no
+		// pods here and "no running pods" is true about the wrong thing —
+		// someone following older docs would read it as their box being
+		// broken while it sits there running. One query, only on a path that
+		// is already failing.
+		if hint := agentBoxVerbHint(ctx, client, execApp); hint != "" {
+			return "", "", errors.New(hint)
+		}
 		suffix := ""
 		if execWorkload != "" {
 			suffix = fmt.Sprintf(" (workload %q)", execWorkload)

@@ -648,6 +648,35 @@ func resolveBoxPod(ctx context.Context, client *api.Client, box *agentBox) (stri
 	return pick.Name, container, nil
 }
 
+// agentBoxVerbHint names the right verb when an exec target turns out to be an
+// agent-box rather than an app.
+//
+// `astro exec --app <slug>` cannot reach a box: the control plane resolves app
+// pods through a surface that deliberately stopped answering for boxes
+// (astrolift-app#1482), so a perfectly healthy box produces "no running pods
+// for app". That sentence is true about the wrong subject, and #128's own text
+// still shows the old `astro exec --app X -- claude` form — so the reader most
+// likely to hit it is the one following the documentation.
+//
+// Returns "" when the slug is not a box, or when the lookup cannot be made at
+// all (an older control plane, a missing grant). A hint is a courtesy on a
+// failing path; it must never replace the real error with a guess.
+func agentBoxVerbHint(ctx context.Context, client *api.Client, slug string) string {
+	box, err := getBox(ctx, client, slug)
+	if err != nil || box == nil {
+		return ""
+	}
+	if boxLiveStatuses[box.Status] {
+		return fmt.Sprintf(
+			"%s is an agent-box, not an app. Use: astro box attach %s", box.Slug, box.Slug)
+	}
+	// A settled box is just as misleading to report as a pod-less app, and the
+	// useful next step is different — it needs starting, not attaching.
+	return fmt.Sprintf(
+		"%s is an agent-box and is %s, so it has no pod. Start it with: astro box ensure --env-spec %s",
+		box.Slug, box.Status, box.EnvironmentSpecSlug)
+}
+
 // ---- output ----------------------------------------------------------------
 
 func printBox(cmd *cobra.Command, box *agentBox) {
