@@ -558,3 +558,74 @@ func TestResolveBoxPodSurfacesARealFailure(t *testing.T) {
 		t.Fatal("a permission failure must surface, not degrade to the legacy path")
 	}
 }
+
+// ---- exec naming the box verb ---------------------------------------------
+
+// `astro exec --app <box>` cannot reach a box, and "no running pods for app"
+// is true about the wrong subject. #128's own text still shows the old
+// `astro exec --app X -- claude` form, so the person most likely to hit this
+// is the one following the docs.
+func TestExecOnALiveBoxNamesTheBoxVerb(t *testing.T) {
+	srv := gqlServer(t, map[string]interface{}{
+		"agentBox": boxPayload("box-claude-dev", "running"),
+	}, nil)
+	defer srv.Close()
+
+	hint := agentBoxVerbHint(context.Background(), api.NewClient(srv.URL, "tok", false), "box-claude-dev")
+
+	if !strings.Contains(hint, "is an agent-box") {
+		t.Errorf("hint should say it is a box: %q", hint)
+	}
+	if !strings.Contains(hint, "astro box attach box-claude-dev") {
+		t.Errorf("hint must name the verb that works: %q", hint)
+	}
+}
+
+// A settled box is equally misleading to report as a pod-less app, and the
+// useful next step differs — it needs starting, not attaching.
+func TestExecOnASettledBoxPointsAtEnsure(t *testing.T) {
+	srv := gqlServer(t, map[string]interface{}{
+		"agentBox": boxPayload("box-claude-dev", "expired"),
+	}, nil)
+	defer srv.Close()
+
+	hint := agentBoxVerbHint(context.Background(), api.NewClient(srv.URL, "tok", false), "box-claude-dev")
+
+	if !strings.Contains(hint, "expired") {
+		t.Errorf("hint should carry the status: %q", hint)
+	}
+	if !strings.Contains(hint, "box ensure --env-spec claude-dev") {
+		t.Errorf("a settled box needs starting, not attaching: %q", hint)
+	}
+	if strings.Contains(hint, "box attach") {
+		t.Errorf("must not send someone to attach to a box that is gone: %q", hint)
+	}
+}
+
+// The hint is a courtesy on an already-failing path. A slug that is genuinely
+// an unknown app must keep its real error rather than acquire a guess.
+func TestExecOnANonBoxOffersNoHint(t *testing.T) {
+	srv := gqlServer(t, map[string]interface{}{"agentBox": nil}, nil)
+	defer srv.Close()
+
+	if hint := agentBoxVerbHint(context.Background(), api.NewClient(srv.URL, "tok", false), "web"); hint != "" {
+		t.Errorf("expected no hint for a non-box slug, got %q", hint)
+	}
+}
+
+// An older control plane, or a caller without the grant, must fall through to
+// the original error rather than swallow it.
+func TestExecHintStaysSilentWhenItCannotLook(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"errors": []interface{}{
+				map[string]interface{}{"message": `Cannot query field "agentBox" on type "Query".`},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	if hint := agentBoxVerbHint(context.Background(), api.NewClient(srv.URL, "tok", false), "anything"); hint != "" {
+		t.Errorf("a failed lookup must not produce a hint, got %q", hint)
+	}
+}
