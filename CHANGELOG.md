@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `astro exec --app <slug>` now names the right verb when the slug turns out to
+  be an agent-box: `box-… is an agent-box, not an app. Use: astro box attach
+  box-…`. A settled box points at `box ensure` instead, since it needs starting
+  rather than attaching.
+
+  A box is not a registered app, so it resolves to no app pods and the old
+  message was `no running pods for app` — true about the wrong subject, and
+  read by anyone following calliopeai/astrolift#128's own text, which still
+  shows the `astro exec --app X -- claude` form. Someone hits that against a
+  box that is running fine and concludes it is broken.
+
+  Deliberately a hint on an already-failing path, not a fallback: `exec` is the
+  app verb and `box attach` is the box verb, and the split is kept rather than
+  papered over. The lookup costs one query, only when the exec was going to
+  fail anyway, and stays silent when it cannot be made — an older control plane
+  or a missing grant leaves the original error intact rather than replacing it
+  with a guess.
+
 ## 0.6.1 — 2026-08-18
 
 ### Added
