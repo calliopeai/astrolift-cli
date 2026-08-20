@@ -64,6 +64,6 @@ supported until those archives have a public distribution channel. There is no
 - Repo: [github.com/calliopeai/astrolift-cli](https://github.com/calliopeai/astrolift-cli)
 - Project: [astrolift.ai](https://astrolift.ai)
 - Docs: [astrolift.dev](https://astrolift.dev)
-- License: Apache-2.0
+- License: MIT
 
 Part of the **Calliope AI** platform: [calliope.ai](https://calliope.ai)
