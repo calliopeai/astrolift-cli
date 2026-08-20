@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 
@@ -75,6 +76,24 @@ stdin is a terminal; pass --no-tty to force a non-interactive pipe.
 The target pod is auto-resolved (first ready/Running pod for the app);
 narrow it with --workload, or pin an exact pod with --pod. Use
 --container for multi-container pods.
+
+Interrupts and detaching
+  In an interactive session Ctrl-C interrupts the REMOTE process, the
+  same as ssh or kubectl exec. It does not end the session and it does
+  not kill this client. That holds whether or not the terminal could be
+  put in raw mode.
+
+  To leave, end the session: exit the remote shell, or close the
+  connection (Ctrl-D at a shell prompt). A deliberate exit returns the
+  remote command's status, so a clean shell exit is 0.
+
+  This client dying does NOT stop the remote process. The pod owns it,
+  and a killed client leaves it running with no one attached. For work
+  that should survive a disconnect on purpose, use an agent-box, whose
+  tmux session is designed to be re-attached (astro box attach).
+
+  Non-interactive runs (--no-tty, or piped stdin) keep the ordinary
+  behaviour: Ctrl-C ends the command like any other program in a script.
 
 Examples:
   astro exec --app web -- bash
@@ -155,9 +174,20 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 
 	var restore func()
 	if wantTTY {
-		if oldState, merr := term.MakeRaw(stdinFd); merr == nil {
+		oldState, merr := term.MakeRaw(stdinFd)
+		if merr == nil {
 			restore = func() { _ = term.Restore(stdinFd, oldState) }
 			defer restore()
+		} else {
+			// Said out loud rather than swallowed. Without raw mode the
+			// terminal keeps ISIG, so Ctrl-C becomes a SIGINT that kills this
+			// client instead of a 0x03 byte the remote process sees. The
+			// SIGINT handler below covers it, but an operator whose Ctrl-C
+			// now interrupts the remote rather than the shell they think they
+			// are in deserves to know which mode they are in (#72).
+			fmt.Fprintf(cmd.ErrOrStderr(),
+				"warning: could not put the terminal in raw mode (%v); Ctrl-C will "+
+					"interrupt the remote process rather than being passed through\n", merr)
 		}
 	}
 
@@ -195,6 +225,33 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		// SIGWINCH is Unix-only, so the resize watcher lives in
 		// platform-tagged files (no-op on Windows). See exec_resize_*.go.
 		defer watchResize(sendResize)()
+	}
+
+	// Ctrl-C, and anything else that sends us an interrupt.
+	//
+	// With raw mode on, the terminal driver does not raise SIGINT at all and
+	// the 0x03 byte reaches the remote through the normal stdin path. But an
+	// interrupt can arrive by other routes -- an IDE's stop button, a signal
+	// to the process group -- and Go's default disposition is to die. That is
+	// exit 130 with the remote's fate unstated, which is what #72 reported
+	// from the IDE's exec terminal.
+	//
+	// So on an interactive session an interrupt is forwarded as 0x03 and the
+	// client stays up, matching ssh and kubectl exec: Ctrl-C interrupts what
+	// is running remotely, it does not tear down the session. This also makes
+	// the raw-mode failure above degrade gracefully rather than fatally.
+	//
+	// Non-interactive runs keep the default. A piped `astro exec -- cmd` in a
+	// script is expected to die on Ctrl-C like any other command.
+	if wantTTY {
+		interrupts := make(chan os.Signal, 1)
+		signal.Notify(interrupts, os.Interrupt)
+		defer signal.Stop(interrupts)
+		go func() {
+			for range interrupts {
+				_ = writeJSON(map[string]interface{}{"type": "stdin", "data": "\x03"})
+			}
+		}()
 	}
 
 	// stdin → stdin frames (best-effort; ends on EOF/error with a close).
