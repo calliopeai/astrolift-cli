@@ -55,7 +55,10 @@ const boxFields = `
     podName
     lastError
     createdAt
-    startedAt`
+    startedAt
+    lastAttachedAt
+    endedAt
+    ownerEmail`
 
 const ensureBoxMutation = `mutation($input: EnsureAgentBoxInput!, $orgId: ID!) {
   ensureAgentBox(input: $input, orgId: $orgId) {
@@ -116,6 +119,14 @@ type agentBox struct {
 	LastError           string   `json:"lastError"`
 	CreatedAt           string   `json:"createdAt"`
 	StartedAt           *string  `json:"startedAt"`
+	// Liveness. Nullable on the wire and kept nullable here: a box that has
+	// never been attached and one attached at an unknown time are different
+	// facts, and flattening both to "" would let a consumer read the first as
+	// the second. calliopeai/vscode#560 draws an idle-since line from these,
+	// so the distinction is the whole signal.
+	LastAttachedAt *string `json:"lastAttachedAt"`
+	EndedAt        *string `json:"endedAt"`
+	OwnerEmail     string  `json:"ownerEmail"`
 }
 
 type boxMutationResult struct {
@@ -144,10 +155,8 @@ var (
 	boxEnsureName  string
 	boxEnsureIdle  string
 	boxEnsureWait  bool
-	boxEnsureJSON  bool
 
-	boxListAll  bool
-	boxListJSON bool
+	boxListAll bool
 
 	boxRmYes bool
 
@@ -227,7 +236,7 @@ func runBoxEnsure(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 		}
 	}
 
-	if boxEnsureJSON {
+	if wantJSON(cmd) {
 		return renderJSON(cmd, box)
 	}
 	printBox(cmd, box)
@@ -414,7 +423,7 @@ func runBoxList(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg
 	}
 
 	out := cmd.OutOrStdout()
-	if boxListJSON {
+	if wantJSON(cmd) {
 		return renderJSON(cmd, resp.AgentBoxes)
 	}
 	if len(resp.AgentBoxes) == 0 {
@@ -503,6 +512,9 @@ func runBoxRm(cmd *cobra.Command, ctx context.Context, client *api.Client, slug 
 	}
 	if !resp.Result.Ok {
 		return fmt.Errorf("destroy failed: %s", firstMutationError(resp.Result.Errors))
+	}
+	if wantJSON(cmd) {
+		return renderJSON(cmd, map[string]any{"slug": slug, "destroyed": true})
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Box %s destroyed.\n", slug)
 	return nil
@@ -679,6 +691,22 @@ func agentBoxVerbHint(ctx context.Context, client *api.Client, slug string) stri
 
 // ---- output ----------------------------------------------------------------
 
+// wantJSON reports whether this invocation asked for machine-readable output.
+//
+// Read off cmd.Flags() rather than a package-level var bound at registration.
+// Every box command used to register its own --json, which shadowed the root
+// persistent one: `astro box ensure --json` worked and `astro --json box
+// ensure` silently emitted prose. Setting output mode globally is the natural
+// thing for a caller driving the CLI to do, so the working form was the one a
+// human types and the broken one was the one a client uses (#76).
+//
+// cmd.Flags() resolves inherited persistent flags, so both forms now land on
+// the same value and neither command needs a flag of its own.
+func wantJSON(cmd *cobra.Command) bool {
+	ok, err := cmd.Flags().GetBool("json")
+	return err == nil && ok
+}
+
 func printBox(cmd *cobra.Command, box *agentBox) {
 	out := cmd.OutOrStdout()
 	fmt.Fprintf(out, "Box:     %s\n", box.Slug)
@@ -707,10 +735,8 @@ func init() {
 	boxEnsureCmd.Flags().StringVar(&boxEnsureName, "name", "", "Human-readable name (defaults to the agent or spec name)")
 	boxEnsureCmd.Flags().StringVar(&boxEnsureIdle, "idle-timeout", "", "Reap after this much inactivity: 90m, seconds, or never")
 	boxEnsureCmd.Flags().BoolVar(&boxEnsureWait, "wait", false, "Block until the box is attachable")
-	boxEnsureCmd.Flags().BoolVar(&boxEnsureJSON, "json", false, "Output the box record as JSON")
 
 	boxListCmd.Flags().BoolVar(&boxListAll, "all", false, "Include settled boxes (reaped, stopped, failed)")
-	boxListCmd.Flags().BoolVar(&boxListJSON, "json", false, "Output as JSON")
 
 	boxRmCmd.Flags().BoolVarP(&boxRmYes, "yes", "y", false, "Skip confirmation prompt")
 

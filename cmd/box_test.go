@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/calliopeai/astrolift-cli/internal/config"
@@ -21,9 +24,7 @@ func resetBoxFlags() {
 	boxEnsureName = ""
 	boxEnsureIdle = ""
 	boxEnsureWait = false
-	boxEnsureJSON = false
 	boxListAll = false
-	boxListJSON = false
 	boxRmYes = false
 	boxAttachAgent = ""
 	boxAttachSpec = ""
@@ -218,7 +219,6 @@ func TestBoxEnsureJSONEmitsTheRecord(t *testing.T) {
 	resetBoxFlags()
 	defer resetBoxFlags()
 	boxEnsureSpec = "claude-dev"
-	boxEnsureJSON = true
 
 	srv := gqlServer(t, map[string]interface{}{
 		"astroliftOrganizations": orgsPayload(),
@@ -229,6 +229,13 @@ func TestBoxEnsureJSONEmitsTheRecord(t *testing.T) {
 	defer srv.Close()
 
 	cmd, out := agentTestCmd()
+	// Set on the command rather than a package var. Production reads --json off
+	// cmd.Flags(), so the root persistent flag and a local one resolve to the
+	// same value; a test driving a package var would have passed while
+	// `astro --json box ensure` stayed broken, which is the bug (#76).
+	if err := cmd.Flags().Set("json", "true"); err != nil {
+		t.Fatalf("set --json: %v", err)
+	}
 	if err := runBoxEnsure(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), &config.Config{}); err != nil {
 		t.Fatalf("runBoxEnsure: %v", err)
 	}
@@ -627,5 +634,58 @@ func TestExecHintStaysSilentWhenItCannotLook(t *testing.T) {
 
 	if hint := agentBoxVerbHint(context.Background(), api.NewClient(srv.URL, "tok", false), "anything"); hint != "" {
 		t.Errorf("a failed lookup must not produce a hint, got %q", hint)
+	}
+}
+
+func TestBoxJSONHonoursTheRootPersistentFlag(t *testing.T) {
+	// The bug in #76. Every box command registered its own --json, which
+	// shadowed the root persistent one, so `astro box ensure --json` worked
+	// and `astro --json box ensure` silently emitted prose. Setting output
+	// mode globally is the natural thing for a client to do, so the broken
+	// form was the one the IDE uses.
+	resetBoxFlags()
+	defer resetBoxFlags()
+	boxEnsureSpec = "claude-dev"
+
+	srv := gqlServer(t, map[string]interface{}{
+		"astroliftOrganizations": orgsPayload(),
+		"ensureAgentBox": map[string]interface{}{
+			"ok": true, "errors": []interface{}{}, "data": boxPayload("box-claude-dev", "running"),
+		},
+	}, nil)
+	defer srv.Close()
+
+	root := &cobra.Command{}
+	root.PersistentFlags().Bool("json", false, "")
+	root.PersistentFlags().Bool("no-prompt", false, "")
+	child := &cobra.Command{}
+	child.Flags().String("org", "", "")
+	child.Flags().Bool("debug", false, "")
+	root.AddCommand(child)
+	out := &bytes.Buffer{}
+	child.SetOut(out)
+
+	// Set on the ROOT, which is what `astro --json box ensure` does.
+	if err := root.PersistentFlags().Set("json", "true"); err != nil {
+		t.Fatalf("set root --json: %v", err)
+	}
+	// Cobra folds a parent's persistent flags into the child's flag set during
+	// ParseFlags, so a real invocation has already merged by the time RunE
+	// runs. This test calls the handler directly, so it forces the same merge;
+	// without it cobra reports "flag accessed but not defined" and wantJSON
+	// fails safe to false, which would look like the bug rather than the
+	// harness.
+	_ = child.InheritedFlags()
+
+	if err := runBoxEnsure(child, context.Background(), api.NewClient(srv.URL, "tok", false), &config.Config{}); err != nil {
+		t.Fatalf("runBoxEnsure: %v", err)
+	}
+
+	var parsed agentBox
+	if err := json.Unmarshal(out.Bytes(), &parsed); err != nil {
+		t.Fatalf("--json set on the root produced non-JSON output: %v\n%s", err, out.String())
+	}
+	if parsed.Slug != "box-claude-dev" {
+		t.Fatalf("slug = %q, want box-claude-dev", parsed.Slug)
 	}
 }
