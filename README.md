@@ -1,6 +1,6 @@
 # astrolift-cli
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/go-%3E%3D1.23-00ADD8.svg)](https://go.dev/)
 
 `astro` is the command-line client for the
@@ -332,13 +332,13 @@ Community standards: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   **[CODEX.md](CODEX.md)** — agent shims
   (all point at `bootstrap.md`)
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — community standards
-- **[LICENSE](LICENSE)** — Apache-2.0
+- **[LICENSE](LICENSE)** — MIT
 
 ---
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 Copyright (c) 2026 Calliope Labs Inc. Calliope AI is a trademark of Calliope
 Labs Inc.
