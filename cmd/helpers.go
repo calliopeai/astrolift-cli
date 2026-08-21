@@ -221,6 +221,9 @@ display_name = %q
 name = "web"
 kind = "deployment"
 replicas = 1
+# Renders a Service + Ingress on a managed hostname. Without this the
+# app deploys private with no route — set false for internal services.
+is_public = true
 cpu_request = "100m"
 cpu_limit = %q
 memory_request = "128Mi"

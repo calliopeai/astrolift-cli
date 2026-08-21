@@ -21,6 +21,7 @@ type scaffoldedManifest struct {
 	Workloads    []struct {
 		Name          string `toml:"name"`
 		Kind          string `toml:"kind"`
+		IsPublic      bool   `toml:"is_public"`
 		CPURequest    string `toml:"cpu_request"`
 		CPULimit      string `toml:"cpu_limit"`
 		MemoryRequest string `toml:"memory_request"`
@@ -72,6 +73,9 @@ func TestScaffoldManifestMatchesCurrentServerShape(t *testing.T) {
 		t.Fatalf("unexpected workload/container count: %#v", manifest.Workloads)
 	}
 	workload := manifest.Workloads[0]
+	if !workload.IsPublic {
+		t.Fatalf("scaffolded web workload must be public by default (cli#79): %#v", workload)
+	}
 	if workload.CPURequest == "" || workload.CPULimit == "" || workload.MemoryRequest == "" || workload.MemoryLimit == "" {
 		t.Fatalf("resources must be direct workload fields: %#v", workload)
 	}
