@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.7.0 — 2026-08-21
+
+### Changed
+
+- `astro app init` scaffolds the web workload with `is_public = true` (plus a
+  comment pointing internal services at `false`). A scaffolded hello-world app
+  previously registered private — no Service, no Ingress, no route — and the
+  platform deployed it unreachable out of the box
+  (calliopeai/astrolift-cli#79).
+
 ### Fixed
 
 - `astro exec --app <slug>` now names the right verb when the slug turns out to
