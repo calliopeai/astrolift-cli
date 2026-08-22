@@ -48,6 +48,7 @@ manpages: build
 vendor-docs:
 	@test -d "$(DOCS_SRC)" || (echo "missing $(DOCS_SRC)" && exit 1)
 	@mkdir -p "$(DOCS_DST)"
+	cp "$(DOCS_SRC)/getting-started.md" "$(DOCS_DST)/start.md"
 	cp "$(DOCS_SRC)/guides/clients.md" "$(DOCS_DST)/client.md"
 	cp "$(DOCS_SRC)/reference/cli.md" "$(DOCS_DST)/cli.md"
 	cp "$(DOCS_SRC)/reference/api.md" "$(DOCS_DST)/api.md"
@@ -58,11 +59,12 @@ vendor-docs:
 	cp "$(DOCS_SRC)/llms.txt" "$(DOCS_DST)/llms.txt"
 
 vendor-docs-check:
-	@for file in client.md cli.md api.md mcp.md manifest.md agents.md workflows.md llms.txt; do \
+	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md llms.txt; do \
 		test -s "$(DOCS_DST)/$$file" || { echo "missing $(DOCS_DST)/$$file — run \`make vendor-docs\`"; exit 1; }; \
 	done
 	@if [ -d "$(DOCS_SRC)" ]; then \
 		for pair in \
+			"getting-started.md:start.md" \
 			"guides/clients.md:client.md" \
 			"reference/cli.md:cli.md" \
 			"reference/api.md:api.md" \
