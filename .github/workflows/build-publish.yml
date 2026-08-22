@@ -242,6 +242,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Both images in one matrix so a main build publishes them together,
+        # under one tag: astrolift-builder:main-abc1234 always carries the
+        # astro from main-abc1234. cli is the thin distroless binary; builder
+        # is the pipeline-job image that wraps it in a shell + git + kubectl.
+        image: [cli, builder]
         platform: [linux/amd64, linux/arm64]
         include:
           - platform: linux/amd64
@@ -250,6 +255,12 @@ jobs:
           - platform: linux/arm64
             suffix: arm64
             runner: ubuntu-24.04-arm
+          - image: cli
+            image_name: calliopeai/astrolift-cli
+            dockerfile: ./Dockerfile.source
+          - image: builder
+            image_name: calliopeai/astrolift-builder
+            dockerfile: ./Dockerfile.builder
 
     outputs:
       sha_tag: ${{ steps.tag.outputs.sha_tag }}
@@ -284,22 +295,22 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.source
+          file: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE }}:${{ steps.tag.outputs.sha_tag }}-${{ matrix.suffix }}
+          tags: ${{ env.REGISTRY_GHCR }}/${{ matrix.image_name }}:${{ steps.tag.outputs.sha_tag }}-${{ matrix.suffix }}
           build-args: |
             VERSION=${{ steps.tag.outputs.sha_tag }}
-          cache-from: type=gha,scope=cli-${{ matrix.suffix }}
-          cache-to:   type=gha,mode=max,scope=cli-${{ matrix.suffix }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.suffix }}
+          cache-to:   type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.suffix }}
           provenance: false
           sbom: false
 
       - name: Mirror to Docker Hub
         run: |
           set -euo pipefail
-          GHCR_TAG="${{ env.REGISTRY_GHCR }}/${{ env.IMAGE }}:${{ steps.tag.outputs.sha_tag }}-${{ matrix.suffix }}"
-          HUB_TAG="${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE }}:${{ steps.tag.outputs.sha_tag }}-${{ matrix.suffix }}"
+          GHCR_TAG="${{ env.REGISTRY_GHCR }}/${{ matrix.image_name }}:${{ steps.tag.outputs.sha_tag }}-${{ matrix.suffix }}"
+          HUB_TAG="${{ env.REGISTRY_DOCKERHUB }}/${{ matrix.image_name }}:${{ steps.tag.outputs.sha_tag }}-${{ matrix.suffix }}"
           docker pull --platform ${{ matrix.platform }} "$GHCR_TAG"
           docker tag "$GHCR_TAG" "$HUB_TAG"
           docker push "$HUB_TAG"
@@ -334,11 +345,13 @@ jobs:
           set -euo pipefail
           BASE_TAG="${{ needs.main-image.outputs.sha_tag }}"
           for REGISTRY in "${{ env.REGISTRY_DOCKERHUB }}" "${{ env.REGISTRY_GHCR }}"; do
-            BASE="${REGISTRY}/${{ env.IMAGE }}"
+          for IMAGE_NAME in "calliopeai/astrolift-cli" "calliopeai/astrolift-builder"; do
+            BASE="${REGISTRY}/${IMAGE_NAME}"
             for ALIAS in "${BASE_TAG}" "latest" "main"; do
               docker manifest create --amend "${BASE}:${ALIAS}" \
                 "${BASE}:${BASE_TAG}-amd64" \
                 "${BASE}:${BASE_TAG}-arm64"
               docker manifest push "${BASE}:${ALIAS}"
             done
+          done
           done

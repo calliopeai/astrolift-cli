@@ -102,6 +102,24 @@ dockers:
       - "--label=org.opencontainers.image.description=Astrolift CLI"
       - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.source=https://github.com/calliopeai/astrolift-cli"
+  # Bundled with the CLI on purpose: this is the default image an Astrolift
+  # pipeline job runs in, and its only reason to exist is to carry `astro`.
+  # Building it from a separate pipeline would let the two versions drift.
+  # ASTRO_STAGE=astro-dist takes goreleaser's prebuilt binary from the
+  # build context instead of compiling from source.
+  - image_templates:
+      - "docker.io/calliopeai/astrolift-builder:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astrolift-builder:{{ .Version }}-amd64"
+    dockerfile: Dockerfile.builder
+    use: buildx
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=ASTRO_STAGE=astro-dist"
+      - "--label=org.opencontainers.image.title=astrolift-builder"
+      - "--label=org.opencontainers.image.description=Default image for Astrolift pipeline jobs"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.source=https://github.com/calliopeai/astrolift-cli"
   - image_templates:
       - "docker.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
       - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
@@ -111,6 +129,19 @@ dockers:
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
       - "--label=org.opencontainers.image.description=Astrolift CLI"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.source=https://github.com/calliopeai/astrolift-cli"
+  - image_templates:
+      - "docker.io/calliopeai/astrolift-builder:{{ .Version }}-arm64"
+      - "ghcr.io/calliopeai/astrolift-builder:{{ .Version }}-arm64"
+    dockerfile: Dockerfile.builder
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=ASTRO_STAGE=astro-dist"
+      - "--label=org.opencontainers.image.title=astrolift-builder"
+      - "--label=org.opencontainers.image.description=Default image for Astrolift pipeline jobs"
       - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.source=https://github.com/calliopeai/astrolift-cli"
 
@@ -131,3 +162,19 @@ docker_manifests:
     image_templates:
       - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-amd64"
       - "ghcr.io/calliopeai/astrolift-cli:{{ .Version }}-arm64"
+  - name_template: "docker.io/calliopeai/astrolift-builder:{{ .Version }}"
+    image_templates:
+      - "docker.io/calliopeai/astrolift-builder:{{ .Version }}-amd64"
+      - "docker.io/calliopeai/astrolift-builder:{{ .Version }}-arm64"
+  - name_template: "docker.io/calliopeai/astrolift-builder:latest"
+    image_templates:
+      - "docker.io/calliopeai/astrolift-builder:{{ .Version }}-amd64"
+      - "docker.io/calliopeai/astrolift-builder:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/calliopeai/astrolift-builder:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/calliopeai/astrolift-builder:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astrolift-builder:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/calliopeai/astrolift-builder:latest"
+    image_templates:
+      - "ghcr.io/calliopeai/astrolift-builder:{{ .Version }}-amd64"
+      - "ghcr.io/calliopeai/astrolift-builder:{{ .Version }}-arm64"
