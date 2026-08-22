@@ -22,6 +22,10 @@ type Topic struct {
 }
 
 var topics = []Topic{
+	// First deliberately: this is the only topic that answers "how do I log
+	// in", and its absence meant `astro docs list` offered seven references
+	// and no way in.
+	{Slug: "start", Title: "Install, authenticate, and deploy", Filename: "start.md", OnlinePath: "/getting-started/"},
 	{Slug: "client", Title: "Choose an Astrolift client", Filename: "client.md", OnlinePath: "/guides/clients/"},
 	{Slug: "cli", Title: "astro CLI reference", Filename: "cli.md", OnlinePath: "/reference/cli/"},
 	{Slug: "api", Title: "Control API reference", Filename: "api.md", OnlinePath: "/reference/api/"},
