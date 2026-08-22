@@ -1,0 +1,86 @@
+[
+  {
+    "name": "app-secrets-and-env",
+    "description": "Store credentials (API tokens, passwords) securely on Astrolift and wire configuration into workloads — secrets injected as env vars, plain config in the manifest. Use whenever an app needs to talk to an external service or hold any key.",
+    "version": "0.1.0",
+    "path": "skills/app-secrets-and-env"
+  },
+  {
+    "name": "astro-cli",
+    "description": "Install and use the astro CLI — authenticate via browser device flow, check platform status, validate manifests, drive CI deploys, and diagnose permissions from the terminal.",
+    "version": "0.1.0",
+    "path": "skills/astro-cli"
+  },
+  {
+    "name": "astrolift-deploy",
+    "description": "Check, debug, or explain an Astrolift app's deploy — CI run status, what each step failure means, rollout state, logs, and rollback. Use after merging, or whenever \"the deploy failed\" or the live site looks stale.",
+    "version": "0.1.0",
+    "path": "skills/astrolift-deploy"
+  },
+  {
+    "name": "astrolift-platform",
+    "description": "The capability map of the Astrolift platform an app runs on — workload kinds, delivery, scheduling, secrets, managed services, observability, agents/workflows, tokens, and RBAC. Read before designing anything that touches deployment, infrastructure, scheduling, or integrations, so you build WITH the platform instead of around it.",
+    "version": "0.1.0",
+    "path": "skills/astrolift-platform"
+  },
+  {
+    "name": "csv-process",
+    "description": "Read, filter, select, aggregate, and join CSV / tabular data without spinning up a full data stack.",
+    "version": "0.1.0",
+    "path": "skills/csv-process"
+  },
+  {
+    "name": "data-transform",
+    "description": "jq-style select, filter, and reshape over JSON and YAML — extract paths, map arrays, and filter records without writing throwaway code.",
+    "version": "0.1.0",
+    "path": "skills/data-transform"
+  },
+  {
+    "name": "export",
+    "description": "Write a dataset (array of records) to CSV, JSON, XLSX, or PDF through one interface — format chosen by the output extension.",
+    "version": "0.1.0",
+    "path": "skills/export"
+  },
+  {
+    "name": "file-ops",
+    "description": "Read, write, search, and edit files in the workspace safely — atomic writes, exact-match edits, and recursive content search.",
+    "version": "0.1.0",
+    "path": "skills/file-ops"
+  },
+  {
+    "name": "git",
+    "description": "Everyday git — clone, branch, stage, diff, commit, and push, with a safe, predictable workflow.",
+    "version": "0.1.0",
+    "path": "skills/git"
+  },
+  {
+    "name": "http-request",
+    "description": "Make HTTP/REST requests with auth, custom headers, query/body, pagination, retries with backoff, and structured error handling.",
+    "version": "0.1.0",
+    "path": "skills/http-request"
+  },
+  {
+    "name": "mcp-client",
+    "description": "Connect to a Model Context Protocol (MCP) server, perform the handshake, discover its tools, and invoke them over JSON-RPC.",
+    "version": "0.1.0",
+    "path": "skills/mcp-client"
+  },
+  {
+    "name": "pdf-generate",
+    "description": "\"Print to PDF\" — render a markdown/text report (headings, paragraphs, bullet lists) to a clean PDF document.",
+    "version": "0.1.0",
+    "path": "skills/pdf-generate"
+  },
+  {
+    "name": "schedule-tasks",
+    "description": "Schedule recurring or one-off work on Astrolift — \"run this every X hours\" or \"at a certain time\" — by declaring a cronjob workload in astrolift.toml. Use instead of CI cron or any external scheduler.",
+    "version": "0.1.0",
+    "path": "skills/schedule-tasks"
+  },
+  {
+    "name": "shell",
+    "description": "Run shell commands safely — correct quoting, exit-code handling, output capture, and timeouts.",
+    "version": "0.1.0",
+    "path": "skills/shell"
+  }
+]

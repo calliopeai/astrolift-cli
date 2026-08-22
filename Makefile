@@ -11,6 +11,8 @@ LDFLAGS  := -ldflags "-X $(MODULE)/cmd.Version=$(VERSION) -X $(MODULE)/cmd.Commi
 # binary can be built without the metarepo sibling on disk).
 PREREQS_SRC ?= ../astrolift-opscode/helm/astrolift-prereqs
 PREREQS_DST := internal/charts/astrolift-prereqs
+SKILLS_SRC ?= ../astrolift-skills
+SKILLS_DST := internal/skills/catalogue
 
 # Canonical public documentation lives in astrolift-docs. A deliberately
 # small release-matched snapshot is committed here so `astro docs` and the
@@ -18,7 +20,7 @@ PREREQS_DST := internal/charts/astrolift-prereqs
 DOCS_SRC ?= ../astrolift-docs/docs
 DOCS_DST := internal/portabledocs/content
 
-.PHONY: build test fmt lint clean docs manpages vendor-docs vendor-docs-check vendor-charts vendor-charts-check
+.PHONY: build test fmt lint clean docs manpages vendor-docs vendor-docs-check vendor-charts vendor-charts-check vendor-skills vendor-skills-check
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
@@ -92,6 +94,29 @@ vendor-charts:
 		cp -R $(PREREQS_SRC)/. $(PREREQS_DST)/; \
 	else \
 		echo "skip vendor-charts: $(PREREQS_SRC) not present (using committed copy)"; \
+	fi
+
+# Refresh the vendored agent skills from the metarepo sibling. Bundled into
+# the binary so `astro onboard` can install them with no network and no
+# access to a private repo -- an agent onboarding itself has neither.
+vendor-skills:
+	@if [ -d "$(SKILLS_SRC)" ]; then \
+		echo "vendoring $(SKILLS_SRC) -> $(SKILLS_DST)"; \
+		rm -rf $(SKILLS_DST); \
+		mkdir -p $(SKILLS_DST); \
+		cp "$(SKILLS_SRC)/catalogue.json" "$(SKILLS_DST)/catalogue.json"; \
+		cp -R "$(SKILLS_SRC)/skills" "$(SKILLS_DST)/skills"; \
+	else \
+		echo "skip vendor-skills: $(SKILLS_SRC) not present (using committed copy)"; \
+	fi
+
+vendor-skills-check:
+	@test -s "$(SKILLS_DST)/catalogue.json" || { echo "missing $(SKILLS_DST)/catalogue.json — run \`make vendor-skills\`"; exit 1; }
+	@if [ -d "$(SKILLS_SRC)" ]; then \
+		cmp -s "$(SKILLS_SRC)/catalogue.json" "$(SKILLS_DST)/catalogue.json" || { \
+			echo "stale $(SKILLS_DST)/catalogue.json — run \`make vendor-skills\`"; exit 1; }; \
+		diff -rq "$(SKILLS_SRC)/skills" "$(SKILLS_DST)/skills" >/dev/null || { \
+			echo "stale $(SKILLS_DST)/skills — run \`make vendor-skills\`"; exit 1; }; \
 	fi
 
 # CI sanity check — the committed copy must exist and contain Chart.yaml.

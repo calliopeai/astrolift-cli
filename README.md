@@ -193,6 +193,7 @@ the status note above.)
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
+| `astro onboard` | Set an AI coding agent up against the selected install in one call: writes an MCP server entry pointing at the install's gateway, installs the bundled skill catalogue, and drops the offline guides as agent context. Components are selectable with `--only mcp,skills,docs`, the layout with `--target claude\|codex\|both`, and `--dry-run` reports the plan without touching the filesystem. Existing files are reported and left alone unless `--force`. Authentication is reported, never performed. |
 | `astro docs` | Open public docs, read embedded release-matched topics, or export portable Markdown and man pages. |
 | `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. |
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
@@ -204,6 +205,41 @@ to stderr; data goes to stdout.
 
 Run `astro <command> --help` for the full flag set; the help text is
 the source of truth.
+
+### Onboarding an AI agent
+
+`astro onboard` assembles what an agent needs against the selected install.
+Every piece already existed -- the MCP gateway, API tokens that authenticate
+both it and this CLI, a skill catalogue, offline guides in this binary -- but
+nothing put them together, so setup meant reading three references and
+hand-editing JSON.
+
+```bash
+astro onboard --dry-run                 # what would be written
+astro onboard                           # mcp + skills + docs, both layouts
+astro onboard --only mcp --target codex # just the MCP entry, Codex layout
+astro onboard --json                    # machine-readable, for an agent to run itself
+```
+
+It writes `.mcp.json` and/or `.codex/mcp.json`, the catalogue under
+`.claude/skills/` and/or `.codex/skills/`, and the guides under
+`.astrolift/docs/`. Nothing is overwritten without `--force`, and no network
+call is made.
+
+Two ways for an agent to authenticate, both reported by `onboard`:
+
+```bash
+export ASTROLIFT_TOKEN=alft_at_...   # unattended: mint an API token under
+                                     # Settings > API tokens. The same token
+                                     # authenticates the CLI and the MCP
+                                     # gateway, so nothing else is needed.
+astro auth login                     # browser device flow. An agent with no
+                                     # browser can relay the printed URL to a
+                                     # human and let the poll complete.
+```
+
+The MCP config references `${ASTROLIFT_TOKEN}` rather than a resolved bearer,
+so the file is safe to commit and works for every agent on the machine.
 
 ### Documentation for humans and agents
 
