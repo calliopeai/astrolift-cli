@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,6 +39,35 @@ var (
 	execPod       string
 	execContainer string
 	execNoTTY     bool
+)
+
+// execTerminal is exactly the slice of golang.org/x/term that a session
+// depends on. It exists as an interface so a test can drive a session that
+// believes it holds a TTY without allocating a pty, which is what kept
+// raw-mode handling, resize frames and interrupt forwarding untestable
+// (#78). Production wiring is the real package; nothing else implements it.
+type execTerminal interface {
+	IsTerminal(fd int) bool
+	GetSize(fd int) (width, height int, err error)
+	MakeRaw(fd int) (*term.State, error)
+	Restore(fd int, state *term.State) error
+}
+
+type xTerm struct{}
+
+func (xTerm) IsTerminal(fd int) bool              { return term.IsTerminal(fd) }
+func (xTerm) GetSize(fd int) (int, int, error)    { return term.GetSize(fd) }
+func (xTerm) MakeRaw(fd int) (*term.State, error) { return term.MakeRaw(fd) }
+func (xTerm) Restore(fd int, s *term.State) error { return term.Restore(fd, s) }
+
+// Process handles a session reaches for, named so tests can substitute
+// them. execExit stays os.Exit in production: forwarding the remote's
+// status is the documented behaviour of the exit frame below, and a test
+// that let it run would take the test binary down with it.
+var (
+	execStdin io.Reader    = os.Stdin
+	execExit  func(int)    = os.Exit
+	execTerm  execTerminal = xTerm{}
 )
 
 // astroliftAppPodsQuery lists the app's pods so exec can resolve a target
@@ -170,13 +200,13 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		command = []string{"sh"}
 	}
 	stdinFd := int(os.Stdin.Fd())
-	wantTTY := !execNoTTY && term.IsTerminal(stdinFd)
+	wantTTY := !execNoTTY && execTerm.IsTerminal(stdinFd)
 
 	var restore func()
 	if wantTTY {
-		oldState, merr := term.MakeRaw(stdinFd)
+		oldState, merr := execTerm.MakeRaw(stdinFd)
 		if merr == nil {
-			restore = func() { _ = term.Restore(stdinFd, oldState) }
+			restore = func() { _ = execTerm.Restore(stdinFd, oldState) }
 			defer restore()
 		} else {
 			// Said out loud rather than swallowed. Without raw mode the
@@ -214,7 +244,7 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		if !wantTTY {
 			return
 		}
-		cols, rows, gerr := term.GetSize(stdinFd)
+		cols, rows, gerr := execTerm.GetSize(stdinFd)
 		if gerr != nil {
 			return
 		}
@@ -255,10 +285,15 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 	}
 
 	// stdin → stdin frames (best-effort; ends on EOF/error with a close).
+	//
+	// Bind the source once. Which reader a session pumps from is a property
+	// of the session, not of each read, and re-reading the package var every
+	// iteration means a goroutine that outlives runExec is still touching it.
+	stdinSrc := execStdin
 	go func() {
 		buf := make([]byte, 4096)
 		for {
-			n, rerr := os.Stdin.Read(buf)
+			n, rerr := stdinSrc.Read(buf)
 			if n > 0 {
 				if werr := writeJSON(map[string]interface{}{"type": "stdin", "data": string(buf[:n])}); werr != nil {
 					return
@@ -313,7 +348,8 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 			// os.Exit, so close explicitly first.
 			if frame.Code != 0 {
 				_ = conn.Close()
-				os.Exit(frame.Code)
+				execExit(frame.Code)
+				return nil
 			}
 			return nil
 		}
