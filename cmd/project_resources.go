@@ -50,20 +50,35 @@ type projectResourceAttachment struct {
 }
 
 type projectResource struct {
-	ID              string                      `json:"id"`
-	Name            string                      `json:"name"`
-	Kind            string                      `json:"kind"`
-	Variant         string                      `json:"variant"`
-	Status          string                      `json:"status"`
-	StatusError     string                      `json:"statusError"`
-	Config          map[string]interface{}      `json:"config"`
-	ProjectSlug     string                      `json:"projectSlug"`
-	ClusterSlug     string                      `json:"clusterSlug"`
-	EnvironmentName string                      `json:"environmentName"`
-	EditableFields  []string                    `json:"editableFields"`
-	Attachments     []projectResourceAttachment `json:"attachments"`
-	CreatedAt       string                      `json:"createdAt"`
-	UpdatedAt       string                      `json:"updatedAt"`
+	ID                string                      `json:"id"`
+	Name              string                      `json:"name"`
+	Kind              string                      `json:"kind"`
+	Variant           string                      `json:"variant"`
+	Status            string                      `json:"status"`
+	StatusError       string                      `json:"statusError"`
+	Config            map[string]interface{}      `json:"config"`
+	ProjectSlug       string                      `json:"projectSlug"`
+	ClusterSlug       string                      `json:"clusterSlug"`
+	EnvironmentName   string                      `json:"environmentName"`
+	ProviderPortalURL string                      `json:"providerPortalUrl"`
+	EditableFields    []string                    `json:"editableFields"`
+	Attachments       []projectResourceAttachment `json:"attachments"`
+	CreatedAt         string                      `json:"createdAt"`
+	UpdatedAt         string                      `json:"updatedAt"`
+}
+
+type projectResourceCostPreview struct {
+	ManagedServiceID string                   `json:"managedServiceId"`
+	Available        bool                     `json:"available"`
+	Reason           string                   `json:"reason"`
+	Message          string                   `json:"message"`
+	MonthlyTotal     *float64                 `json:"monthlyTotal"`
+	Currency         string                   `json:"currency"`
+	LineItems        []map[string]interface{} `json:"lineItems"`
+	PricingSourceURL string                   `json:"pricingSourceUrl"`
+	PricingFetchedAt string                   `json:"pricingFetchedAt"`
+	Notes            []string                 `json:"notes"`
+	Approximate      bool                     `json:"approximate"`
 }
 
 type projectResourceMutation struct {
@@ -97,7 +112,7 @@ project's apps and agents.
 
 The catalogue comes from the selected cluster. It includes executable provider
 drivers and visible roadmap entries; unavailable entries explain why they
-cannot be provisioned and link to their delivery issue. Use --json on any
+cannot be provisioned. Use --json on any
 command for automation. Select the project with --project or default_project.`,
 }
 
@@ -128,6 +143,15 @@ var projectResourceShowCmd = &cobra.Command{
 			return err
 		}
 		return renderProjectResource(cmd, resource)
+	}),
+}
+
+var projectResourceCostCmd = &cobra.Command{
+	Use:   "cost <name-or-id>",
+	Short: "Preview monthly cost from the provider's live pricing API",
+	Args:  cobra.ExactArgs(1),
+	RunE: projectResourceRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef) error {
+		return runProjectResourceCost(cmd, ctx, client, project, cmd.Flags().Arg(0))
 	}),
 }
 
@@ -218,6 +242,7 @@ func init() {
 		projectResourceCatalogCmd,
 		projectResourceListCmd,
 		projectResourceShowCmd,
+		projectResourceCostCmd,
 		projectResourceAddCmd,
 		projectResourceUpdateCmd,
 		projectResourceReprovisionCmd,
@@ -354,7 +379,7 @@ func listProjectResources(ctx context.Context, client *api.Client, projectID str
 	query := `query($projectId: GUID!) {
   astroliftProjectManagedServices(projectId: $projectId) {
     id name kind variant status statusError config projectSlug clusterSlug
-    environmentName editableFields createdAt updatedAt
+    environmentName providerPortalUrl editableFields createdAt updatedAt
     attachments { id consumerKind consumerSlug environmentName }
   }
 }`
@@ -417,6 +442,9 @@ func renderProjectResource(cmd *cobra.Command, resource *projectResource) error 
 	fmt.Fprintf(out, "Status:      %s\n", resource.Status)
 	fmt.Fprintf(out, "Cluster:     %s\n", dashIfEmpty(resource.ClusterSlug))
 	fmt.Fprintf(out, "Environment: %s\n", resource.EnvironmentName)
+	if resource.ProviderPortalURL != "" {
+		fmt.Fprintf(out, "Provider:    %s\n", resource.ProviderPortalURL)
+	}
 	if resource.StatusError != "" {
 		fmt.Fprintf(out, "Error:       %s\n", resource.StatusError)
 	}
@@ -431,6 +459,51 @@ func renderProjectResource(cmd *cobra.Command, resource *projectResource) error 
 	}
 	configJSON, _ := json.MarshalIndent(resource.Config, "", "  ")
 	fmt.Fprintf(out, "Config:\n%s\n", configJSON)
+	return nil
+}
+
+func runProjectResourceCost(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, selector string) error {
+	resource, err := resolveProjectResource(ctx, client, project.ID, selector)
+	if err != nil {
+		return err
+	}
+	var resp struct {
+		Preview *projectResourceCostPreview `json:"astroliftManagedServiceCostPreview"`
+	}
+	query := `query($managedServiceId: GUID!) {
+  astroliftManagedServiceCostPreview(managedServiceId: $managedServiceId) {
+    managedServiceId available reason message monthlyTotal currency lineItems
+    pricingSourceUrl pricingFetchedAt notes approximate
+  }
+}`
+	if err := client.GraphQL(ctx, query, map[string]interface{}{"managedServiceId": resource.ID}, &resp); err != nil {
+		return fmt.Errorf("previewing project resource cost: %w", err)
+	}
+	if resp.Preview == nil {
+		return fmt.Errorf("project resource %q is no longer visible", selector)
+	}
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, resp.Preview)
+	}
+	if !resp.Preview.Available || resp.Preview.MonthlyTotal == nil {
+		detail := resp.Preview.Message
+		if detail == "" {
+			detail = resp.Preview.Reason
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Cost unavailable: %s\n", detail)
+		return nil
+	}
+	prefix := ""
+	if resp.Preview.Approximate {
+		prefix = "approximately "
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "%s%.2f %s/month\n", prefix, *resp.Preview.MonthlyTotal, resp.Preview.Currency)
+	if resp.Preview.PricingSourceURL != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "Pricing source: %s\n", resp.Preview.PricingSourceURL)
+	}
+	for _, note := range resp.Preview.Notes {
+		fmt.Fprintf(cmd.OutOrStdout(), "Note: %s\n", note)
+	}
 	return nil
 }
 

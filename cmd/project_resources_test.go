@@ -103,3 +103,34 @@ func TestRunProjectResourceAttachRequiresExactlyOneConsumer(t *testing.T) {
 		t.Fatalf("expected consumer validation, got %v", err)
 	}
 }
+
+func TestRunProjectResourceCostPrintsLiveEstimateAndSource(t *testing.T) {
+	srv := gqlServer(t, map[string]interface{}{
+		"astroliftProjectManagedServices": []map[string]interface{}{
+			{"id": "r-1", "name": "db", "attachments": []interface{}{}},
+		},
+		"astroliftManagedServiceCostPreview": map[string]interface{}{
+			"managedServiceId": "r-1",
+			"available":        true,
+			"monthlyTotal":     42.5,
+			"currency":         "USD",
+			"lineItems":        []interface{}{},
+			"pricingSourceUrl": "https://prices.example.test/sku",
+			"pricingFetchedAt": "2026-08-23T00:00:00Z",
+			"notes":            []string{"Live list price"},
+			"approximate":      false,
+		},
+	}, nil)
+	defer srv.Close()
+
+	cmd, out := groupsTestCmd()
+	client := api.NewClient(srv.URL, "tok", false)
+	if err := runProjectResourceCost(cmd, context.Background(), client, projectRef{ID: "p-1"}, "db"); err != nil {
+		t.Fatalf("runProjectResourceCost: %v", err)
+	}
+	for _, want := range []string{"42.50 USD/month", "https://prices.example.test/sku", "Live list price"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("cost preview missing %q:\n%s", want, out.String())
+		}
+	}
+}
