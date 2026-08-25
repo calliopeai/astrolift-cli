@@ -152,6 +152,7 @@ var boxLiveStatuses = map[string]bool{
 var (
 	boxEnsureAgent string
 	boxEnsureSpec  string
+	boxEnsureImage string
 	boxEnsureName  string
 	boxEnsureIdle  string
 	boxEnsureWait  bool
@@ -162,6 +163,7 @@ var (
 
 	boxAttachAgent string
 	boxAttachSpec  string
+	boxAttachImage string
 	boxAttachIdle  string
 )
 
@@ -205,6 +207,12 @@ Name what to run with --agent (a registered agent whose run mode is
 persistent), with --env-spec (an environment spec, which is where the image and
 the secret packet come from), or both.
 
+--image takes a container reference directly, for a throwaway box against a
+stock image with no spec to register first. It is part of the box's identity:
+pressing twice with the same image attaches to the same box, and a different
+image gets a different one. Mutually exclusive with --env-spec, which already
+names an image.
+
 --idle-timeout takes a duration ("90m", "4h"), a bare number of seconds, or
 "never". It is measured from the last pane activity rather than the last
 attach, so an agent working while you are away keeps its box. "never" holds
@@ -213,6 +221,7 @@ the node until you destroy it.
 Examples:
   astro box ensure --env-spec claude-dev
   astro box ensure --agent claude-box --idle-timeout 4h --wait
+  astro box ensure --image ghcr.io/acme/dev:v1
   astro box ensure --env-spec claude-dev --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
@@ -224,7 +233,7 @@ Examples:
 }
 
 func runBoxEnsure(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg *config.Config) error {
-	box, err := ensureBox(cmd, ctx, client, cfg, boxEnsureAgent, boxEnsureSpec, boxEnsureName, boxEnsureIdle)
+	box, err := ensureBox(cmd, ctx, client, cfg, boxEnsureAgent, boxEnsureSpec, boxEnsureImage, boxEnsureName, boxEnsureIdle)
 	if err != nil {
 		return err
 	}
@@ -249,10 +258,17 @@ func ensureBox(
 	ctx context.Context,
 	client *api.Client,
 	cfg *config.Config,
-	agent, spec, name, idle string,
+	agent, spec, image, name, idle string,
 ) (*agentBox, error) {
-	if strings.TrimSpace(agent) == "" && strings.TrimSpace(spec) == "" {
-		return nil, fmt.Errorf("a box needs something to run: pass --agent or --env-spec")
+	if strings.TrimSpace(agent) == "" && strings.TrimSpace(spec) == "" && strings.TrimSpace(image) == "" {
+		return nil, fmt.Errorf("a box needs something to run: pass --agent, --env-spec, or --image")
+	}
+	// Refused here as well as server-side, so the operator finds out before a
+	// round trip. A spec already names an image, and silently preferring one
+	// would make the box's contents depend on which flag they happened to
+	// pass (#84).
+	if strings.TrimSpace(spec) != "" && strings.TrimSpace(image) != "" {
+		return nil, fmt.Errorf("--env-spec and --image are mutually exclusive: a spec already names an image")
 	}
 
 	input := map[string]interface{}{}
@@ -261,6 +277,9 @@ func ensureBox(
 	}
 	if s := strings.TrimSpace(spec); s != "" {
 		input["environmentSpecSlug"] = s
+	}
+	if s := strings.TrimSpace(image); s != "" {
+		input["image"] = s
 	}
 	if s := strings.TrimSpace(name); s != "" {
 		input["name"] = s
@@ -565,7 +584,7 @@ func runBoxAttach(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 			return fmt.Errorf("box %s not found (see `astro box ls`)", slug)
 		}
 	} else {
-		box, err = ensureBox(cmd, ctx, client, cfg, boxAttachAgent, boxAttachSpec, "", boxAttachIdle)
+		box, err = ensureBox(cmd, ctx, client, cfg, boxAttachAgent, boxAttachSpec, boxAttachImage, "", boxAttachIdle)
 		if err != nil {
 			return err
 		}
@@ -732,6 +751,7 @@ func printBox(cmd *cobra.Command, box *agentBox) {
 func init() {
 	boxEnsureCmd.Flags().StringVar(&boxEnsureAgent, "agent", "", "Registered agent slug (run mode must be persistent)")
 	boxEnsureCmd.Flags().StringVar(&boxEnsureSpec, "env-spec", "", "Agent environment spec slug (image + secret packet)")
+	boxEnsureCmd.Flags().StringVar(&boxEnsureImage, "image", "", "Container image for a one-off box, with no spec to register first")
 	boxEnsureCmd.Flags().StringVar(&boxEnsureName, "name", "", "Human-readable name (defaults to the agent or spec name)")
 	boxEnsureCmd.Flags().StringVar(&boxEnsureIdle, "idle-timeout", "", "Reap after this much inactivity: 90m, seconds, or never")
 	boxEnsureCmd.Flags().BoolVar(&boxEnsureWait, "wait", false, "Block until the box is attachable")
@@ -742,6 +762,7 @@ func init() {
 
 	boxAttachCmd.Flags().StringVar(&boxAttachAgent, "agent", "", "Registered agent slug, when ensuring a box to attach to")
 	boxAttachCmd.Flags().StringVar(&boxAttachSpec, "env-spec", "", "Environment spec slug, when ensuring a box to attach to")
+	boxAttachCmd.Flags().StringVar(&boxAttachImage, "image", "", "Container image, when ensuring a one-off box to attach to")
 	boxAttachCmd.Flags().StringVar(&boxAttachIdle, "idle-timeout", "", "Reap after this much inactivity: 90m, seconds, or never")
 
 	boxCmd.AddCommand(boxEnsureCmd, boxListCmd, boxRmCmd, boxAttachCmd)
