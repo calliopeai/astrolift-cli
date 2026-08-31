@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
@@ -42,8 +43,64 @@ var (
 	appRegisterDescription   string
 	appRegisterManifestPath  string
 	appRegisterDefaultBranch string
+	appRegisterBuildMode     string
+	appRegisterBuildStrategy string
+	appRegisterDockerfile    string
+	appRegisterBuildContext  string
 	appRegisterJSON          bool
 )
+
+// validBuildModes / validBuildStrategies mirror RegisteredApp.BuildMode and
+// RegisteredApp.BuildStrategy on the platform. Validated client-side so a typo
+// costs a round trip and a clear message rather than a GraphQL enum error.
+var (
+	validBuildModes      = []string{"ci_pushed", "platform_build", "none"}
+	validBuildStrategies = []string{"off", "dockerfile", "buildpacks", "nixpacks"}
+)
+
+func oneOf(value string, allowed []string) bool {
+	for _, a := range allowed {
+		if value == a {
+			return true
+		}
+	}
+	return false
+}
+
+// applyBuildFlags validates the build-related flags and writes them onto the
+// registerApp input.
+//
+// Every field is omitted when empty rather than defaulted here: the platform
+// owns the defaults, and sending one from the CLI would freeze it at whatever
+// this binary was built against. The one exception is the strategy implied by
+// platform_build, which is a client-side correction of a combination that is
+// accepted by the API but can never build -- build_mode platform_build with
+// build_strategy off selects no builder, so BuildImageActivity has nothing to
+// invoke.
+func applyBuildFlags(input map[string]interface{}, mode, strategy, dockerfile, context string) error {
+	if mode != "" && !oneOf(mode, validBuildModes) {
+		return fmt.Errorf("--build-mode must be one of %s", strings.Join(validBuildModes, ", "))
+	}
+	if strategy != "" && !oneOf(strategy, validBuildStrategies) {
+		return fmt.Errorf("--build-strategy must be one of %s", strings.Join(validBuildStrategies, ", "))
+	}
+	if mode == "platform_build" && strategy == "" {
+		strategy = "dockerfile"
+	}
+	if mode != "" {
+		input["buildMode"] = mode
+	}
+	if strategy != "" {
+		input["buildStrategy"] = strategy
+	}
+	if dockerfile != "" {
+		input["dockerfilePath"] = dockerfile
+	}
+	if context != "" {
+		input["buildContext"] = context
+	}
+	return nil
+}
 
 // appManifest is the minimal shape of astrolift.toml that register reads.
 type appManifest struct {
@@ -81,6 +138,16 @@ var appRegisterCmd = &cobra.Command{
 the app slug and display name, and calls the registerApp GraphQL mutation.
 
 --project-id and --source-repo are required; all other flags are optional.
+
+--build-mode selects who publishes the container image. The platform default
+is ci_pushed, where your CI builds and pushes and the platform only rolls out
+the tag. Use platform_build to hand the repo to the platform and have it build
+in-cluster -- no CI to configure and nothing to build locally:
+
+  astro app register --project-id <uuid> --source-repo myorg/my-app \
+    --build-mode platform_build
+
+which implies --build-strategy dockerfile unless you name another builder.
 
 Example:
   astro app register --project-id <uuid> --source-repo myorg/my-app`,
@@ -127,6 +194,10 @@ Example:
 		}
 		if appRegisterDefaultBranch != "" {
 			input["defaultBranch"] = appRegisterDefaultBranch
+		}
+		if err := applyBuildFlags(input, appRegisterBuildMode, appRegisterBuildStrategy,
+			appRegisterDockerfile, appRegisterBuildContext); err != nil {
+			return err
 		}
 
 		const m = `
@@ -216,6 +287,10 @@ func init() {
 	appRegisterCmd.Flags().StringVar(&appRegisterDescription, "description", "", "Short description of the app")
 	appRegisterCmd.Flags().StringVar(&appRegisterManifestPath, "manifest-path", "", "Path to the manifest file within the repo (default: astrolift.toml)")
 	appRegisterCmd.Flags().StringVar(&appRegisterDefaultBranch, "default-branch", "", "Default branch for deploys (default: the repo default)")
+	appRegisterCmd.Flags().StringVar(&appRegisterBuildMode, "build-mode", "", "Who publishes the image: ci_pushed (platform default), platform_build, none")
+	appRegisterCmd.Flags().StringVar(&appRegisterBuildStrategy, "build-strategy", "", "Builder the platform invokes under --build-mode platform_build: dockerfile (default), buildpacks, nixpacks, off")
+	appRegisterCmd.Flags().StringVar(&appRegisterDockerfile, "dockerfile-path", "", "Dockerfile path within the repo (platform_build only; default: Dockerfile)")
+	appRegisterCmd.Flags().StringVar(&appRegisterBuildContext, "build-context", "", "Build context within the repo (platform_build only; default: .)")
 	appRegisterCmd.Flags().BoolVar(&appRegisterJSON, "json", false, "Output the registered app as JSON")
 
 	appCmd.AddCommand(
