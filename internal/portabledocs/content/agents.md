@@ -197,6 +197,41 @@ Repo sync is idempotent by source repo and manifest path. Added and changed
 agents are reconciled. Removing a source manifest does not automatically delete
 the registered agent; teardown is explicit so audit history is retained.
 
+## Runtime environment
+
+The platform injects these into the agent container. They are reserved: a
+manifest `[environment]` block that sets one of them is ignored with a warning,
+because the dispatcher owns the value.
+
+| Variable | Carries | Absent when |
+|---|---|---|
+| `ASTROLIFT_TRIGGER_PAYLOAD` | The per-dispatch input, JSON-encoded — `astro agent dispatch --input '{...}'`, a workflow stage's payload, or a trigger-bound webhook's mapped body | No input was supplied. An empty payload and no payload are the same thing, so nothing is set rather than the string `null` |
+| `ASTROLIFT_TASK_ID` | The task's GUID | never |
+| `ASTROLIFT_CONTROLLER_URL` | Base URL of the control plane | never |
+| `AGENT_CALLBACK_URL` + `ASTROLIFT_CLUSTER_KEY` | Where a one-shot pod reports its terminal result, and the task-scoped credential to do it with. The key is minted per spawn, so a token from a retried render is dead | The task has no callback route |
+| `ASTROLIFT_BRIEF_ID`, `ASTROLIFT_BRIEF_HASH` | Identify the Brief the run was assembled from | The task has no Brief |
+| `ASTROLIFT_PAYLOAD_URL`, `ASTROLIFT_PAYLOAD_HASH` | Where to fetch the agent package archive, and its digest | The package ships inline |
+| `AGENT_SYSTEM`, `AGENT_PROMPT` | The assembled system prompt and the kickoff turn | The runtime idles in listener mode instead of running once |
+| `ASTROLIFT_WORKSPACE` | Working directory the runtime checks out into | never |
+| `ASTROLIFT_SNAPSHOT_URL`, `ASTROLIFT_SNAPSHOT_INTERVAL`, `ASTROLIFT_SNAPSHOT_LOCAL_PATH` | Where and how often a VNC session uploads its snapshot | Not a VNC runtime, or no blob store configured |
+| `ASTROLIFT_TMUX_SESSION` | The tmux session name a VNC runtime attaches to | Not a VNC runtime |
+
+Everything else in the container comes from your own manifest `[environment]`
+block and the environment spec's secret refs.
+
+### Reading the trigger input
+
+```python
+import json, os
+
+payload = json.loads(os.environ.get("ASTROLIFT_TRIGGER_PAYLOAD") or "{}")
+mode = payload.get("mode", "smoke")
+```
+
+A prompt-driven agent does not have to read the variable at all: the kickoff
+turn in `AGENT_PROMPT` carries the same JSON inline, so `--input` reaches a
+harness that only ever sees its prompt.
+
 ## Import other formats
 
 The Agent Package importer accepts `agents_md`, `astrolift_package`, `langflow`,
