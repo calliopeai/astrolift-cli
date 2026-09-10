@@ -98,6 +98,11 @@ task's triggerPayload. A single smoke-test run is just a small payload
 (or none); a bounded backfill is a payload the agent loops on, e.g.
   --input '{"mode":"backfill","batches":5,"batch_size":10}'
 
+The agent reads it from ASTROLIFT_TRIGGER_PAYLOAD, a JSON-encoded
+environment variable on the task container. A dispatch with no --input
+sets no such variable, so an agent should treat it as absent rather
+than empty.
+
 --env-spec pins an AgentEnvironmentSpec (by slug) to launch into — its
 image + secret packet. Omit to use the workload's own image/runtime.
 
