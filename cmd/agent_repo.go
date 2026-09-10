@@ -93,7 +93,18 @@ func runAgentRegisterRepo(cmd *cobra.Command, ctx context.Context, client *api.C
 
 	out := cmd.OutOrStdout()
 	if resp.Result.Data == nil || len(resp.Result.Data.Agents) == 0 {
+		// "No agent manifests registered." on its own reads as "the repo
+		// has no agents", which is usually false and always unhelpful
+		// (#1697). The commonest reason is a root manifest that declares
+		// an agent beside other workloads: that agent is materialized by
+		// app registration, and this command only walks standalone agent
+		// packages.
 		fmt.Fprintln(out, "No agent manifests registered.")
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "This command registers standalone agent packages —")
+		fmt.Fprintln(out, "  agents/<slug>/astrolift.toml, each declaring a single kind = \"agent\" workload.")
+		fmt.Fprintln(out, "An agent declared alongside other workloads in the root astrolift.toml is")
+		fmt.Fprintln(out, "registered with the app instead; use `astro app register` for that repo.")
 		return nil
 	}
 	for _, a := range resp.Result.Data.Agents {
