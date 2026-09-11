@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `astro app deploy` allows omitting `--image-tag` for platform builds and apps
+  using manifest images. The API resolves platform builds to a commit before
+  scheduling or approval and uses that SHA as the default image tag. `--ref`
+  selects a branch, tag, or commit; the response includes the resolved commit.
+  CI-pushed apps still require an explicit image tag (#94).
+
 ## 0.7.0 — 2026-08-21
 
 ### Changed
