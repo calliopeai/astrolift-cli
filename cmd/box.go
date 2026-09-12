@@ -498,8 +498,11 @@ Reach for this when a box is wedged, or when you want the node back now.
 Prompts for confirmation unless --yes is given.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
+			return err
+		}
+		if _, err := resolveOrg(cmd, cmd.Context(), client, cfg); err != nil {
 			return err
 		}
 		return runBoxRm(cmd, cmd.Context(), client, args[0])
@@ -561,6 +564,9 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
+			return err
+		}
+		if _, err := resolveOrg(cmd, cmd.Context(), client, cfg); err != nil {
 			return err
 		}
 		slug := ""

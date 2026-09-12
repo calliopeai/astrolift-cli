@@ -41,7 +41,7 @@ login URL in your default browser, then polls until you complete
 authentication. The resulting credentials are stored at
 ~/.config/astrolift/credentials/<server>.yaml with mode 0600.
 
-If no server slug is given, uses the current_server from your config.
+If no server slug is given, uses --server or the saved current_server.
 Use 'astro server add' to register a new server first.
 
 For an agent or any caller without a browser:
@@ -63,16 +63,9 @@ MCP gateway alike.`,
 		if err != nil {
 			return err
 		}
-		serverSlug := cfg.CurrentServer
-		if len(args) == 1 {
-			serverSlug = args[0]
-		}
-		if serverSlug == "" {
-			return errors.New("no server selected; run `astro server add` first or pass a slug")
-		}
-		entry, ok := cfg.Servers[serverSlug]
-		if !ok {
-			return fmt.Errorf("server %q not registered; run `astro server add %s <api-url>` first", serverSlug, serverSlug)
+		serverSlug, entry, err := selectedServer(cfg, args)
+		if err != nil {
+			return err
 		}
 
 		asJSON := viper.GetBool("output_json")
@@ -204,16 +197,9 @@ fifteen minutes.`,
 		if err != nil {
 			return err
 		}
-		serverSlug := cfg.CurrentServer
-		if len(args) == 1 {
-			serverSlug = args[0]
-		}
-		if serverSlug == "" {
-			return errors.New("no server selected; pass a slug or set one with `astro server use`")
-		}
-		entry, ok := cfg.Servers[serverSlug]
-		if !ok {
-			return fmt.Errorf("server %q not registered", serverSlug)
+		serverSlug, entry, err := selectedServer(cfg, args)
+		if err != nil {
+			return err
 		}
 
 		// Rebuilt rather than persisted: the id is the only part the server
@@ -237,12 +223,9 @@ var authLogoutCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		serverSlug := cfg.CurrentServer
-		if len(args) == 1 {
-			serverSlug = args[0]
-		}
-		if serverSlug == "" {
-			return errors.New("no server selected")
+		serverSlug, _, err := selectedServer(cfg, args)
+		if err != nil {
+			return err
 		}
 		if err := config.DeleteCredentials(serverSlug); err != nil {
 			return err
@@ -260,15 +243,18 @@ var authStatusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if cfg.CurrentServer == "" {
+		if cfg.CurrentServer == "" && strings.TrimSpace(viper.GetString("server")) == "" {
 			fmt.Fprintln(cmd.OutOrStdout(), "Not logged in. No current server.")
 			return nil
 		}
-		entry := cfg.Servers[cfg.CurrentServer]
-		creds, err := config.LoadCredentials(cfg.CurrentServer)
+		serverSlug, entry, err := selectedServer(cfg, nil)
 		if err != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "Server: %s (%s)\nNot logged in.\n", cfg.CurrentServer, entry.APIURL)
-			return nil
+			return err
+		}
+		creds, err := config.LoadCredentials(serverSlug)
+		if err != nil {
+			_, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "Server: %s (%s)\nNot logged in.\n", serverSlug, entry.APIURL)
+			return writeErr
 		}
 		state := "valid"
 		if creds.IsExpired(time.Minute) {
@@ -277,7 +263,7 @@ var authStatusCmd = &cobra.Command{
 		fmt.Fprintf(
 			cmd.OutOrStdout(),
 			"Server:     %s\nAPI URL:    %s\nExpires at: %s\nState:      %s\n",
-			cfg.CurrentServer, entry.APIURL,
+			serverSlug, entry.APIURL,
 			creds.ExpiresAt.Format(time.RFC3339), state,
 		)
 		return nil
@@ -292,11 +278,11 @@ var authRefreshCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if cfg.CurrentServer == "" {
-			return errors.New("no current server selected")
+		serverSlug, entry, err := selectedServer(cfg, nil)
+		if err != nil {
+			return err
 		}
-		entry := cfg.Servers[cfg.CurrentServer]
-		creds, err := config.LoadCredentials(cfg.CurrentServer)
+		creds, err := config.LoadCredentials(serverSlug)
 		if err != nil {
 			return fmt.Errorf("loading credentials: %w", err)
 		}
@@ -306,7 +292,7 @@ var authRefreshCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("refreshing: %w", err)
 		}
-		if err := config.SaveCredentials(cfg.CurrentServer, fresh); err != nil {
+		if err := config.SaveCredentials(serverSlug, fresh); err != nil {
 			return err
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Token refreshed.")

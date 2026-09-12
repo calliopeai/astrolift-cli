@@ -199,9 +199,21 @@ the status note above.)
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
 
 Every command supports `--json` for machine-readable output, plus
-`--api-url`, `--token`, `--org`, `--team`, `--project`, `--app`,
+`--server`, `--api-url`, `--token`, `--org`, `--team`, `--project`, `--app`,
 `--no-color`, `--no-prompt`, and `--debug` as global flags. Errors go
 to stderr; data goes to stdout.
+
+Use `astro --server <registered-slug> --org <organization> box ls --json` to
+address one install without changing `astro server use` or another client's
+selection. The endpoint and stored credentials both come from that server.
+Authentication and onboarding accept the same selector. Unknown servers fail;
+an API URL override must match the explicitly selected registered server.
+Without `--server`, the saved selection and existing override behavior apply.
+Box attachment, removal, and `exec` resolve `--org` before addressing a target.
+HTTP requests and terminal WebSocket handshakes carry the selected organization.
+API tokens remain tied to their issuing organization; use credentials for the
+selected organization. Older control planes may silently ignore a conflicting
+organization header, so they require a server update to reject that mismatch.
 
 Run `astro <command> --help` for the full flag set; the help text is
 the source of truth.
