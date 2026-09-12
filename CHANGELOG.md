@@ -4,8 +4,9 @@
 
 - Add per-command `--server` selection for registered endpoints and their
   credentials without changing the saved default. Reject conflicting endpoint
-  overrides before using credentials. Box attachment and removal honor the
-  selected organization in the API tenant header (#100).
+  overrides before using credentials. Box attachment, removal, and exec honor
+  the selected organization in HTTP requests and terminal WebSocket handshakes
+  (#100).
 
 ## 0.7.0 — 2026-08-21
 
