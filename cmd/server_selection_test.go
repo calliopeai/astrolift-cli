@@ -13,6 +13,7 @@ import (
 
 	"github.com/calliopeai/astrolift-cli/internal/auth"
 	"github.com/calliopeai/astrolift-cli/internal/config"
+	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -176,6 +177,74 @@ func TestBoxCommandsUseSelectedServerAndOrganization(t *testing.T) {
 			}
 			if boxRequests != 1 {
 				t.Fatalf("expected one scoped box request, got %d", boxRequests)
+			}
+		})
+	}
+}
+
+func TestTerminalCommandsCarrySelectedOrganizationToWebSocket(t *testing.T) {
+	for _, operation := range []string{"exec", "box attach"} {
+		t.Run(operation, func(t *testing.T) {
+			withExecSession(t, newBlockingReader(t), notATerm{}, func(int) {})
+			handshake := make(chan http.Header, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if websocket.IsWebSocketUpgrade(r) {
+					handshake <- r.Header.Clone()
+					upgrader := websocket.Upgrader{}
+					conn, err := upgrader.Upgrade(w, r, nil)
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					defer func() { _ = conn.Close() }()
+					var frame execFrame
+					if err := conn.ReadJSON(&frame); err != nil || frame.Type != "open" {
+						t.Errorf("missing open frame: %v, %+v", err, frame)
+						return
+					}
+					if err := conn.WriteJSON(execFrame{Type: "exit", Code: 0}); err != nil {
+						t.Error(err)
+					}
+					return
+				}
+				var body struct{ Query string }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
+					return
+				}
+				if strings.Contains(body.Query, "astroliftOrganizations") {
+					_, _ = fmt.Fprint(w, `{"data":{"astroliftOrganizations":[{"id":"selected-org","slug":"selected"}]}}`)
+					return
+				}
+				if r.Header.Get("X-Astrolift-Organization") != "selected-org" {
+					t.Error("box lookup used another organization")
+				}
+				_, _ = fmt.Fprint(w, `{"data":{"agentBox":{"slug":"same-slug","status":"running","podName":"box-pod"}}}`)
+			}))
+			defer server.Close()
+			serverSelectionFixture(t, server.URL)
+			command := testCmd()
+			command.SetContext(context.Background())
+			command.SetOut(&bytes.Buffer{})
+			if err := command.Flags().Set("org", "selected"); err != nil {
+				t.Fatal(err)
+			}
+			var err error
+			if operation == "exec" {
+				err = execCmd.RunE(command, []string{"sh"})
+			} else {
+				err = boxAttachCmd.RunE(command, []string{"same-slug"})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case header := <-handshake:
+				if header.Get("Authorization") != "Bearer selected-token" || header.Get("X-Astrolift-Organization") != "selected-org" {
+					t.Error("terminal handshake did not preserve the selected server and organization")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("terminal did not connect")
 			}
 		})
 	}

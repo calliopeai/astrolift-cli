@@ -10,16 +10,7 @@ register clusters and configure providers against an Astrolift control plane.
 
 > **Status posture.** The CLI is pre-1.0. Pin a tagged release in CI rather
 > than tracking `main`; command and API surfaces may still evolve before 1.0.
-> Use `astro --server <registered-slug> --org <organization> box ls --json` to
-address one install without changing `astro server use` or another client's
-selection. The endpoint and stored credentials both come from that server.
-Authentication and onboarding accept the same selector. Unknown servers fail;
-an API URL override must match the explicitly selected registered server.
-Without `--server`, the saved selection and existing override behavior apply.
-Box attachment and removal resolve `--org` before addressing a box by slug,
-so identically named boxes in different organizations remain separate.
-
-Run `astro <command> --help` or `astro docs show cli` for the exact surface
+> Run `astro <command> --help` or `astro docs show cli` for the exact surface
 > shipped by your installed release.
 
 ---
@@ -218,6 +209,11 @@ selection. The endpoint and stored credentials both come from that server.
 Authentication and onboarding accept the same selector. Unknown servers fail;
 an API URL override must match the explicitly selected registered server.
 Without `--server`, the saved selection and existing override behavior apply.
+Box attachment, removal, and `exec` resolve `--org` before addressing a target.
+HTTP requests and terminal WebSocket handshakes carry the selected organization.
+API tokens remain tied to their issuing organization; use credentials for the
+selected organization. Older control planes may silently ignore a conflicting
+organization header, so they require a server update to reject that mismatch.
 
 Run `astro <command> --help` for the full flag set; the help text is
 the source of truth.
