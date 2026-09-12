@@ -181,43 +181,47 @@ func describeAuthState() authState {
 		}
 	}
 	cfg, err := config.Load()
-	if err != nil || cfg.CurrentServer == "" {
+	if err != nil || (cfg.CurrentServer == "" && strings.TrimSpace(viper.GetString("server")) == "") {
 		return authState{
 			Source: "none",
 			Hint: "run `astro server add <slug> <api-url>`, then either " +
 				"export ASTROLIFT_TOKEN=alft_at_... or run `astro auth login`",
 		}
 	}
-	if _, err := config.LoadCredentials(cfg.CurrentServer); err != nil {
+	serverSlug, _, err := selectedServer(cfg, nil)
+	if err != nil {
+		return authState{Source: "none", Hint: err.Error()}
+	}
+	if _, err := config.LoadCredentials(serverSlug); err != nil {
 		return authState{
 			Source: "none",
-			Server: cfg.CurrentServer,
+			Server: serverSlug,
 			Hint: "export ASTROLIFT_TOKEN=alft_at_... for an unattended agent, " +
 				"or run `astro auth login` for a browser device flow",
 		}
 	}
-	return authState{Authenticated: true, Source: "stored credentials", Server: cfg.CurrentServer}
+	return authState{Authenticated: true, Source: "stored credentials", Server: serverSlug}
 }
 
 // onboardAPIURL resolves the install's API URL the same way every other
 // command does, so the MCP entry points where the CLI already points.
 func onboardAPIURL() (string, error) {
-	if override := strings.TrimSpace(viper.GetString("api_url")); override != "" {
+	if override := strings.TrimSpace(viper.GetString("api_url")); override != "" && strings.TrimSpace(viper.GetString("server")) == "" {
 		return override, nil
 	}
 	cfg, err := config.Load()
 	if err != nil {
 		return "", err
 	}
-	if cfg.CurrentServer == "" {
+	if cfg.CurrentServer == "" && strings.TrimSpace(viper.GetString("server")) == "" {
 		return "", errors.New(
 			"no current server, so there is no API URL to point an MCP client at. " +
 				"run `astro server add <slug> <api-url>` first, or pass --api-url",
 		)
 	}
-	entry, ok := cfg.Servers[cfg.CurrentServer]
-	if !ok {
-		return "", fmt.Errorf("current server %q missing from config", cfg.CurrentServer)
+	_, entry, err := selectedServer(cfg, nil)
+	if err != nil {
+		return "", err
 	}
 	return entry.APIURL, nil
 }

@@ -36,6 +36,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().String("api-url", "", "Astrolift API URL")
+	rootCmd.PersistentFlags().String("server", "", "Registered server for this command (does not change the saved selection)")
 	rootCmd.PersistentFlags().String("token", "", "API token (overrides stored credentials)")
 	rootCmd.PersistentFlags().String("org", "", "Organization slug")
 	rootCmd.PersistentFlags().String("team", "", "Team slug")
@@ -47,6 +48,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("debug", false, "Enable debug output")
 
 	_ = viper.BindPFlag("api_url", rootCmd.PersistentFlags().Lookup("api-url"))
+	_ = viper.BindPFlag("server", rootCmd.PersistentFlags().Lookup("server"))
 	_ = viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
 	_ = viper.BindPFlag("default_org", rootCmd.PersistentFlags().Lookup("org"))
 	_ = viper.BindPFlag("output_json", rootCmd.PersistentFlags().Lookup("json"))

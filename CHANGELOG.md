@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add per-command `--server` selection for registered endpoints and their
+  credentials without changing the saved default. Reject conflicting endpoint
+  overrides before using credentials. Box attachment and removal honor the
+  selected organization in the API tenant header (#100).
+
 ## 0.7.0 — 2026-08-21
 
 ### Changed
