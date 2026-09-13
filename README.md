@@ -203,6 +203,37 @@ Every command supports `--json` for machine-readable output, plus
 `--no-color`, `--no-prompt`, and `--debug` as global flags. Errors go
 to stderr; data goes to stdout.
 
+### Exact workflow executions
+
+Use the `WorkflowRun` ID returned by `workflow run`, `workflow run-manifest`, or
+`agent run` to observe either a configured workflow or a definition directly.
+`execution` looks up that record even after it leaves the recent-run list:
+
+```bash
+astro --server <server> --org <organization> workflow execution <id> --json
+astro --server <server> --org <organization> workflow execution <id> --watch
+astro --server <server> --org <organization> workflow execution-stop <id> --yes
+astro --server <server> --org <organization> workflow execution-cleanup <id> --yes
+```
+
+Keep the original server and organization when revisiting a run. The returned
+execution GUID also works as `<id>`; a configured workflow instance ID from
+`workflow runs` is a different identifier. `--workflow-id` and `--run-id` can
+require the original Temporal workflow and execution IDs. Stop and cleanup
+first verify the exact record, then pin both Temporal IDs in their request.
+`execution-stop --terminate --reason <text> --yes` requests hard termination.
+
+The JSON record separates `status` / `isTerminal` from `taskCleanup` (status,
+remaining tasks, errors, and retryability). A successful control prints
+`requested: true`, meaning the request was acknowledged; it does not mean the
+execution has closed or its resources are gone. Cleanup is allowed only after
+verified closure and retries one owned task per call; the platform's scheduled
+reconciler also retries unfinished cleanup. Watch keeps observing until closure
+and cleanup are both verified, for up to 30 minutes. With `--json --watch` only
+the final record is printed. An unavailable observation retains the last state
+with `observationError` and cannot be used to initiate control. These commands
+require a server exposing `workflowExecution` and `controlWorkflowExecution`.
+
 Use `astro --server <registered-slug> --org <organization> box ls --json` to
 address one install without changing `astro server use` or another client's
 selection. The endpoint and stored credentials both come from that server.
