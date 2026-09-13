@@ -214,6 +214,7 @@ astro --server <server> --org <organization> workflow execution <id> --json
 astro --server <server> --org <organization> workflow execution <id> --watch
 astro --server <server> --org <organization> workflow execution-stop <id> --yes
 astro --server <server> --org <organization> workflow execution-cleanup <id> --yes
+astro --server <server> --org <organization> workflow execution-stages <id>
 ```
 
 Keep the original server and organization when revisiting a run. The returned
