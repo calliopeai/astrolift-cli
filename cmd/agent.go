@@ -397,7 +397,7 @@ interrupted (Ctrl-C). An empty result means the task has produced no logs
 yet (or has no readable pod); it is not an error.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, _, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -487,7 +487,7 @@ its pod before recording the task as CANCELLED.
 Prompts for confirmation unless --yes is given.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -537,7 +537,7 @@ prints its record: status, timestamps, VNC relay path, and terminal result
 payload (if any). Use --json for the raw record.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}

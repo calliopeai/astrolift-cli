@@ -411,6 +411,10 @@ has no log cursor: lines that expire between polls cannot be recovered, and
 identical full snapshots cannot reveal whether more identical lines were written.
 Use `agent logs --tail <n>` to request a larger recent window when needed.
 
+Task dispatch, inspection, logs, replies, cancellation and VNC lookup resolve
+`--org` (or the saved working organization) before making task requests. An
+unknown organization fails before any task operation is sent.
+
 `astro agent inspect <task-id>` also reports the control plane's recorded failure
 reason in text and JSON output. This remains available for failures before a
 pod starts, when there are no pod logs to inspect.

@@ -112,7 +112,7 @@ agentTask. --tail additionally streams the task's logs while waiting.
 Exit codes: 0 success, 1 dispatch/run failure.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, _, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
