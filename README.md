@@ -410,3 +410,7 @@ If snapshots no longer overlap, the available tail is printed again. The API
 has no log cursor: lines that expire between polls cannot be recovered, and
 identical full snapshots cannot reveal whether more identical lines were written.
 Use `agent logs --tail <n>` to request a larger recent window when needed.
+
+`astro agent inspect <task-id>` also reports the control plane's recorded failure
+reason in text and JSON output. This remains available for failures before a
+pod starts, when there are no pod logs to inspect.

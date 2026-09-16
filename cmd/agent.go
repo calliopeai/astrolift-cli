@@ -120,6 +120,7 @@ const agentTaskQuery = `query($id: ID!) {
     status
     callbackUrl
     result
+    failureMessage
     createdAt
     startedAt
     finishedAt
@@ -165,16 +166,17 @@ type workflowInstance struct {
 
 // agentTask mirrors the AstroliftAgentTask GraphQL type.
 type agentTask struct {
-	ID          string      `json:"id"`
-	Status      string      `json:"status"`
-	CallbackURL string      `json:"callbackUrl"`
-	Result      interface{} `json:"result"`
-	CreatedAt   string      `json:"createdAt"`
-	StartedAt   *string     `json:"startedAt"`
-	FinishedAt  *string     `json:"finishedAt"`
-	VNCEnabled  bool        `json:"vncEnabled"`
-	VNCURL      string      `json:"vncUrl"`
-	SnapshotURL *string     `json:"snapshotUrl"`
+	ID             string      `json:"id"`
+	Status         string      `json:"status"`
+	CallbackURL    string      `json:"callbackUrl"`
+	Result         interface{} `json:"result"`
+	FailureMessage *string     `json:"failureMessage,omitempty"`
+	CreatedAt      string      `json:"createdAt"`
+	StartedAt      *string     `json:"startedAt"`
+	FinishedAt     *string     `json:"finishedAt"`
+	VNCEnabled     bool        `json:"vncEnabled"`
+	VNCURL         string      `json:"vncUrl"`
+	SnapshotURL    *string     `json:"snapshotUrl"`
 }
 
 // noneMutationResult is the NoneTypeMutationResult envelope (cancelTask). Its
@@ -566,6 +568,11 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 
 	fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
 	fmt.Fprintf(out, "Status:        %s\n", t.Status)
+	if t.FailureMessage != nil && strings.TrimSpace(*t.FailureMessage) != "" {
+		if _, err := fmt.Fprintf(out, "Failure:       %s\n", *t.FailureMessage); err != nil {
+			return err
+		}
+	}
 	fmt.Fprintf(out, "VNC enabled:   %s\n", yesNo(t.VNCEnabled))
 	if t.CreatedAt != "" {
 		fmt.Fprintf(out, "Created at:    %s\n", t.CreatedAt)
