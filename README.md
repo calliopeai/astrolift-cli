@@ -400,3 +400,13 @@ Copyright (c) 2026 Calliope Labs Inc. Calliope AI is a trademark of Calliope
 Labs Inc.
 
 Portions of the framework underlying this repo are derived from **[boilerworks](https://github.com/ConflictHQ/boilerworks)** (Copyright (c) Conflict LLC, MIT-licensed). Tip of the hat 🎩
+
+### Agent log following
+
+`astro agent logs <task-id> --follow` and `astro agent dispatch <agent-slug> --tail`
+poll recent pod log snapshots. Following continues when the tail reaches its
+line limit, matching overlapping lines instead of relying on a growing count.
+If snapshots no longer overlap, the available tail is printed again. The API
+has no log cursor: lines that expire between polls cannot be recovered, and
+identical full snapshots cannot reveal whether more identical lines were written.
+Use `agent logs --tail <n>` to request a larger recent window when needed.
