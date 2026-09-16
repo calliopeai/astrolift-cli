@@ -60,9 +60,14 @@ Examples:
 		}
 
 		debug, _ := cmd.Flags().GetBool("debug")
-		client, _, _, err := loadActiveClient(ctx, debug)
+		client, cfg, _, err := loadActiveClient(ctx, debug)
 		if err != nil {
 			return err
+		}
+		if strings.TrimSpace(orgFlagValue(cmd)) != "" || strings.TrimSpace(cfg.DefaultOrg) != "" {
+			if _, err := resolveOrg(cmd, ctx, client, cfg); err != nil {
+				return err
+			}
 		}
 
 		// The response shape is whatever the caller asked for, so decode
