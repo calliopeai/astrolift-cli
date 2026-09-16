@@ -217,7 +217,7 @@ func waitAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 func tailAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, taskID string) error {
 	out := cmd.OutOrStdout()
 
-	printed := 0
+	var tail agentLogTail
 	last := ""
 	for {
 		// print any newly-appended log lines
@@ -234,13 +234,9 @@ func tailAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 			}
 			return fmt.Errorf("polling logs: %w", err)
 		}
-		if len(logResp.Lines) < printed {
-			printed = 0
-		}
-		for _, line := range logResp.Lines[printed:] {
+		for _, line := range tail.append(logResp.Lines) {
 			fmt.Fprintln(out, line)
 		}
-		printed = len(logResp.Lines)
 
 		// check terminal status
 		status, err := fetchAgentTaskStatus(ctx, client, taskID)

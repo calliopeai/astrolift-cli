@@ -448,13 +448,7 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 		return nil
 	}
 
-	// --follow: poll the query and print only lines we haven't printed yet.
-	// agentTaskLogs returns a tail snapshot (most-recent <=tail lines), so
-	// across polls we track how many lines we've already emitted and print
-	// only the newly-appended suffix. A snapshot shorter than what we've
-	// seen (the ring buffer rolled, or the pod restarted) resets the
-	// watermark so we don't drop the fresh tail.
-	printed := 0
+	var tail agentLogTail
 	for {
 		fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		lines, err := fetch(fetchCtx)
@@ -467,13 +461,9 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 			}
 			return fmt.Errorf("polling logs: %w", err)
 		}
-		if len(lines) < printed {
-			printed = 0
-		}
-		for _, line := range lines[printed:] {
+		for _, line := range tail.append(lines) {
 			fmt.Fprintln(out, line)
 		}
-		printed = len(lines)
 
 		select {
 		case <-ctx.Done():
