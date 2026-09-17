@@ -120,6 +120,7 @@ const agentTaskQuery = `query($id: ID!) {
     status
     callbackUrl
     result
+    failureMessage
     createdAt
     startedAt
     finishedAt
@@ -165,16 +166,17 @@ type workflowInstance struct {
 
 // agentTask mirrors the AstroliftAgentTask GraphQL type.
 type agentTask struct {
-	ID          string      `json:"id"`
-	Status      string      `json:"status"`
-	CallbackURL string      `json:"callbackUrl"`
-	Result      interface{} `json:"result"`
-	CreatedAt   string      `json:"createdAt"`
-	StartedAt   *string     `json:"startedAt"`
-	FinishedAt  *string     `json:"finishedAt"`
-	VNCEnabled  bool        `json:"vncEnabled"`
-	VNCURL      string      `json:"vncUrl"`
-	SnapshotURL *string     `json:"snapshotUrl"`
+	ID             string      `json:"id"`
+	Status         string      `json:"status"`
+	CallbackURL    string      `json:"callbackUrl"`
+	Result         interface{} `json:"result"`
+	FailureMessage *string     `json:"failureMessage,omitempty"`
+	CreatedAt      string      `json:"createdAt"`
+	StartedAt      *string     `json:"startedAt"`
+	FinishedAt     *string     `json:"finishedAt"`
+	VNCEnabled     bool        `json:"vncEnabled"`
+	VNCURL         string      `json:"vncUrl"`
+	SnapshotURL    *string     `json:"snapshotUrl"`
 }
 
 // noneMutationResult is the NoneTypeMutationResult envelope (cancelTask). Its
@@ -395,7 +397,7 @@ interrupted (Ctrl-C). An empty result means the task has produced no logs
 yet (or has no readable pod); it is not an error.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, _, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -448,13 +450,7 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 		return nil
 	}
 
-	// --follow: poll the query and print only lines we haven't printed yet.
-	// agentTaskLogs returns a tail snapshot (most-recent <=tail lines), so
-	// across polls we track how many lines we've already emitted and print
-	// only the newly-appended suffix. A snapshot shorter than what we've
-	// seen (the ring buffer rolled, or the pod restarted) resets the
-	// watermark so we don't drop the fresh tail.
-	printed := 0
+	var tail agentLogTail
 	for {
 		fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		lines, err := fetch(fetchCtx)
@@ -467,13 +463,9 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 			}
 			return fmt.Errorf("polling logs: %w", err)
 		}
-		if len(lines) < printed {
-			printed = 0
-		}
-		for _, line := range lines[printed:] {
+		for _, line := range tail.append(lines) {
 			fmt.Fprintln(out, line)
 		}
-		printed = len(lines)
 
 		select {
 		case <-ctx.Done():
@@ -495,7 +487,7 @@ its pod before recording the task as CANCELLED.
 Prompts for confirmation unless --yes is given.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -545,7 +537,7 @@ prints its record: status, timestamps, VNC relay path, and terminal result
 payload (if any). Use --json for the raw record.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -576,6 +568,11 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 
 	fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
 	fmt.Fprintf(out, "Status:        %s\n", t.Status)
+	if t.FailureMessage != nil && strings.TrimSpace(*t.FailureMessage) != "" {
+		if _, err := fmt.Fprintf(out, "Failure:       %s\n", *t.FailureMessage); err != nil {
+			return err
+		}
+	}
 	fmt.Fprintf(out, "VNC enabled:   %s\n", yesNo(t.VNCEnabled))
 	if t.CreatedAt != "" {
 		fmt.Fprintf(out, "Created at:    %s\n", t.CreatedAt)

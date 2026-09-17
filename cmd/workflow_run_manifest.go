@@ -23,6 +23,7 @@
 //   - importWorkflowManifest(toml, preview) → createdSlug + parsed manifest
 //   - agentWorkloads(orgId)                 → name/slug → workload GUID
 //   - createWorkflow(...)                   → the configured Workflow
+//   - updateWorkflowDefinition(slug, isEnabled) → activate the new import
 //   - runWorkflow(workflowId, inputs)       → the run
 //
 // Issue: calliopeai/astrolift-cli#59
@@ -62,7 +63,7 @@ var (
 
 var workflowRunManifestCmd = &cobra.Command{
 	Use:   "run-manifest <file.toml>",
-	Short: "Import, bind, and run a local workflow manifest in one call",
+	Short: "Import, bind, enable, and run a local workflow manifest in one call",
 	Long: `Imports a §5.4 workflow manifest, binds every agent_dispatch stage to
 its declared agent, and starts a run — the one-call form of
 'workflow import' + 'workflow create --bind ...' + 'workflow run'.
@@ -72,8 +73,12 @@ registered agent workloads by slug, then by name. Override any stage with
 --bind <stageOrder>=<agentWorkloadGuid>, which also covers a stage whose
 manifest names an agent that is not registered here.
 
+The newly imported definition is enabled through the platform's update API
+before launch, which requires workflow update permission. Existing definitions
+are never enabled by this command.
+
 Use --dry-run to see the resolved bindings without importing anything, and
---no-run to import and configure but not start a run.`,
+--no-run to import and configure while leaving the definition disabled for review.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
@@ -166,8 +171,17 @@ func runWorkflowRunManifest(
 	}
 
 	if runManifestNoRun {
-		fmt.Fprintf(out, "\nRun it with `astro workflow run %s`.\n", wf.Slug)
-		return nil
+		_, err := fmt.Fprintf(out, "\nDefinition remains disabled. Review it with `astro workflow definition %s`,\n"+
+			"then enable it with `astro workflow definition-enable %s`\n"+
+			"and run it with `astro workflow run %s`.\n", imported.CreatedSlug, imported.CreatedSlug, wf.Slug)
+		return err
+	}
+
+	if err := enableWorkflowDefinition(ctx, client, imported.CreatedSlug); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "Enabled definition:  %s\n", imported.CreatedSlug); err != nil {
+		return err
 	}
 
 	runID, workflowRunID, err := startConfiguredWorkflow(ctx, client, wf.GUID, inputs)

@@ -50,6 +50,9 @@ func (c *Client) BaseURL() string { return c.baseURL }
 // to that organization (the tenant middleware resolves the org by GUID).
 func (c *Client) SetOrg(orgID string) { c.orgID = orgID }
 
+// Org returns the organization selected for HTTP and WebSocket requests.
+func (c *Client) Org() string { return c.orgID }
+
 // Token returns the bearer credential the client authenticates with, so
 // the WebSocket exec dialer can set the same Authorization header the
 // GraphQL calls use.

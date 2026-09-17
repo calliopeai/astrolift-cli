@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -411,5 +412,40 @@ func TestAgentCancelSuccess(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Task task-aaa cancelled.") {
 		t.Errorf("missing success line:\n%s", out.String())
+	}
+}
+
+func TestAgentInspectPreservesEarlyFailureWithoutLogs(t *testing.T) {
+	for _, asJSON := range []bool{false, true} {
+		t.Run(fmt.Sprintf("json=%v", asJSON), func(t *testing.T) {
+			prior := agentInspectJSON
+			agentInspectJSON = asJSON
+			defer func() { agentInspectJSON = prior }()
+			var captured gqlRequest
+			const reason = "No dispatcher can provision the requested environment"
+			srv := gqlServer(t, map[string]interface{}{"agentTask": map[string]interface{}{
+				"id": "failed-before-spawn", "status": "failed", "result": nil, "failureMessage": reason,
+			}}, &captured)
+			defer srv.Close()
+			command, out := agentTestCmd()
+			if err := runAgentInspect(command, context.Background(), api.NewClient(srv.URL, "fixture-token", false), &config.Config{}, "failed-before-spawn"); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(captured.Query, "failureMessage") {
+				t.Fatal("inspect did not request the server failure reason")
+			}
+			if !strings.Contains(out.String(), reason) {
+				t.Fatalf("missing failure reason: %q", out.String())
+			}
+			if asJSON {
+				var record map[string]interface{}
+				if err := json.Unmarshal(out.Bytes(), &record); err != nil {
+					t.Fatal(err)
+				}
+				if record["failureMessage"] != reason {
+					t.Fatalf("failureMessage = %v", record["failureMessage"])
+				}
+			}
+		})
 	}
 }

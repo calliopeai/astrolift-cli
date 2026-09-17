@@ -186,22 +186,67 @@ the status note above.)
 | `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
 | `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`, `workloads`, `vnc`, `send`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <workflow-slug>` is the distinct WorkflowDefinition seam (`runWorkflowDefinition`). `workloads ls` enumerates the org's registered `kind=agent` workloads, carrying both the slug `dispatch` takes and the GUID `workflow create --bind` takes. `vnc <task-id>` resolves a task to the absolute console URL that serves its live VNC viewer (the stored `vnc_url` is a root-relative WebSocket relay path, not openable). `send <task-id> <input>` queues a follow-up prompt for a task that is already running (`--stdin` for multi-line input; `--json`) — the steering channel: the message is applied at the agent's next turn boundary, so a send means queued, not read, and `deliveredAt` is what answers that. The task must be running, and not every agent runtime can accept a follow-up prompt; one that cannot leaves the message queued rather than dropping it. |
 | `astro box` | Agent-boxes: warm containers an interactive agent session attaches to (`ensure`, `ls`, `rm`, `attach`). Unlike `agent dispatch`, which starts a batch run that ends, a box holds a tmux session open and waits, so the agent survives a dropped connection, an IDE restart, or a closed laptop, and more than one person can watch it. `ensure` is idempotent by design — it is what a button calls, so pressing it twice attaches to the box you already have rather than starting a rival one on a second node; a box that was idle-reaped restarts under the same slug, so a stored address keeps working. Name what to run with `--agent` (a registered agent whose run mode is `persistent`) or `--env-spec` (which is where the image and the secret packet come from). `--idle-timeout` takes `90m`, a number of seconds, or `never`, and is measured from the last pane activity rather than the last attach, so an agent working while you are away keeps its box. `ls` shows warm boxes only (`--all` includes the settled ones, which is how you find out why a box went away). `attach` ensures, waits, and joins the session; detaching leaves the agent running. Note: `attach` does not work yet — the exec relay admits registered apps only and a box is not one, so it fails as a permission error; tracked in calliopeai/astrolift#129. `ensure`, `ls` and `rm` are unaffected. |
-| `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, control, and delete organization workflows. `validate --server` is authoritative for the selected install. `run-manifest <file.toml>` collapses `import` → `create --bind` → `run` into one call, resolving each `agent_dispatch` stage's declared agent against the org's registered workloads (`--dry-run` shows the resolved bindings; `--no-run` stops after configuring). `run-cancel <slug>` stops an in-flight run — cooperatively by default so a run that owns external resources tears them down, or `--terminate --reason <text>` to hard-kill a wedged one; `--run <guid>` picks a run other than the newest, `--yes` is the confirmation (no prompt), and a run that is already terminal is refused before anything is sent. `run-show <slug>` prints a run stage by stage: order, kind, role, status, attempt, timings, and for a `human_gate` its gate state (pending / approved / rejected / closed) plus the approvers the stage declares, so "waiting on approval, and on whom" is read from the platform. Deciding a gate is not a CLI operation. Repository registration separately reconciles `workflows/**/*.toml`. |
+| `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, control, and delete organization workflows. `validate --server` is authoritative for the selected install. `run-manifest <file.toml>` collapses `import` → `create --bind` → activation → `run` into one call, resolving each `agent_dispatch` stage's declared agent against the org's registered workloads (`--dry-run` shows the resolved bindings; `--no-run` leaves the imported definition disabled for review). Launching enables only the newly imported definition through the platform update API and requires workflow update permission. Use `definition <slug>` to review an import and `definition-enable <slug>` to enable it explicitly; `workflow run` never enables existing definitions implicitly. `run-cancel <slug>` stops an in-flight run — cooperatively by default so a run that owns external resources tears them down, or `--terminate --reason <text>` to hard-kill a wedged one; `--run <guid>` picks a run other than the newest, `--yes` is the confirmation (no prompt), and a run that is already terminal is refused before anything is sent. `run-show <slug>` prints a run stage by stage: order, kind, role, status, attempt, timings, and for a `human_gate` its gate state (pending / approved / rejected / closed) plus the approvers the stage declares, so "waiting on approval, and on whom" is read from the platform. Deciding a gate is not a CLI operation. Repository registration separately reconciles `workflows/**/*.toml`. |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. `render` prints the manifests the platform would apply (`astroliftRenderedManifest`) for pre-merge review. |
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `project resources` discovers the selected cluster's full provider catalogue and manages project-owned shared services and their app/agent attachments. |
 | `astro operator` | Operator (admin) cluster, provider, and federation management. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
+| `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
 | `astro onboard` | Set an AI coding agent up against the selected install in one call: writes an MCP server entry pointing at the install's gateway, installs the bundled skill catalogue, and drops the offline guides as agent context. Components are selectable with `--only mcp,skills,docs`, the layout with `--target claude\|codex\|both`, and `--dry-run` reports the plan without touching the filesystem. Existing files are reported and left alone unless `--force`. Authentication is reported, never performed. |
 | `astro docs` | Open public docs, read embedded release-matched topics, or export portable Markdown and man pages. |
 | `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. |
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
 
 Every command supports `--json` for machine-readable output, plus
-`--api-url`, `--token`, `--org`, `--team`, `--project`, `--app`,
+`--server`, `--api-url`, `--token`, `--org`, `--team`, `--project`, `--app`,
 `--no-color`, `--no-prompt`, and `--debug` as global flags. Errors go
 to stderr; data goes to stdout.
+
+### Exact workflow executions
+
+Use the `WorkflowRun` ID returned by `workflow run`, `workflow run-manifest`, or
+`agent run` to observe either a configured workflow or a definition directly.
+`execution` looks up that record even after it leaves the recent-run list:
+
+```bash
+astro --server <server> --org <organization> workflow execution <id> --json
+astro --server <server> --org <organization> workflow execution <id> --watch
+astro --server <server> --org <organization> workflow execution-stop <id> --yes
+astro --server <server> --org <organization> workflow execution-cleanup <id> --yes
+astro --server <server> --org <organization> workflow execution-stages <id>
+```
+
+Keep the original server and organization when revisiting a run. The returned
+execution GUID also works as `<id>`; a configured workflow instance ID from
+`workflow runs` is a different identifier. `--workflow-id` and `--run-id` can
+require the original Temporal workflow and execution IDs. Stop and cleanup
+first verify the exact record, then pin both Temporal IDs in their request.
+`execution-stop --terminate --reason <text> --yes` requests hard termination.
+
+The JSON record separates `status` / `isTerminal` from `taskCleanup` (status,
+remaining tasks, errors, and retryability). A successful control prints
+`requested: true`, meaning the request was acknowledged; it does not mean the
+execution has closed or its resources are gone. Cleanup is allowed only after
+verified closure and retries one owned task per call; the platform's scheduled
+reconciler also retries unfinished cleanup. Watch keeps observing until closure
+and cleanup are both verified, for up to 30 minutes. With `--json --watch` only
+the final record is printed. An unavailable observation retains the last state
+with `observationError` and cannot be used to initiate control. These commands
+require a server exposing `workflowExecution` and `controlWorkflowExecution`.
+
+Use `astro --server <registered-slug> --org <organization> box ls --json` to
+address one install without changing `astro server use` or another client's
+selection. The endpoint and stored credentials both come from that server.
+Authentication and onboarding accept the same selector. Unknown servers fail;
+an API URL override must match the explicitly selected registered server.
+Without `--server`, the saved selection and existing override behavior apply.
+Box attachment, removal, and `exec` resolve `--org` before addressing a target.
+HTTP requests and terminal WebSocket handshakes carry the selected organization.
+API tokens remain tied to their issuing organization; use credentials for the
+selected organization. Older control planes may silently ignore a conflicting
+organization header, so they require a server update to reject that mismatch.
 
 Run `astro <command> --help` for the full flag set; the help text is
 the source of truth.
@@ -388,3 +433,21 @@ Copyright (c) 2026 Calliope Labs Inc. Calliope AI is a trademark of Calliope
 Labs Inc.
 
 Portions of the framework underlying this repo are derived from **[boilerworks](https://github.com/ConflictHQ/boilerworks)** (Copyright (c) Conflict LLC, MIT-licensed). Tip of the hat 🎩
+
+### Agent log following
+
+`astro agent logs <task-id> --follow` and `astro agent dispatch <agent-slug> --tail`
+poll recent pod log snapshots. Following continues when the tail reaches its
+line limit, matching overlapping lines instead of relying on a growing count.
+If snapshots no longer overlap, the available tail is printed again. The API
+has no log cursor: lines that expire between polls cannot be recovered, and
+identical full snapshots cannot reveal whether more identical lines were written.
+Use `agent logs --tail <n>` to request a larger recent window when needed.
+
+Task dispatch, inspection, logs, replies, cancellation and VNC lookup resolve
+`--org` (or the saved working organization) before making task requests. An
+unknown organization fails before any task operation is sent.
+
+`astro agent inspect <task-id>` also reports the control plane's recorded failure
+reason in text and JSON output. This remains available for failures before a
+pod starts, when there are no pod logs to inspect.
