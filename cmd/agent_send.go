@@ -100,7 +100,7 @@ silently stranded.`,
 		if err != nil {
 			return err
 		}
-		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
