@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add `agent send --request-id` and `agent input-receipt` to recover queued
+  steering after a lost reply without submitting a duplicate instruction.
+
 - Add per-command `--server` selection for registered endpoints and their
   credentials without changing the saved default. Reject conflicting endpoint
   overrides before using credentials. Box attachment, removal, and exec honor
