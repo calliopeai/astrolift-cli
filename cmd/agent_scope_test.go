@@ -15,7 +15,7 @@ func TestAgentCommandsHonorOrganizationBeforeTaskRequests(t *testing.T) {
 	oldYes := agentCancelYes
 	agentCancelYes = true
 	t.Cleanup(func() { agentCancelYes = oldYes })
-	for _, command := range []*cobra.Command{agentInspectCmd, agentLogsCmd, agentSendCmd, agentCancelCmd, agentDispatchCmd} {
+	for _, command := range []*cobra.Command{agentInspectCmd, agentLogsCmd, agentSendCmd, agentInputReceiptCmd, agentCancelCmd, agentDispatchCmd} {
 		for _, organization := range []string{"selected-org", "missing-org"} {
 			t.Run(command.Name()+"/"+organization, func(t *testing.T) {
 				operations := 0
@@ -37,11 +37,12 @@ func TestAgentCommandsHonorOrganizationBeforeTaskRequests(t *testing.T) {
 							t.Error("task operation did not use selected organization")
 						}
 						data = map[string]interface{}{
-							"agentTask":          map[string]string{"id": "task", "status": "failed"},
-							"agentTaskLogs":      []string{"fixture log"},
-							"sendAgentTaskInput": map[string]interface{}{"ok": true},
-							"cancelTask":         map[string]interface{}{"ok": true},
-							"runAstroliftAgent":  map[string]interface{}{"ok": true, "data": map[string]string{"id": "task", "status": "pending"}},
+							"agentTask":             map[string]string{"id": "task", "status": "failed"},
+							"agentTaskLogs":         []string{"fixture log"},
+							"sendAgentTaskInput":    map[string]interface{}{"ok": true, "data": map[string]string{"id": "input", "message": "continue"}},
+							"agentTaskInputMessage": map[string]string{"id": "input", "clientRequestId": receiptRequestID, "message": "continue"},
+							"cancelTask":            map[string]interface{}{"ok": true},
+							"runAstroliftAgent":     map[string]interface{}{"ok": true, "data": map[string]string{"id": "task", "status": "pending"}},
 						}
 					}
 					if err := json.NewEncoder(w).Encode(map[string]interface{}{"data": data}); err != nil {
@@ -52,6 +53,7 @@ func TestAgentCommandsHonorOrganizationBeforeTaskRequests(t *testing.T) {
 				serverSelectionFixture(t, server.URL)
 				invocation, _ := agentTestCmd()
 				invocation.SetContext(context.Background())
+				invocation.Flags().String("request-id", receiptRequestID, "")
 				if err := invocation.Flags().Set("org", organization); err != nil {
 					t.Fatal(err)
 				}
