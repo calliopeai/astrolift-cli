@@ -193,9 +193,6 @@ func TestAppSecretsCreateSendsSetAppSecretWithDefaults(t *testing.T) {
 	if input["appSlug"] != "web" || input["key"] != "API_KEY" || input["value"] != "s3cr3t" {
 		t.Errorf("input = %#v", input)
 	}
-	if input["scope"] != "all" {
-		t.Errorf("scope default = %v, want all", input["scope"])
-	}
 	if input["setVia"] != "cli" {
 		t.Errorf("setVia default = %v, want cli", input["setVia"])
 	}
@@ -207,10 +204,69 @@ func TestAppSecretsCreateSendsSetAppSecretWithDefaults(t *testing.T) {
 	}
 }
 
-func TestAppSecretsCreateHonorsScopeAndSetViaFlags(t *testing.T) {
+// A bare --scope default of "all" would silently widen an existing
+// production-only (or preview-only) secret to every environment the moment
+// its value is rotated without also repeating --scope. scope must only ride
+// along when the operator explicitly passed it.
+func TestAppSecretsCreateOmitsScopeWhenNotExplicitlyPassed(t *testing.T) {
 	resetAppSecretsFlags()
 	defer resetAppSecretsFlags()
-	appSecretsCreateScope = "preview:feat/x"
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"setAppSecret": map[string]interface{}{
+			"ok": true, "errors": []interface{}{},
+			"data": map[string]interface{}{"appSlug": "web", "key": "K", "rawManifestStaged": ""},
+		},
+	}, &captured)
+	defer srv.Close()
+
+	// appTestCmd() registers no --scope flag, so cmd.Flags().Changed("scope")
+	// reports false here exactly as it would for a real invocation that
+	// never passed --scope.
+	cmd, _ := appTestCmd()
+	if err := runAppSecretsCreate(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "K", "v"); err != nil {
+		t.Fatalf("runAppSecretsCreate: %v", err)
+	}
+	input := captured.Variables["input"].(map[string]interface{})
+	if _, ok := input["scope"]; ok {
+		t.Errorf("scope should be omitted when --scope is not passed, got %v", input["scope"])
+	}
+}
+
+func TestAppSecretsCreateSendsExplicitScope(t *testing.T) {
+	resetAppSecretsFlags()
+	defer resetAppSecretsFlags()
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"setAppSecret": map[string]interface{}{
+			"ok": true, "errors": []interface{}{},
+			"data": map[string]interface{}{"appSlug": "web", "key": "K", "rawManifestStaged": ""},
+		},
+	}, &captured)
+	defer srv.Close()
+
+	// Registering --scope on this cmd's own FlagSet and Set()-ing it marks
+	// Changed("scope") true, exactly as cobra would after parsing a real
+	// --scope flag on the command line.
+	cmd, _ := appTestCmd()
+	cmd.Flags().StringVar(&appSecretsCreateScope, "scope", "all", "")
+	if err := cmd.Flags().Set("scope", "preview:feat/x"); err != nil {
+		t.Fatalf("setting --scope: %v", err)
+	}
+	if err := runAppSecretsCreate(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "K", "v"); err != nil {
+		t.Fatalf("runAppSecretsCreate: %v", err)
+	}
+	input := captured.Variables["input"].(map[string]interface{})
+	if input["scope"] != "preview:feat/x" {
+		t.Errorf("scope = %#v, want preview:feat/x", input["scope"])
+	}
+}
+
+func TestAppSecretsCreateHonorsSetViaFlag(t *testing.T) {
+	resetAppSecretsFlags()
+	defer resetAppSecretsFlags()
 	appSecretsCreateSetVia = "web"
 
 	var captured gqlRequest
@@ -227,8 +283,8 @@ func TestAppSecretsCreateHonorsScopeAndSetViaFlags(t *testing.T) {
 		t.Fatalf("runAppSecretsCreate: %v", err)
 	}
 	input := captured.Variables["input"].(map[string]interface{})
-	if input["scope"] != "preview:feat/x" || input["setVia"] != "web" {
-		t.Errorf("input = %#v", input)
+	if input["setVia"] != "web" {
+		t.Errorf("setVia = %#v, want web", input["setVia"])
 	}
 }
 
