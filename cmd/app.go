@@ -267,17 +267,17 @@ Subcommands typically include: list, show, create, update, delete.`, summary),
 	}
 }
 
-var appSecretsCmd = newSubResourceCmd("secrets", "Manage app secrets (#5)")
-var appServicesCmd = newSubResourceCmd("services", "Manage bound managed services")
-var appDomainsCmd = newSubResourceCmd("domains", "Manage custom domains")
 var appTokensCmd = newSubResourceCmd("tokens", "Manage deploy tokens")
 var appMembersCmd = newSubResourceCmd("members", "Manage app team members")
 var appJobsCmd = newSubResourceCmd("jobs", "Manage scheduled jobs")
-var appEventsCmd = newSubResourceCmd("events", "Show app event log (#12)")
 var appAuditCmd = newSubResourceCmd("audit", "Show app audit log (#12)")
 
 // app logs and app exec are wired in cmd/app_lifecycle.go.
 // app previews is a real command group, wired in cmd/app_previews.go.
+// app secrets is a real command group, wired in cmd/app_secrets.go.
+// app services is a real command group, wired in cmd/app_services.go.
+// app domains is a real command group, wired in cmd/app_domains.go.
+// app events is a real command group, wired in cmd/app_events.go.
 
 func init() {
 	appRegisterCmd.Flags().StringVarP(&appRegisterFile, "file", "f", "astrolift.toml", "Path to the app manifest (default: astrolift.toml)")

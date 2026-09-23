@@ -8,6 +8,17 @@
   the selected organization in HTTP requests and terminal WebSocket handshakes
   (#100).
 
+- Implement `astro app secrets` (`list`/`create`/`delete`, over
+  `setAppSecret`/`deleteAppSecret`), `astro app events` (`list`, also runs
+  bare), `astro app services list`, and `astro app domains list` against the
+  real GraphQL API. All four previously printed the generic sub-resource
+  placeholder ("Subcommands typically include...") and did nothing. `secrets
+  list` returns metadata only and never a value; `create`/`delete` report a
+  queued proposal id instead of an applied write on installs that require
+  secret-change approval. `services`/`domains` are read-only for now; managed
+  service provisioning remains `astro project resources`
+  (calliopeai/astrolift-cli#91, calliopeai/astrolift-cli#99).
+
 ## 0.7.0 — 2026-08-21
 
 ### Changed
