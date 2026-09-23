@@ -45,8 +45,13 @@ longhorn:
 # Cluster essentials
 # -----------------------------------------------------------------------------
 
-# cert-manager: enabled with CRDs.
+# cert-manager: enabled with CRDs. `certManager.enabled` is condition-only.
+# Real subchart values go under the hyphenated `cert-manager:` key below,
+# because the dependency has no `alias` (see values.yaml, #1695 defect 3).
 certManager:
+  enabled: true
+
+cert-manager:
   enabled: true
   installCRDs: true
 
