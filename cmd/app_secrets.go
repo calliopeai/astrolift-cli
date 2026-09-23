@@ -29,6 +29,14 @@
 // what #99 asked for, and the platform's own proven workaround
 // (setAppSecret with appSlug/key/value/scope/setVia) didn't use them
 // either.
+//
+// create sends scope only when --scope was explicitly passed
+// (cmd.Flags().Changed). The mutation's scope default of "all" would
+// otherwise silently widen an existing production-only (or preview-only)
+// secret to every environment on a routine value rotation -- rotating a
+// key without remembering to repeat --scope production would leak it to
+// preview. astrolift-app#1915 makes the server keep the existing scope
+// when scope is omitted; this is the client half of that fix.
 package cmd
 
 import (
@@ -246,7 +254,13 @@ func runAppSecretsCreate(cmd *cobra.Command, ctx context.Context, client *api.Cl
 		"appSlug": appSlug,
 		"key":     key,
 		"value":   value,
-		"scope":   appSecretsCreateScope,
+	}
+	// Only send scope when the operator explicitly asked for it. The
+	// mutation input defaults scope to "all", so sending it unconditionally
+	// would widen an existing production-only secret to every environment
+	// the moment its value gets rotated without also repeating --scope.
+	if cmd.Flags().Changed("scope") {
+		input["scope"] = appSecretsCreateScope
 	}
 	if setVia := strings.TrimSpace(appSecretsCreateSetVia); setVia != "" {
 		input["setVia"] = setVia
@@ -380,7 +394,7 @@ func init() {
 
 	appSecretsCreateCmd.Flags().StringVar(&appSecretsCreateValue, "value", "", "Secret value (avoid -- lands in shell history; prefer --stdin/prompt)")
 	appSecretsCreateCmd.Flags().BoolVar(&appSecretsCreateStdin, "stdin", false, "Read the value from stdin")
-	appSecretsCreateCmd.Flags().StringVar(&appSecretsCreateScope, "scope", "all", `Visibility scope: "all", an environment name, or "preview:<branch>"`)
+	appSecretsCreateCmd.Flags().StringVar(&appSecretsCreateScope, "scope", "", `Visibility scope: "all", an environment name, or "preview:<branch>". Default: keep the existing scope; "all" for a new secret.`)
 	appSecretsCreateCmd.Flags().StringVar(&appSecretsCreateSetVia, "set-via", "cli", "Recorded source of this write, shown on the secret's metadata")
 
 	appSecretsDeleteCmd.Flags().BoolVarP(&appSecretsDeleteYes, "yes", "y", false, "Skip the confirmation prompt")
