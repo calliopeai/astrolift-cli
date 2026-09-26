@@ -176,3 +176,37 @@ func RefreshCredentials(ctx context.Context, apiURL, refreshToken string) (*Cred
 	}
 	return &creds, nil
 }
+
+// SignOut ends the device-flow session that owns refreshToken at the
+// server: the access token stops authenticating and the refresh
+// chain dies, the same way it would on its own after the access
+// token's TTL and then the refresh chain's TTL both elapsed. Proof of
+// possession of the refresh secret is the only credential this needs,
+// same as RefreshCredentials.
+//
+// The server always answers 200 whether or not the token was still
+// live, so the only error this returns is a transport/HTTP failure --
+// callers that are about to delete the same local credentials anyway
+// (`astro auth logout`) should treat that as non-fatal.
+func SignOut(ctx context.Context, apiURL, refreshToken string) error {
+	url := strings.TrimSuffix(apiURL, "/") + "/api/cli/v1/auth/signout"
+	body, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth/signout: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("auth/signout returned %d: %s", resp.StatusCode, respBody)
+	}
+	return nil
+}
