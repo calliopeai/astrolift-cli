@@ -280,8 +280,10 @@ rejection noted "gate timed out". The gate state describes the stage: a run
 cancelled while a gate was open leaves that gate open, so read it against the
 run state printed above it.
 
-Deciding a gate is not a CLI operation — approvers act through the platform,
-where RBAC applies. This is read-only.
+This is read-only. Decide a pending gate with
+` + "`astro workflow gate <definition-slug> --decision approve|reject`" + `
+(#1820); list every pending gate across the org with
+` + "`astro workflow gates`" + `.
 
 By default this shows the newest run; --run <guid> selects one from
 ` + "`astro workflow runs <slug>`" + `.`,
