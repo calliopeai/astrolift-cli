@@ -599,6 +599,113 @@ func TestWorkflowImportSurfacesErrorEnvelope(t *testing.T) {
 	}
 }
 
+// ---- import --replace (#1822) -----------------------------------------------
+
+func TestWorkflowImportReplaceSendsFlag(t *testing.T) {
+	workflowImportPreview = false
+	workflowImportReplace = true
+	defer func() { workflowImportReplace = false }()
+
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"importWorkflowManifest": map[string]interface{}{
+			"ok": true, "errors": []interface{}{}, "createdSlug": "feature-dev",
+			"mode": "created", "repointedSlugs": []interface{}{}, "manifest": nil,
+		},
+	}, &captured)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out, _ := workflowTestCmd()
+	if err := runWorkflowImport(cmd, context.Background(), client, "[workflow]\nslug=\"feature-dev\"\n"); err != nil {
+		t.Fatalf("import --replace: %v", err)
+	}
+	if captured.Variables["replace"] != true {
+		t.Errorf("replace var = %v, want true", captured.Variables["replace"])
+	}
+	if !strings.Contains(captured.Query, "$replace") {
+		t.Errorf("query did not declare $replace:\n%s", captured.Query)
+	}
+	if !strings.Contains(out.String(), "Imported workflow definition: feature-dev") {
+		t.Errorf("output wrong for mode=created:\n%s", out.String())
+	}
+}
+
+func TestWorkflowImportReplacePrintsUpdatedInPlace(t *testing.T) {
+	workflowImportPreview = false
+	workflowImportReplace = true
+	defer func() { workflowImportReplace = false }()
+
+	srv := gqlServer(t, map[string]interface{}{
+		"importWorkflowManifest": map[string]interface{}{
+			"ok": true, "errors": []interface{}{}, "createdSlug": "feature-dev",
+			"mode": "updated_in_place", "repointedSlugs": []interface{}{}, "manifest": nil,
+		},
+	}, nil)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out, _ := workflowTestCmd()
+	if err := runWorkflowImport(cmd, context.Background(), client, "[workflow]\nslug=\"feature-dev\"\n"); err != nil {
+		t.Fatalf("import --replace: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "Updated workflow definition in place: feature-dev") ||
+		!strings.Contains(got, "keep working unchanged") {
+		t.Errorf("output wrong for mode=updated_in_place:\n%s", got)
+	}
+}
+
+func TestWorkflowImportReplacePrintsVersionedWithRepoints(t *testing.T) {
+	workflowImportPreview = false
+	workflowImportReplace = true
+	defer func() { workflowImportReplace = false }()
+
+	srv := gqlServer(t, map[string]interface{}{
+		"importWorkflowManifest": map[string]interface{}{
+			"ok": true, "errors": []interface{}{}, "createdSlug": "feature-dev-1",
+			"mode": "versioned", "repointedSlugs": []interface{}{"nightly-feature-dev"}, "manifest": nil,
+		},
+	}, nil)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, out, _ := workflowTestCmd()
+	if err := runWorkflowImport(cmd, context.Background(), client, "[workflow]\nslug=\"feature-dev\"\n"); err != nil {
+		t.Fatalf("import --replace: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "Versioned workflow definition: feature-dev-1") ||
+		!strings.Contains(got, "Repointed 1 configured workflow(s): nightly-feature-dev") {
+		t.Errorf("output wrong for mode=versioned:\n%s", got)
+	}
+}
+
+func TestWorkflowImportReplaceBlockedSurfacesError(t *testing.T) {
+	workflowImportPreview = false
+	workflowImportReplace = true
+	defer func() { workflowImportReplace = false }()
+
+	srv := gqlServer(t, map[string]interface{}{
+		"importWorkflowManifest": map[string]interface{}{
+			"ok": false,
+			"errors": []interface{}{
+				map[string]interface{}{"field": "workflow.nightly-feature-dev",
+					"messages": []interface{}{"Unbound agent_dispatch stage(s): stage 0"}},
+			},
+			"createdSlug": nil, "mode": nil, "repointedSlugs": []interface{}{}, "manifest": nil,
+		},
+	}, nil)
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "tok", false)
+	cmd, _, _ := workflowTestCmd()
+	err := runWorkflowImport(cmd, context.Background(), client, "[workflow]\nslug=\"feature-dev\"\n")
+	if err == nil || !strings.Contains(err.Error(), "Unbound agent_dispatch stage") {
+		t.Fatalf("expected blocked envelope error surfaced, got %v", err)
+	}
+}
+
 // ---- delete / definition-delete -----------------------------------------------
 
 func TestWorkflowDeleteRefusesWithoutYes(t *testing.T) {
