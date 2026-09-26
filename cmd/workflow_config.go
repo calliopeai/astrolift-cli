@@ -9,7 +9,9 @@
 //   - create      — configure a Workflow from a visible definition
 //   - run         — start a configured Workflow's run (tier 3)
 //   - runs        — list a Workflow's runs; --watch polls until terminal
-//   - import      — importWorkflowManifest (--preview to validate only)
+//   - import      — importWorkflowManifest (--preview to validate only,
+//     --replace to upsert the org's own definition in place instead of
+//     always creating a new one)
 //   - delete      — soft-delete a configured Workflow (+ schedule teardown)
 //   - definition-delete — soft-delete an org-owned WorkflowDefinition
 //
@@ -21,7 +23,9 @@
 //   - create      → createWorkflow(...) → { ok, errors, workflow }
 //   - run         → workflow(slug) then runWorkflow(workflowId, inputs)
 //   - runs        → workflow(slug) then workflowRuns(workflowId)
-//   - import      → importWorkflowManifest(toml, preview)
+//   - import      → importWorkflowManifest(toml, preview, replace) →
+//     { ok, errors, createdSlug, mode, repointedSlugs }; mode is one of
+//     "created" / "updated_in_place" / "versioned" (#1822)
 //   - delete      → deleteWorkflow(slug) → MutationResult
 //   - definition-delete → deleteWorkflowDefinition(slug) → MutationResult
 //
@@ -68,6 +72,7 @@ var (
 	workflowRunsWatch bool
 
 	workflowImportPreview bool
+	workflowImportReplace bool
 
 	workflowDeleteYes    bool
 	workflowDefDeleteYes bool
@@ -142,11 +147,13 @@ const workflowRunsQuery = `query($workflowId: ID!) {
   }
 }`
 
-const importWorkflowManifestMutation = `mutation($toml: String!, $preview: Boolean!) {
-  importWorkflowManifest(toml: $toml, preview: $preview) {
+const importWorkflowManifestMutation = `mutation($toml: String!, $preview: Boolean!, $replace: Boolean = false) {
+  importWorkflowManifest(toml: $toml, preview: $preview, replace: $replace) {
     ok
     errors { field messages }
     createdSlug
+    mode
+    repointedSlugs
     manifest {
       definition { slug name pattern description }
       stages {
@@ -772,6 +779,13 @@ importWorkflowManifest. With --preview the server only validates and returns
 the parsed structure — nothing is persisted. The persisting import prints the
 created definition slug.
 
+--replace upserts the org's own definition sharing the manifest's slug
+instead of always creating a new one (` + "`<slug>-1`" + `, ` + "`<slug>-2`" + `, ...): in
+place when the stage kinds are unchanged, so every configured Workflow,
+its bindings and its Temporal schedule keep working untouched; otherwise
+as a new version with every configured Workflow repointed to it, or a
+clear refusal (nothing changed) when a repoint would break one's bindings.
+
 The inverse of ` + "`astro workflow pull`" + ` (alias: export).`,
 	Args: cobra.ExactArgs(1),
 	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
@@ -789,16 +803,20 @@ func runWorkflowImport(cmd *cobra.Command, ctx context.Context, client *api.Clie
 
 	var resp struct {
 		Result struct {
-			Ok          bool             `json:"ok"`
-			Errors      validationErrors `json:"errors"`
-			CreatedSlug *string          `json:"createdSlug"`
-			Manifest    *struct {
+			Ok             bool             `json:"ok"`
+			Errors         validationErrors `json:"errors"`
+			CreatedSlug    *string          `json:"createdSlug"`
+			Mode           *string          `json:"mode"`
+			RepointedSlugs []string         `json:"repointedSlugs"`
+			Manifest       *struct {
 				Definition *workflowPreviewDef    `json:"definition"`
 				Stages     []workflowPreviewStage `json:"stages"`
 			} `json:"manifest"`
 		} `json:"importWorkflowManifest"`
 	}
-	vars := map[string]interface{}{"toml": content, "preview": workflowImportPreview}
+	vars := map[string]interface{}{
+		"toml": content, "preview": workflowImportPreview, "replace": workflowImportReplace,
+	}
 	if err := client.GraphQL(importCtx, importWorkflowManifestMutation, vars, &resp); err != nil {
 		return fmt.Errorf("importing manifest: %w", err)
 	}
@@ -821,7 +839,24 @@ func runWorkflowImport(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	if resp.Result.CreatedSlug != nil {
 		created = *resp.Result.CreatedSlug
 	}
-	fmt.Fprintf(out, "Imported workflow definition: %s\n", created)
+
+	mode := ""
+	if resp.Result.Mode != nil {
+		mode = *resp.Result.Mode
+	}
+	switch mode {
+	case "updated_in_place":
+		fmt.Fprintf(out, "Updated workflow definition in place: %s\n", created)
+		fmt.Fprintln(out, "Configured Workflows, bindings and schedules keep working unchanged.")
+	case "versioned":
+		fmt.Fprintf(out, "Versioned workflow definition: %s\n", created)
+		if len(resp.Result.RepointedSlugs) > 0 {
+			fmt.Fprintf(out, "Repointed %d configured workflow(s): %s\n",
+				len(resp.Result.RepointedSlugs), strings.Join(resp.Result.RepointedSlugs, ", "))
+		}
+	default:
+		fmt.Fprintf(out, "Imported workflow definition: %s\n", created)
+	}
 	return nil
 }
 
@@ -950,6 +985,7 @@ func init() {
 
 	// import
 	workflowImportCmd.Flags().BoolVar(&workflowImportPreview, "preview", false, "Validate server-side only; persist nothing")
+	workflowImportCmd.Flags().BoolVar(&workflowImportReplace, "replace", false, "Upsert the org's own definition sharing this slug instead of always creating a new one")
 
 	// delete / definition-delete
 	workflowDeleteCmd.Flags().BoolVarP(&workflowDeleteYes, "yes", "y", false, "Confirm the deletion (required to proceed)")
