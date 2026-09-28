@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `astro auth login --scope clusters` asks for the CLI's usual scopes plus
+  `write:clusters` and `manage:clusters` (astrolift-app#2120), so an operator
+  can set a cluster's config or run its recipe without minting an admin token.
+  The approval page lists the scopes asked for. Needs a server with #2120.
+
 - Add per-command `--server` selection for registered endpoints and their
   credentials without changing the saved default. Reject conflicting endpoint
   overrides before using credentials. Box attachment, removal, and exec honor

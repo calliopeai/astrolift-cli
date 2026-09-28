@@ -31,6 +31,7 @@ var authCmd = &cobra.Command{
 var (
 	loginNoWait    bool
 	loginNoBrowser bool
+	loginScope     string
 )
 
 var authLoginCmd = &cobra.Command{
@@ -80,7 +81,11 @@ MCP gateway alike.`,
 		if !asJSON {
 			fmt.Fprintf(out, "Starting login flow against %s...\n", entry.APIURL)
 		}
-		session, err := auth.StartLogin(startCtx, entry.APIURL)
+		clientKind, err := auth.ClientKindForScope(loginScope)
+		if err != nil {
+			return err
+		}
+		session, err := auth.StartLogin(startCtx, entry.APIURL, clientKind)
 		if err != nil {
 			return fmt.Errorf("starting login: %w", err)
 		}
@@ -320,6 +325,8 @@ var authRefreshCmd = &cobra.Command{
 func init() {
 	authLoginCmd.Flags().BoolVar(&loginNoWait, "no-wait", false,
 		"start the flow, report the session, and exit without polling")
+	authLoginCmd.Flags().StringVar(&loginScope, "scope", "",
+		"ask for more than the CLI default: clusters (update and operate clusters, #2120)")
 	authLoginCmd.Flags().BoolVar(&loginNoBrowser, "no-browser", false,
 		"do not try to open a browser")
 
