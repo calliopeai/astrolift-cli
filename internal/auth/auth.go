@@ -52,10 +52,31 @@ var ErrPending = errors.New("auth: login pending")
 // before the user completed it.
 var ErrExpired = errors.New("auth: session expired; run `astro auth login` again")
 
-// StartLogin initiates the browser device flow.
-func StartLogin(ctx context.Context, apiURL string) (*LoginSession, error) {
+// ClientKindForScope maps `astro auth login --scope` to the device-flow
+// client kind the server keys its scope ceiling on. The approval page lists
+// the scopes, so the approver sees what the login asks for.
+func ClientKindForScope(scope string) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(scope)) {
+	case "", "default":
+		return "", nil
+	case "clusters":
+		// The CLI's scopes plus write:clusters and manage:clusters (#2120),
+		// for an operator who would otherwise mint an admin token.
+		return "cli-operator", nil
+	default:
+		return "", fmt.Errorf("unknown --scope %q (want: clusters)", scope)
+	}
+}
+
+// StartLogin initiates the browser device flow. An empty clientKind sends no
+// kind, which the server treats as the plain CLI.
+func StartLogin(ctx context.Context, apiURL, clientKind string) (*LoginSession, error) {
 	url := strings.TrimSuffix(apiURL, "/") + "/api/cli/v1/auth/start"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte("{}")))
+	body := []byte("{}")
+	if clientKind != "" {
+		body, _ = json.Marshal(map[string]string{"client_kind": clientKind})
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
