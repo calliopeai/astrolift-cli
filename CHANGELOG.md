@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- `astro app access show|allow|deny|clear [app] [--group g] [--user email]`
+  restricts who may enter an app behind central auth (astrolift-app#2132). A
+  change that would lock someone out names them and asks first (`--yes` to
+  skip); an app whose astrolift.toml sets `[ingress.access]` is left to the
+  repo.
+
+- `astro auth-users list|create|set-password|reset-password|disable|enable|delete|groups|group-create <cluster> ...`
+  manages who can sign in to the apps behind a cluster's central auth
+  (astrolift-app#2131). Passwords come from a hidden prompt or
+  `--password-stdin`, never a flag; `create` without one has the provider
+  email a temporary password. `astro auth login --scope clusters` now also
+  asks for `manage:auth-users` and `write:app-access`.
+
+- `astro auth login --scope clusters` asks for the CLI's usual scopes plus
+  `write:clusters` and `manage:clusters` (astrolift-app#2120), so an operator
+  can set a cluster's config or run its recipe without minting an admin token.
+  The approval page lists the scopes asked for. Needs a server with #2120.
+
 - Add per-command `--server` selection for registered endpoints and their
   credentials without changing the saved default. Reject conflicting endpoint
   overrides before using credentials. Box attachment, removal, and exec honor
