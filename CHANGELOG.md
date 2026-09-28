@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `astro app access show|allow|deny|clear [app] [--group g] [--user email]`
+  restricts who may enter an app behind central auth (astrolift-app#2132). A
+  change that would lock someone out names them and asks first (`--yes` to
+  skip); an app whose astrolift.toml sets `[ingress.access]` is left to the
+  repo.
+
 - `astro auth-users list|create|set-password|reset-password|disable|enable|delete|groups|group-create <cluster> ...`
   manages who can sign in to the apps behind a cluster's central auth
   (astrolift-app#2131). Passwords come from a hidden prompt or
