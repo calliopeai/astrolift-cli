@@ -67,6 +67,7 @@ var (
 	envSpecManifestPath string
 	envSpecAllowInstall bool
 	envSpecVNC          bool
+	envSpecNonRoot      bool
 	envSpecEnv          []string
 	envSpecSecret       []string
 )
@@ -142,6 +143,7 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 	if envSpecManifestPath != "" {
 		common["configManifestPath"] = envSpecManifestPath
 	}
+	applyNonRoot(cmd, common)
 
 	// Already exists? -> update (slug-keyed, org from token).
 	var existing struct {
@@ -191,6 +193,15 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Created env-spec %s in org %s\n", slug, org.Slug)
 	return nil
+}
+
+// applyNonRoot sends runAsNonRoot only when --non-root is given: older control
+// planes reject the unknown field, and an upsert that omits the flag leaves the
+// spec's mode as it was.
+func applyNonRoot(cmd *cobra.Command, input map[string]interface{}) {
+	if cmd.Flags().Changed("non-root") {
+		input["runAsNonRoot"] = envSpecNonRoot
+	}
 }
 
 func runEnvSpecLs(cmd *cobra.Command, args []string) error {
@@ -266,6 +277,7 @@ func init() {
 	f.StringVar(&envSpecManifestPath, "manifest-path", "", "Repo-relative path to the agent's astrolift.toml (or its dir)")
 	f.BoolVar(&envSpecAllowInstall, "allow-install", false, "Allow runtime package installs")
 	f.BoolVar(&envSpecVNC, "vnc", false, "Enable VNC for this spec")
+	f.BoolVar(&envSpecNonRoot, "non-root", false, "Run pods as the non-root agent user with all capabilities dropped (excludes --allow-install)")
 	f.StringArrayVar(&envSpecEnv, "env", nil, "Non-secret env var KEY=VALUE (repeatable)")
 	f.StringArrayVar(&envSpecSecret, "secret", nil, "Secret ref ENV_VAR=secret-store-name (repeatable)")
 	_ = agentEnvSpecUpsertCmd.MarkFlagRequired("agent-type")

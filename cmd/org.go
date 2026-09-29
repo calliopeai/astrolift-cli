@@ -56,6 +56,14 @@ func stdinIsInteractive() bool {
 
 // resolveOrg resolves the working organization to its (id, slug, name).
 func resolveOrg(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg *config.Config) (orgRef, error) {
+	org, err := resolveOrgSelection(cmd, ctx, client, cfg)
+	if err == nil {
+		client.SetOrg(org.ID)
+	}
+	return org, err
+}
+
+func resolveOrgSelection(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg *config.Config) (orgRef, error) {
 	want := strings.TrimSpace(orgFlagValue(cmd))
 	if want == "" {
 		want = strings.TrimSpace(cfg.DefaultOrg)

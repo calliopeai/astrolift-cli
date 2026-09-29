@@ -69,7 +69,7 @@ The session authenticates with the console's normal login, so open the
 URL in a browser that is signed in to Astrolift.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}

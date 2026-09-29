@@ -131,8 +131,11 @@ Examples:
   astro exec --app web --pod web-7c9f-abc -c sidecar -- sh
   echo "select 1" | astro exec --app web --no-tty -- psql "$DATABASE_URL"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
+			return err
+		}
+		if _, err := resolveOrg(cmd, cmd.Context(), client, cfg); err != nil {
 			return err
 		}
 		return runExec(cmd, cmd.Context(), client, args)
@@ -171,6 +174,9 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 	header := http.Header{}
 	if tok := client.Token(); tok != "" {
 		header.Set("Authorization", "Bearer "+tok)
+	}
+	if org := client.Org(); org != "" {
+		header.Set("X-Astrolift-Organization", org)
 	}
 	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, wsURL, header)
 	if err != nil {

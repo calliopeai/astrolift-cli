@@ -28,12 +28,14 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // ---- top-level `astro dev` group -------------------------------------------
@@ -403,6 +405,21 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	if v := os.Getenv("ASTROLIFT_API_URL"); v != "" {
 		apiURL = v
 	}
+	pinnedServer := ""
+	if strings.TrimSpace(viper.GetString("server")) != "" {
+		cfg, err := config.Load()
+		if err != nil {
+			return err
+		}
+		slug, entry, err := selectedServer(cfg, nil)
+		if err != nil {
+			return err
+		}
+		if apiURL != "" && strings.TrimRight(apiURL, "/") != strings.TrimRight(entry.APIURL, "/") {
+			return fmt.Errorf("API URL override does not match registered server %q", slug)
+		}
+		pinnedServer, apiURL = slug, entry.APIURL
+	}
 	if apiURL == "" {
 		// Fall back to active server config
 		if cfg, err := config.Load(); err == nil && cfg.CurrentServer != "" {
@@ -421,8 +438,12 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	}
 	if token == "" {
 		// Try stored credentials for the active server
-		if cfg, err := config.Load(); err == nil && cfg.CurrentServer != "" {
-			if creds, err := config.LoadCredentials(cfg.CurrentServer); err == nil {
+		if cfg, err := config.Load(); err == nil {
+			slug := pinnedServer
+			if slug == "" {
+				slug = cfg.CurrentServer
+			}
+			if creds, err := config.LoadCredentials(slug); err == nil {
 				token = creds.AccessToken
 			}
 		}

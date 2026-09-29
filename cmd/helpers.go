@@ -29,7 +29,7 @@ func loadActiveClient(ctx context.Context, debug bool) (*api.Client, *config.Con
 	overrideAPIURL := strings.TrimSpace(viper.GetString("api_url"))
 	explicitToken := strings.TrimSpace(viper.GetString("token"))
 	deployToken := strings.TrimSpace(os.Getenv("ASTROLIFT_DEPLOY_TOKEN"))
-	if cfg.CurrentServer == "" {
+	if cfg.CurrentServer == "" && strings.TrimSpace(viper.GetString("server")) == "" {
 		if overrideAPIURL != "" && (explicitToken != "" || deployToken != "") {
 			entry := config.ServerEntry{APIURL: overrideAPIURL, DisplayName: "ephemeral"}
 			token := explicitToken
@@ -43,9 +43,9 @@ func loadActiveClient(ctx context.Context, debug bool) (*api.Client, *config.Con
 			"no current server. run `astro server add <slug> <api-url>` and `astro auth login`",
 		)
 	}
-	entry, ok := cfg.Servers[cfg.CurrentServer]
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("current server %q missing from config", cfg.CurrentServer)
+	serverSlug, entry, err := selectedServer(cfg, nil)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	if overrideAPIURL != "" {
 		entry.APIURL = overrideAPIURL
@@ -65,7 +65,7 @@ func loadActiveClient(ctx context.Context, debug bool) (*api.Client, *config.Con
 		return client, cfg, &entry, nil
 	}
 
-	creds, err := config.LoadCredentials(cfg.CurrentServer)
+	creds, err := config.LoadCredentials(serverSlug)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("loading credentials (run `astro auth login`): %w", err)
 	}
@@ -77,7 +77,7 @@ func loadActiveClient(ctx context.Context, debug bool) (*api.Client, *config.Con
 			return nil, nil, nil, fmt.Errorf("token expired and refresh failed (run `astro auth login`): %w", err)
 		}
 		creds = fresh
-		if err := config.SaveCredentials(cfg.CurrentServer, fresh); err != nil {
+		if err := config.SaveCredentials(serverSlug, fresh); err != nil {
 			return nil, nil, nil, fmt.Errorf("saving refreshed credentials: %w", err)
 		}
 	}

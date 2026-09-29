@@ -48,7 +48,13 @@ rookCeph:
 
 # cert-manager: enabled. IRSA role for Route53 dns-01 is provisioned in
 # the AWS terraform tree; the ClusterIssuer below wires it up.
+# `certManager.enabled` is condition-only. Real subchart values go under
+# the hyphenated `cert-manager:` key below, because the dependency has no
+# `alias` (see values.yaml, #1695 defect 3).
 certManager:
+  enabled: true
+
+cert-manager:
   enabled: true
   installCRDs: true
 

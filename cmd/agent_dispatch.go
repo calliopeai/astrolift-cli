@@ -112,7 +112,7 @@ agentTask. --tail additionally streams the task's logs while waiting.
 Exit codes: 0 success, 1 dispatch/run failure.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, _, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -217,7 +217,7 @@ func waitAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 func tailAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, taskID string) error {
 	out := cmd.OutOrStdout()
 
-	printed := 0
+	var tail agentLogTail
 	last := ""
 	for {
 		// print any newly-appended log lines
@@ -234,13 +234,9 @@ func tailAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 			}
 			return fmt.Errorf("polling logs: %w", err)
 		}
-		if len(logResp.Lines) < printed {
-			printed = 0
-		}
-		for _, line := range logResp.Lines[printed:] {
+		for _, line := range tail.append(logResp.Lines) {
 			fmt.Fprintln(out, line)
 		}
-		printed = len(logResp.Lines)
 
 		// check terminal status
 		status, err := fetchAgentTaskStatus(ctx, client, taskID)
