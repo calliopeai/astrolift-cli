@@ -48,6 +48,7 @@ var (
 
 	appDeployEnv      string
 	appDeployImageTag string
+	appDeployRef      string
 	appDeployWait     bool
 
 	appRollbackEnv string
@@ -626,7 +627,9 @@ var appDeployCmd = &cobra.Command{
 	Long: `Starts a deployment via the startDeployment GraphQL mutation. The app
 slug comes from --app or the local astrolift.toml.
 
---image-tag is required (the container image tag or digest to deploy).
+--image-tag is required for ci_pushed apps. With platform_build, the platform
+builds --ref or the app's configured deploy branch and chooses the image tag.
+Apps with build mode none do not require an image tag.
 --env selects the target environment (default: production).
 With --wait, blocks until the deployment reaches a terminal state, polling
 astroliftDeployment and surfacing status transitions.
@@ -646,15 +649,14 @@ Exit codes: 0 success, 1 deploy failure.`,
 }
 
 func runAppDeploy(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
-	if strings.TrimSpace(appDeployImageTag) == "" {
-		return fmt.Errorf("--image-tag is required (the image tag or digest to deploy)")
-	}
-
 	input := map[string]interface{}{
 		"appSlug":         slug,
 		"environmentName": appDeployEnv,
 		"imageTag":        appDeployImageTag,
 		"triggerKind":     "manual",
+	}
+	if sourceRef := strings.TrimSpace(appDeployRef); sourceRef != "" {
+		input["sourceRef"] = sourceRef
 	}
 
 	deployCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -1346,7 +1348,8 @@ func init() {
 
 	// deploy
 	appDeployCmd.Flags().StringVar(&appDeployEnv, "env", "production", "Target environment")
-	appDeployCmd.Flags().StringVar(&appDeployImageTag, "image-tag", "", "Container image tag or digest to deploy (required)")
+	appDeployCmd.Flags().StringVar(&appDeployImageTag, "image-tag", "", "Container image tag or digest (required for ci_pushed apps)")
+	appDeployCmd.Flags().StringVar(&appDeployRef, "ref", "", "Source branch, tag or commit to build (default: the app deploy branch)")
 	appDeployCmd.Flags().BoolVar(&appDeployWait, "wait", false, "Block until the deployment reaches a terminal state")
 
 	// rollback

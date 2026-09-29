@@ -143,6 +143,55 @@ astro exec --app web -- ps aux  # one-off command in a running pod
 # astro app rollback            # roll back the running deployment
 ```
 
+### Registering before a source connection is configured
+
+Pass `--manifest-raw` to send the local manifest with registration, creating its
+workloads even when the platform cannot fetch the repository:
+
+```bash
+astro app register --project-id <uuid> --source-repo myorg/my-app --manifest-raw
+```
+
+Without the flag, registration uses the existing repository-based behavior.
+
+### Changing who builds the image
+
+`--build-mode` on `register` only sets the mode at creation. To change it on an
+app that already exists:
+
+```bash
+astro app set-build-mode my-service ci_pushed       # your CI builds and pushes
+astro app set-build-mode my-service platform_build  # the platform builds in-cluster
+astro app set-build-mode my-service none            # no image at all
+
+# Pick a non-default builder while switching
+astro app set-build-mode my-service platform_build --build-strategy buildpacks
+```
+
+Reach for `ci_pushed` when the platform builder cannot produce the image — a
+source repo it cannot clone, or no builder on the cluster — and your CI already
+can. Push the image to the registry first; the next `astro app deploy` rolls out
+the tag you pass rather than trying to produce one.
+
+The command sets `build_strategy` alongside the mode, because the deploy
+pipeline decides whether to build from the strategy, not the mode. Flipping only
+the mode would leave an app that reports `ci_pushed` and still runs a platform
+build on every deploy. A Dockerfile path or build context saved at registration
+is left untouched, so switching back and forth loses nothing.
+
+### Deploying a platform-built app
+
+A platform-built app can deploy without an image tag. The platform resolves its
+deploy branch and uses that commit for the build. Select another branch, tag or
+commit with `--ref`:
+
+```bash
+astro app deploy --app my-service
+astro app deploy --app my-service --ref release/1.2
+```
+
+CI-pushed apps still require `--image-tag`; apps with build mode `none` do not.
+
 ### From CI
 
 ```bash

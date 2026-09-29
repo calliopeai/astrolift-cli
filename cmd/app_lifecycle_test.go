@@ -329,16 +329,30 @@ func TestAppShowJSON(t *testing.T) {
 func resetDeployFlags() {
 	appDeployEnv = "production"
 	appDeployImageTag = ""
+	appDeployRef = ""
 	appDeployWait = false
 }
 
-func TestAppDeployRequiresImageTag(t *testing.T) {
+func TestAppDeployPreservesServerImageTagRequirementForCiPushed(t *testing.T) {
 	resetDeployFlags()
-	client := api.NewClient("http://127.0.0.1:0", "tok", false)
+	defer resetDeployFlags()
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"startDeployment": map[string]interface{}{
+			"ok": false, "errors": []map[string]string{{
+				"code": "VALIDATION", "message": "image_tag is required for ci_pushed apps", "field": "imageTag",
+			}},
+		},
+	}, &captured)
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "tok", false)
 	cmd, _ := appTestCmd()
 	err := runAppDeploy(cmd, context.Background(), client, "web")
-	if err == nil || !strings.Contains(err.Error(), "--image-tag is required") {
-		t.Fatalf("expected --image-tag required error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "image_tag is required for ci_pushed") {
+		t.Fatalf("expected server image requirement, got %v", err)
+	}
+	if !strings.Contains(captured.Query, "startDeployment") {
+		t.Fatal("the platform must decide the app's build-mode requirements")
 	}
 }
 
@@ -378,6 +392,46 @@ func TestAppDeploySendsMutation(t *testing.T) {
 	got := out.String()
 	if !strings.Contains(got, "Deployment started: dep-99") || !strings.Contains(got, "staging") {
 		t.Errorf("deploy output wrong:\n%s", got)
+	}
+}
+
+func TestAppDeployLetsThePlatformResolveBuildRevisions(t *testing.T) {
+	for _, tc := range []struct {
+		name, ref, image string
+	}{
+		{"deploy branch", "", "resolved-commit"},
+		{"explicit ref", " release/1.2 ", "resolved-release-commit"},
+		{"no image", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetDeployFlags()
+			appDeployRef = tc.ref
+			t.Cleanup(resetDeployFlags)
+			var captured gqlRequest
+			srv := gqlServer(t, map[string]interface{}{"startDeployment": map[string]interface{}{
+				"ok": true, "data": map[string]interface{}{
+					"id": "deployment", "status": "pending", "environmentName": "production",
+					"imageTag": tc.image, "registeredAppSlug": "web", "triggerKind": "manual",
+				},
+			}}, &captured)
+			defer srv.Close()
+			client := api.NewClient(srv.URL, "tok", false)
+			cmd, out := appTestCmd()
+			if err := runAppDeploy(cmd, context.Background(), client, "web"); err != nil {
+				t.Fatal(err)
+			}
+			input := captured.Variables["input"].(map[string]interface{})
+			if input["imageTag"] != "" {
+				t.Fatalf("CLI invented an image tag: %#v", input)
+			}
+			ref, sent := input["sourceRef"]
+			if sent != (tc.ref != "") || (sent && ref != strings.TrimSpace(tc.ref)) {
+				t.Fatalf("source selection lost: %#v", input)
+			}
+			if !strings.Contains(out.String(), "Deployment started: deployment") || !strings.Contains(out.String(), tc.image) {
+				t.Fatalf("platform result lost: %s", out.String())
+			}
+		})
 	}
 }
 

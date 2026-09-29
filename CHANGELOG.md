@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- `astro app register --manifest-raw` sends the local manifest when source
+  connections cannot fetch the repository (#90).
+- `astro app set-build-mode` changes the mode and strategy together without
+  overwriting the saved Dockerfile or build context (#89).
+
+### Fixed
+
+- `astro app deploy` lets the API choose images for platform-built and no-build
+  apps. `--ref` selects the source revision; CI-pushed apps still require an
+  image tag (#94).
+
 ## 0.7.0 — 2026-08-21
 
 ### Changed
