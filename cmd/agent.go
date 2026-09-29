@@ -429,6 +429,19 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 		if err != nil {
 			return fmt.Errorf("fetching logs: %w", err)
 		}
+		if len(lines) == 0 {
+			// Silence and exit 0 is indistinguishable from "the agent
+			// printed nothing", and the moment an operator needs this
+			// most is a failed task (#1712). Say that nothing came back
+			// and where to look next; the control plane logs which of
+			// the several empty cases it actually took.
+			fmt.Fprintf(cmd.ErrOrStderr(),
+				"no log lines returned for task %s.\n"+
+					"The agent may have printed nothing, or its pod may be gone — an agent Job\n"+
+					"is garbage-collected an hour after it settles, taking the pod's logs with it.\n"+
+					"`astro agent inspect %s` shows the task's recorded result and failure.\n",
+				taskID, taskID)
+		}
 		for _, line := range lines {
 			fmt.Fprintln(out, line)
 		}

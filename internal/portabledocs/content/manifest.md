@@ -93,6 +93,101 @@ Common fields:
 A `cronjob` additionally requires `schedule` and accepts
 `concurrency_policy = "forbid" | "queue" | "replace"`.
 
+## Metrics
+
+A workload is not scraped unless it says so. Declaring the table is the
+opt-in; `port` is required because a scrape target with no port would have
+to be guessed.
+
+```toml
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+
+  [workloads.metrics]
+  port = 9090
+  path = "/metrics"   # default
+  # enabled = false   # keep the config, stop the scrape
+```
+
+| Field | Default | Meaning |
+|---|---:|---|
+| `port` | required | Container port serving the metrics endpoint |
+| `path` | `/metrics` | Path scraped on that port |
+| `enabled` | `true` | `false` keeps the table and turns the scrape off |
+
+Rendering emits both scrape mechanisms, because a cluster may run either:
+`prometheus.io/scrape`, `prometheus.io/port` and `prometheus.io/path`
+annotations on the pod, and a `PodMonitor` scoped to the app's namespace for
+a Prometheus Operator install. A private worker gets a `PodMonitor` with no
+Service, which is the case annotation-only scraping handles badly.
+
+### What the request panels need
+
+Traffic, errors and latency (the RED half of the golden signals) are read
+from one of two sources, and an app that matches neither leaves those three
+panels empty:
+
+* **Edge metrics.** If the cluster's ingress controller is one Astrolift has
+  a mapping for, the request signals come from the controller's own metrics,
+  keyed by the app's namespace. Nothing is required of the app.
+* **Application metrics.** Otherwise the queries read the Prometheus HTTP
+  conventions from the app itself:
+
+  | Signal | Metric | Type |
+  |---|---|---|
+  | Traffic, errors, status codes | `http_requests_total` | counter, with a `code` label |
+  | Latency quantiles | `http_request_duration_seconds_bucket` | histogram |
+
+  Both must carry an `app="<app-slug>"` label, and — to answer the
+  per-environment and per-workload views — `environment` and `workload`
+  labels matching those slugs. The standard Prometheus client library for
+  your language emits both metrics under these names; the labels are yours
+  to add.
+
+Saturation (CPU and memory) is read from the cluster's own cAdvisor and
+kube-state-metrics series, so it populates whether or not the app is
+instrumented. When the request panels have no source at all, they say so
+rather than reporting an empty window.
+
+## Edge identity
+
+Apps behind the platform's auth gate receive the authenticated identity as
+`X-Auth-Request-User` / `X-Auth-Request-Email` headers, and a shared secret on
+`X-Astrolift-Gateway-Secret` that proves the request came through the gate
+rather than from anything else that can reach the Service port in-cluster.
+
+An app whose backend reads those under names of its own declares the mapping:
+
+```toml
+[edge]
+gateway_secret_header = "x-qsr-proxy-secret"
+
+[edge.identity_headers]
+user = "x-qsr-user-id"
+email = "x-qsr-email"
+```
+
+| Key | Meaning |
+|---|---|
+| `gateway_secret_header` | Header the gate's shared secret is stamped on for this app. The *value* is never declared here; it comes from the cluster's auth config |
+| `identity_headers` | `identity = header-name` pairs. Valid identities are `user`, `email` and `access_token` — the ones the gate forwards |
+
+The block is app-level, not per workload: every managed hostname for an app
+shares one Ingress.
+
+Header names must be valid HTTP header names; the value is written into the
+ingress controller's configuration, so anything else is refused at parse time.
+An identity the gate does not forward is refused too — a mapping for a header
+that never arrives would render configuration that silently forwards nothing.
+
+This is deliberately a mapping rather than a raw configuration snippet. A
+snippet ties the app to one ingress controller's config language and hands it a
+sharp edge, and ingress-nginx has been narrowing `allow-snippet-annotations`.
+If your app needs something the mapping cannot express, that case is worth
+filing rather than working around.
+
 ## Containers
 
 `[[workloads.containers]]` supports `name`, `is_primary`, `image_ref`,

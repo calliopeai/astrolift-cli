@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -169,15 +170,23 @@ type bootstrapReleaseEntry struct {
 	Status  string `json:"status"`
 }
 
+// recordClusterBootstrapRunInput mirrors the server's
+// RecordClusterBootstrapRunInput exactly. Every field here was wrong
+// once (#1694): the CLI sent clusterId/releases/success/cloud against a
+// schema wanting clusterSlug/status/installedReleases/cliVersion/hostInfo,
+// so not one name lined up and every bootstrap failed to record its run.
+// It is warn-only, so bootstrap still succeeded and no run was ever
+// recorded on any install. See TestRecordClusterBootstrapRunInputMatchesSchema.
 type recordClusterBootstrapRunInput struct {
-	ClusterID    string                  `json:"clusterId"`
-	ChartVersion string                  `json:"chartVersion"`
-	Releases     []bootstrapReleaseEntry `json:"releases"`
-	StartedAt    string                  `json:"startedAt"`
-	EndedAt      string                  `json:"endedAt"`
-	Success      bool                    `json:"success"`
-	ErrorMessage string                  `json:"errorMessage,omitempty"`
-	Cloud        string                  `json:"cloud,omitempty"`
+	ClusterSlug       string                  `json:"clusterSlug"`
+	Status            string                  `json:"status"`
+	ChartVersion      string                  `json:"chartVersion"`
+	InstalledReleases []bootstrapReleaseEntry `json:"installedReleases"`
+	CLIVersion        string                  `json:"cliVersion"`
+	HostInfo          map[string]any          `json:"hostInfo"`
+	StartedAt         string                  `json:"startedAt"`
+	EndedAt           string                  `json:"endedAt"`
+	ErrorMessage      string                  `json:"errorMessage,omitempty"`
 }
 
 type recordBootstrapRunResp struct {
@@ -694,14 +703,26 @@ func recordBootstrapRun(
 			Status:  result.Release.Status,
 		})
 	}
+	status := "succeeded"
+	if installErr != nil {
+		status = "failed"
+	}
 	input := recordClusterBootstrapRunInput{
-		ClusterID:    cluster.ID,
-		ChartVersion: charts.PinnedChartVersion,
-		Releases:     releases,
-		StartedAt:    startedAt.Format(time.RFC3339Nano),
-		EndedAt:      endedAt.Format(time.RFC3339Nano),
-		Success:      installErr == nil,
-		Cloud:        string(cloud),
+		ClusterSlug:       cluster.Slug,
+		Status:            status,
+		ChartVersion:      charts.PinnedChartVersion,
+		InstalledReleases: releases,
+		CLIVersion:        Version,
+		// The cloud the chart was installed for rides here rather than as
+		// its own field: hostInfo is the schema's free-form debug blob,
+		// which is what this is.
+		HostInfo: map[string]any{
+			"cloud": string(cloud),
+			"os":    runtime.GOOS,
+			"arch":  runtime.GOARCH,
+		},
+		StartedAt: startedAt.Format(time.RFC3339Nano),
+		EndedAt:   endedAt.Format(time.RFC3339Nano),
 	}
 	if installErr != nil {
 		input.ErrorMessage = installErr.Error()
