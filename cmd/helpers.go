@@ -186,10 +186,10 @@ func scaffoldManifest(path string, cmd *cobra.Command) error {
 		appSlug = "my-app"
 	}
 
-	var port int = 8080
-	var cpuLimit string = "500m"
-	var memLimit string = "256Mi"
-	var fwNote string = "# No framework detected — using generic defaults."
+	var port = 8080
+	var cpuLimit = "500m"
+	var memLimit = "256Mi"
+	var fwNote = "# No framework detected — using generic defaults."
 
 	if fw != nil {
 		port = fw.Port

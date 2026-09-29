@@ -144,7 +144,7 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	if err != nil {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if err := downloadFile(ctx, downloadURL, token, tmpFile); err != nil {
 		var accessErr *releaseAccessError
@@ -162,7 +162,7 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	if err != nil {
 		return fmt.Errorf("extracting binary: %w", err)
 	}
-	defer os.Remove(binaryPath)
+	defer func() { _ = os.Remove(binaryPath) }()
 
 	// Make executable
 	if err := os.Chmod(binaryPath, 0o755); err != nil {
@@ -283,13 +283,13 @@ func extractFromTarGz(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	gz, err := gzip.NewReader(f)
 	if err != nil {
 		return "", err
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 
 	tr := tar.NewReader(gz)
 	for {
@@ -307,11 +307,14 @@ func extractFromTarGz(path string) (string, error) {
 				return "", err
 			}
 			if _, err := io.Copy(out, tr); err != nil {
-				out.Close()
-				os.Remove(out.Name())
+				_ = out.Close()
+				_ = os.Remove(out.Name())
 				return "", err
 			}
-			out.Close()
+			if err := out.Close(); err != nil {
+				_ = os.Remove(out.Name())
+				return "", err
+			}
 			return out.Name(), nil
 		}
 	}
@@ -323,7 +326,7 @@ func extractFromZip(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	for _, f := range r.File {
 		binaryName := "astro.exe"
@@ -332,17 +335,20 @@ func extractFromZip(path string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			defer rc.Close()
+			defer func() { _ = rc.Close() }()
 			out, err := os.CreateTemp("", "astro-new-*.exe")
 			if err != nil {
 				return "", err
 			}
 			if _, err := io.Copy(out, rc); err != nil {
-				out.Close()
-				os.Remove(out.Name())
+				_ = out.Close()
+				_ = os.Remove(out.Name())
 				return "", err
 			}
-			out.Close()
+			if err := out.Close(); err != nil {
+				_ = os.Remove(out.Name())
+				return "", err
+			}
 			return out.Name(), nil
 		}
 	}
