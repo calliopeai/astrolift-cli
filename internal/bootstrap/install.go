@@ -145,6 +145,20 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 			return nil, fmt.Errorf("helm upgrade: %w", err)
 		}
 	case existing != nil && !opts.Upgrade:
+		// A first install that failed leaves revision 1 in `failed`, and
+		// --upgrade from it has no good previous state to work from, so
+		// pointing the operator at --upgrade would send them in a circle
+		// (#1707). Name the release, its state, and the one command that
+		// clears it.
+		if isWedged(existing) {
+			return nil, fmt.Errorf(
+				"release %q in namespace %q is %s at revision %d — a failed first install has no "+
+					"previous revision to upgrade from. Clear it with "+
+					"`helm uninstall %s -n %s`, then re-run bootstrap",
+				opts.ReleaseName, opts.Namespace, existing.Info.Status, existing.Version,
+				opts.ReleaseName, opts.Namespace,
+			)
+		}
 		return nil, fmt.Errorf(
 			"release %q already exists in namespace %q — re-run with --upgrade to reconcile drift",
 			opts.ReleaseName, opts.Namespace,
@@ -155,6 +169,13 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 		install.Namespace = opts.Namespace
 		install.CreateNamespace = false // we already created it above
 		install.Wait = true
+		// Roll the install back on failure rather than leaving a wedged
+		// release behind (#1707). Without this a partial first install
+		// sits at revision 1 `failed` forever: helm refuses to install
+		// over it, and --upgrade has no previous revision to fall back
+		// to, so the operator has to know to `helm uninstall` by hand
+		// before they can try again. Atomic implies Wait.
+		install.Atomic = true
 		install.Timeout = opts.WaitTimeout
 		install.Version = opts.ChartVersion
 		rel, err = install.RunWithContext(ctx, opts.Chart, mergedValues)
@@ -175,6 +196,24 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 		},
 		SubchartStatus: subchartStatusFromValues(mergedValues),
 	}, nil
+}
+
+// isWedged reports whether a release is in a state a re-run cannot
+// recover from on its own: a failed or interrupted FIRST revision, which
+// has no previous revision to roll back or upgrade from (#1707).
+//
+// A later revision that failed is different -- helm can roll that one
+// back -- so it is left to the existing --upgrade path.
+func isWedged(rel *release.Release) bool {
+	if rel == nil || rel.Info == nil || rel.Version != 1 {
+		return false
+	}
+	switch rel.Info.Status {
+	case release.StatusFailed, release.StatusPendingInstall, release.StatusUninstalling:
+		return true
+	default:
+		return false
+	}
 }
 
 // runRender does a server-side render with --dry-run, returning the

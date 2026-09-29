@@ -3,18 +3,40 @@ cert-manager ClusterIssuer for ACME (Let's Encrypt by default). Renders
 only when both cert-manager subchart and the clusterIssuer block are
 enabled — operators with a private CA leave clusterIssuer.enabled=false
 and ship their own Issuer.
+
+Applied as a post-install/post-upgrade HOOK, not as an ordinary release
+resource (#1695). ClusterIssuer is a cert-manager CRD, and this same
+release is what installs cert-manager — so on a fresh cluster the kind
+does not exist when helm builds the manifest, and the install dies with
+
+    resource mapping not found for kind "ClusterIssuer" ...
+    ensure CRDs are installed first
+
+A single release can never satisfy that ordering on its own. A hook runs
+after the release's own resources are ready, by which point the CRDs are
+registered.
+
+``before-hook-creation`` deletes the previous one before re-creating on
+upgrade, so repeated bootstraps are idempotent. The issuer deliberately
+outlives ``helm uninstall``: hook resources are not tracked in the
+release, and an ACME account key that survives a reinstall is what stops
+a re-bootstrap burning Let's Encrypt rate limits.
 */ -}}
 {{- if and .Values.certManager.enabled .Values.clusterIssuer.enabled -}}
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: {{ .Values.clusterIssuer.name }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
   labels:
     {{- include "astrolift-prereqs.labels" . | nindent 4 }}
 spec:
   acme:
     server: {{ .Values.clusterIssuer.acmeServer }}
-    email: {{ required "clusterIssuer.email is required when clusterIssuer is enabled" .Values.clusterIssuer.email | quote }}
+    email: {{ required "clusterIssuer.email is required when clusterIssuer.enabled=true — set it with --set clusterIssuer.email=you@example.com, or leave clusterIssuer.enabled=false and supply your own Issuer" .Values.clusterIssuer.email | quote }}
     privateKeySecretRef:
       name: {{ .Values.clusterIssuer.name }}-account-key
     solvers:

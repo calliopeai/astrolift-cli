@@ -141,7 +141,7 @@ const startDeploymentMutation = `mutation($input: StartDeploymentInput!) {
   startDeployment(input: $input) {
     ok
     errors { code message field }
-    data { id status environmentName imageTag registeredAppSlug triggerKind createdAt }
+    data { id status environmentName imageTag commitSha branch registeredAppSlug triggerKind createdAt }
   }
 }`
 
@@ -238,6 +238,8 @@ type deploymentSummary struct {
 	Status          string `json:"status"`
 	EnvironmentName string `json:"environmentName"`
 	ImageTag        string `json:"imageTag"`
+	CommitSHA       string `json:"commitSha"`
+	Branch          string `json:"branch"`
 	CreatedAt       string `json:"createdAt"`
 	// Populated on failed/aborted deployments; empty otherwise.
 	AbortedReason string `json:"abortedReason"`
@@ -627,9 +629,10 @@ var appDeployCmd = &cobra.Command{
 	Long: `Starts a deployment via the startDeployment GraphQL mutation. The app
 slug comes from --app or the local astrolift.toml.
 
---image-tag is required for ci_pushed apps. With platform_build, the platform
-builds --ref or the app's configured deploy branch and chooses the image tag.
-Apps with build mode none do not require an image tag.
+--image-tag is required for ci_pushed apps. For platform_build, omit it to
+build the registered deploy branch and tag the image with its resolved commit.
+For build_mode=none, omit it to use the images declared in the manifest.
+--ref selects a source branch, tag, or commit; the API pins it before scheduling.
 --env selects the target environment (default: production).
 With --wait, blocks until the deployment reaches a terminal state, polling
 astroliftDeployment and surfacing status transitions.
@@ -652,11 +655,13 @@ func runAppDeploy(cmd *cobra.Command, ctx context.Context, client *api.Client, s
 	input := map[string]interface{}{
 		"appSlug":         slug,
 		"environmentName": appDeployEnv,
-		"imageTag":        appDeployImageTag,
 		"triggerKind":     "manual",
 	}
-	if sourceRef := strings.TrimSpace(appDeployRef); sourceRef != "" {
-		input["sourceRef"] = sourceRef
+	if tag := strings.TrimSpace(appDeployImageTag); tag != "" {
+		input["imageTag"] = tag
+	}
+	if ref := strings.TrimSpace(appDeployRef); ref != "" {
+		input["sourceRef"] = ref
 	}
 
 	deployCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -684,7 +689,14 @@ func runAppDeploy(cmd *cobra.Command, ctx context.Context, client *api.Client, s
 	out := cmd.OutOrStdout()
 	fmt.Fprintf(out, "Deployment started: %s\n", d.ID)
 	fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
-	fmt.Fprintf(out, "Image:              %s\n", d.ImageTag)
+	if _, err := fmt.Fprintf(out, "Image:              %s\n", dashIfEmpty(d.ImageTag)); err != nil {
+		return err
+	}
+	if d.CommitSHA != "" {
+		if _, err := fmt.Fprintf(out, "Source commit:      %s\n", d.CommitSHA); err != nil {
+			return err
+		}
+	}
 	fmt.Fprintf(out, "Status:             %s\n", d.Status)
 
 	if !appDeployWait {
@@ -1348,8 +1360,8 @@ func init() {
 
 	// deploy
 	appDeployCmd.Flags().StringVar(&appDeployEnv, "env", "production", "Target environment")
-	appDeployCmd.Flags().StringVar(&appDeployImageTag, "image-tag", "", "Container image tag or digest (required for ci_pushed apps)")
-	appDeployCmd.Flags().StringVar(&appDeployRef, "ref", "", "Source branch, tag or commit to build (default: the app deploy branch)")
+	appDeployCmd.Flags().StringVar(&appDeployImageTag, "image-tag", "", "Container image tag or digest (required for ci_pushed; platform builds default to the source commit)")
+	appDeployCmd.Flags().StringVar(&appDeployRef, "ref", "", "Source branch, tag, or commit (default: registered deploy branch)")
 	appDeployCmd.Flags().BoolVar(&appDeployWait, "wait", false, "Block until the deployment reaches a terminal state")
 
 	// rollback
