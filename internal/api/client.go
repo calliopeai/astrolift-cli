@@ -89,35 +89,28 @@ func (c *Client) GraphQL(ctx context.Context, query string, variables map[string
 	}
 
 	if c.debug {
-		fmt.Fprintf(os.Stderr, "graphql response status=%d body=%s\n", resp.StatusCode, respBytes)
-	}
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return ErrUnauthorized
-	}
-	if resp.StatusCode >= 500 {
-		return fmt.Errorf("graphql server error %d: %s", resp.StatusCode, respBytes)
+		fmt.Fprintf(os.Stderr, "graphql response status=%d bytes=%d\n", resp.StatusCode, len(respBytes))
 	}
 
 	var envelope struct {
-		Data   json.RawMessage `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
+		Data   json.RawMessage   `json:"data"`
+		Errors []json.RawMessage `json:"errors"`
 	}
 	if err := json.Unmarshal(respBytes, &envelope); err != nil {
+		if resp.StatusCode >= 400 {
+			return &HTTPError{Status: resp.StatusCode}
+		}
 		return fmt.Errorf("parsing graphql envelope: %w", err)
 	}
 	if len(envelope.Errors) > 0 {
-		msgs := make([]string, len(envelope.Errors))
-		for i, e := range envelope.Errors {
-			msgs[i] = e.Message
+		failure := &GraphQLResponseError{Status: resp.StatusCode}
+		for _, raw := range envelope.Errors {
+			failure.Errors = append(failure.Errors, c.graphQLError(raw))
 		}
-		joined := strings.Join(msgs, "; ")
-		if isSchemaMismatch(msgs) {
-			return fmt.Errorf("%w: %s", ErrSchemaMismatch, joined)
-		}
-		return fmt.Errorf("graphql errors: %s", joined)
+		return failure
+	}
+	if resp.StatusCode >= 400 {
+		return &HTTPError{Status: resp.StatusCode}
 	}
 	if target != nil && len(envelope.Data) > 0 {
 		if err := json.Unmarshal(envelope.Data, target); err != nil {
