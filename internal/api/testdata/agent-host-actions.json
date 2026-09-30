@@ -1,0 +1,385 @@
+[
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/responsePart",
+    "turnId": "turn-1",
+    "part": {
+      "kind": "markdown",
+      "id": "m",
+      "content": ""
+    }
+  },
+  {
+    "type": "chat/delta",
+    "turnId": "turn-1",
+    "partId": "m",
+    "content": "Hello"
+  },
+  {
+    "type": "chat/turnComplete",
+    "turnId": "turn-1",
+    "duration": 130
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/toolCallStart",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "toolName": "Bash",
+    "displayName": "Bash"
+  },
+  {
+    "type": "chat/toolCallReady",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "invocationMessage": "Review shell",
+    "toolInput": "{\"command\":\"pwd\"}",
+    "riskAssessment": {
+      "kind": "judge",
+      "status": "complete",
+      "reason": "Approval required",
+      "safety": 0.5
+    }
+  },
+  {
+    "type": "chat/toolCallConfirmed",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "approved": true,
+    "confirmed": "user-action"
+  },
+  {
+    "type": "chat/turnComplete",
+    "turnId": "turn-1",
+    "duration": 0
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/toolCallStart",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "toolName": "Bash",
+    "displayName": "Bash"
+  },
+  {
+    "type": "chat/toolCallReady",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "invocationMessage": "Review shell",
+    "toolInput": "{\"command\":\"pwd\"}",
+    "riskAssessment": {
+      "kind": "judge",
+      "status": "complete",
+      "reason": "Approval required",
+      "safety": 0.5
+    }
+  },
+  {
+    "type": "chat/toolCallConfirmed",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "approved": false,
+    "reason": "denied",
+    "reasonMessage": "Denied by reviewer"
+  },
+  {
+    "type": "chat/turnComplete",
+    "turnId": "turn-1",
+    "duration": 0
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/toolCallStart",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "toolName": "Bash",
+    "displayName": "Bash"
+  },
+  {
+    "type": "chat/toolCallReady",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "invocationMessage": "Review shell",
+    "toolInput": "{\"command\":\"pwd\"}",
+    "riskAssessment": {
+      "kind": "judge",
+      "status": "complete",
+      "reason": "Approval required",
+      "safety": 0.5
+    }
+  },
+  {
+    "type": "chat/turnCancelled",
+    "turnId": "turn-1",
+    "duration": 140
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/toolCallStart",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "toolName": "Bash",
+    "displayName": "Bash"
+  },
+  {
+    "type": "chat/turnCancelled",
+    "turnId": "turn-1",
+    "duration": 140
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/error",
+    "turnId": "turn-1",
+    "duration": 140,
+    "error": {
+      "errorType": "failed",
+      "message": "Execution failed"
+    }
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/inputRequested",
+    "request": {
+      "id": "request-2",
+      "message": "Pick",
+      "questions": [
+        {
+          "id": "q",
+          "kind": "text",
+          "message": "Name",
+          "required": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "chat/inputCompleted",
+    "requestId": "request-2",
+    "response": "accept",
+    "answers": {
+      "q": {
+        "state": "submitted",
+        "value": {
+          "kind": "text",
+          "value": "Hello"
+        }
+      }
+    }
+  },
+  {
+    "type": "chat/turnComplete",
+    "turnId": "turn-1",
+    "duration": 140
+  },
+  {
+    "type": "chat/pendingMessageSet",
+    "kind": "steering",
+    "id": "steer-1",
+    "message": {
+      "text": "Review",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/responsePart",
+    "turnId": "other",
+    "part": {
+      "kind": "markdown",
+      "id": "m",
+      "content": "wrong"
+    }
+  },
+  {
+    "type": "chat/error",
+    "turnId": "other",
+    "duration": 0,
+    "error": {
+      "errorType": "failed",
+      "message": "wrong"
+    }
+  },
+  {
+    "type": "chat/turnComplete",
+    "turnId": "turn-1",
+    "duration": 140
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/toolCallStart",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "toolName": "Bash",
+    "displayName": "Bash"
+  },
+  {
+    "type": "chat/toolCallReady",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "invocationMessage": "Review shell",
+    "toolInput": "{\"command\":\"pwd\"}",
+    "confirmed": "not-needed"
+  },
+  {
+    "type": "chat/toolCallComplete",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "result": {
+      "success": true,
+      "pastTenseMessage": "Command finished",
+      "content": [
+        {
+          "type": "text",
+          "text": "Observed output"
+        }
+      ]
+    }
+  },
+  {
+    "type": "chat/turnComplete",
+    "turnId": "turn-1",
+    "duration": 100
+  },
+  {
+    "type": "chat/turnStarted",
+    "turnId": "turn-1",
+    "startedAt": "2026-09-29T00:00:01.000Z",
+    "message": {
+      "text": "Inspect",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  {
+    "type": "chat/toolCallStart",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "toolName": "Bash",
+    "displayName": "Bash"
+  },
+  {
+    "type": "chat/toolCallReady",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "invocationMessage": "Review shell",
+    "toolInput": "{\"command\":\"pwd\"}",
+    "confirmed": "not-needed"
+  },
+  {
+    "type": "chat/toolCallComplete",
+    "turnId": "turn-1",
+    "toolCallId": "request-1",
+    "result": {
+      "success": false,
+      "pastTenseMessage": "Command failed",
+      "content": [
+        {
+          "type": "text",
+          "text": "Observed output"
+        }
+      ],
+      "error": {
+        "errorType": "tool",
+        "message": "Observed failure"
+      }
+    }
+  },
+  {
+    "type": "chat/turnComplete",
+    "turnId": "turn-1",
+    "duration": 100
+  }
+]
