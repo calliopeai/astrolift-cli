@@ -386,7 +386,7 @@ func waitForBox(cmd *cobra.Command, ctx context.Context, client *api.Client, box
 		}
 		if time.Now().After(deadline) {
 			return nil, fmt.Errorf(
-				"timed out waiting for box %s (last status: %s) — check `astro box ls` and the pod's events",
+				"timed out waiting for box %s (last status: %s) — the box may still be setting up its workspace; check `astro box ls` and the pod's events",
 				fetched.Slug, fetched.Status)
 		}
 	}
@@ -515,7 +515,7 @@ func runBoxRm(cmd *cobra.Command, ctx context.Context, client *api.Client, slug 
 		if !noPrompt {
 			fmt.Fprintf(cmd.OutOrStdout(), "Destroy box %s and kill its session? [y/N] ", slug)
 			var answer string
-			fmt.Fscan(cmd.InOrStdin(), &answer)
+			_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil

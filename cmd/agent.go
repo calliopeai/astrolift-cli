@@ -501,7 +501,7 @@ func runAgentCancel(cmd *cobra.Command, ctx context.Context, client *api.Client,
 		if !noPrompt {
 			fmt.Fprintf(cmd.OutOrStdout(), "Cancel task %s? [y/N] ", taskID)
 			var answer string
-			fmt.Fscan(cmd.InOrStdin(), &answer)
+			_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil

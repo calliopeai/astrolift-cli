@@ -31,6 +31,7 @@ var authCmd = &cobra.Command{
 var (
 	loginNoWait    bool
 	loginNoBrowser bool
+	loginScope     string
 )
 
 var authLoginCmd = &cobra.Command{
@@ -80,7 +81,11 @@ MCP gateway alike.`,
 		if !asJSON {
 			fmt.Fprintf(out, "Starting login flow against %s...\n", entry.APIURL)
 		}
-		session, err := auth.StartLogin(startCtx, entry.APIURL)
+		clientKind, err := auth.ClientKindForScope(loginScope)
+		if err != nil {
+			return err
+		}
+		session, err := auth.StartLogin(startCtx, entry.APIURL, clientKind)
 		if err != nil {
 			return fmt.Errorf("starting login: %w", err)
 		}
@@ -223,10 +228,27 @@ var authLogoutCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		serverSlug, _, err := selectedServer(cfg, args)
+		serverSlug, entry, err := selectedServer(cfg, args)
 		if err != nil {
 			return err
 		}
+
+		// Best-effort server-side revoke before the local copy is gone:
+		// signout is proof-of-possession only, so it needs the refresh
+		// token this command is about to delete. Local logout must
+		// succeed even when this fails or the server is unreachable,
+		// since that guarantee is the whole point of deleting local
+		// creds unconditionally below -- a signout failure is a
+		// warning, never a command error.
+		if creds, credsErr := config.LoadCredentials(serverSlug); credsErr == nil {
+			ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
+			signOutErr := auth.SignOut(ctx, entry.APIURL, creds.RefreshToken)
+			cancel()
+			if signOutErr != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not end the session at %s: %v\n", entry.APIURL, signOutErr)
+			}
+		}
+
 		if err := config.DeleteCredentials(serverSlug); err != nil {
 			return err
 		}
@@ -303,6 +325,8 @@ var authRefreshCmd = &cobra.Command{
 func init() {
 	authLoginCmd.Flags().BoolVar(&loginNoWait, "no-wait", false,
 		"start the flow, report the session, and exit without polling")
+	authLoginCmd.Flags().StringVar(&loginScope, "scope", "",
+		"ask for more than the CLI default: clusters (update and operate clusters, #2120)")
 	authLoginCmd.Flags().BoolVar(&loginNoBrowser, "no-browser", false,
 		"do not try to open a browser")
 

@@ -2,14 +2,68 @@
 
 ## Unreleased
 
+### Added
+
 - Add `agent send --request-id` and `agent input-receipt` to recover queued
   steering after a lost reply without submitting a duplicate instruction.
+
+- `astro agent env-spec upsert --box-workspace[=false]` explicitly changes box
+  setup without overwriting it when omitted. Box wait timeouts name workspace
+  setup as a possible cause (#112).
+
+- `astro operator domains list|create|update|verify` audits and manages visible
+  organization-owned/platform-shared DNS zones (#92). Creation explicitly
+  defaults to `tenant_apps`; sparse updates preserve unrelated config. JSON
+  exposes ownership, defaults, provisioning and TXT proof, and verification
+  exits nonzero while proof is pending. Shared writes remain server-authorized.
+
+- `astro app register --manifest-raw` sends the local manifest when source
+  connections cannot fetch the repository (#90).
+- `astro app set-build-mode` changes the mode and strategy together without
+  overwriting the saved Dockerfile or build context (#89).
+
+- `astro app access show|allow|deny|clear [app] [--group g] [--user email]`
+  restricts who may enter an app behind central auth (astrolift-app#2132). A
+  change that would lock someone out names them and asks first (`--yes` to
+  skip); an app whose astrolift.toml sets `[ingress.access]` is left to the
+  repo.
+
+- `astro auth-users list|create|set-password|reset-password|disable|enable|delete|groups|group-create <cluster> ...`
+  manages who can sign in to the apps behind a cluster's central auth
+  (astrolift-app#2131). Passwords come from a hidden prompt or
+  `--password-stdin`, never a flag; `create` without one has the provider
+  email a temporary password. `astro auth login --scope clusters` now also
+  asks for `manage:auth-users` and `write:app-access`.
+
+- `astro auth login --scope clusters` asks for the CLI's usual scopes plus
+  `write:clusters` and `manage:clusters` (astrolift-app#2120), so an operator
+  can set a cluster's config or run its recipe without minting an admin token.
+  The approval page lists the scopes asked for. Needs a server with #2120.
 
 - Add per-command `--server` selection for registered endpoints and their
   credentials without changing the saved default. Reject conflicting endpoint
   overrides before using credentials. Box attachment, removal, and exec honor
   the selected organization in HTTP requests and terminal WebSocket handshakes
   (#100).
+
+- Implement `astro app secrets` (`list`/`create`/`delete`, over
+  `setAppSecret`/`deleteAppSecret`), `astro app events` (`list`, also runs
+  bare), `astro app services list`, and `astro app domains list` against the
+  real GraphQL API. All four previously printed the generic sub-resource
+  placeholder ("Subcommands typically include...") and did nothing. `secrets
+  list` returns metadata only and never a value; `create`/`delete` report a
+  queued proposal id instead of an applied write on installs that require
+  secret-change approval. `services`/`domains` are read-only for now; managed
+  service provisioning remains `astro project resources`
+  (calliopeai/astrolift-cli#91, calliopeai/astrolift-cli#99).
+
+### Fixed
+
+- `astro app deploy` allows omitting `--image-tag` for platform builds and apps
+  using manifest images. The API resolves platform builds to a commit before
+  scheduling or approval and uses that SHA as the default image tag. `--ref`
+  selects a branch, tag, or commit; the response includes the resolved commit.
+  CI-pushed apps still require an explicit image tag (#94).
 
 ## 0.7.0 — 2026-08-21
 

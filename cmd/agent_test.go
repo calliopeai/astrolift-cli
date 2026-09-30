@@ -20,8 +20,9 @@ import (
 
 // gqlRequest is the inbound GraphQL envelope the test server inspects.
 type gqlRequest struct {
-	Query     string                 `json:"query"`
-	Variables map[string]interface{} `json:"variables"`
+	Organization string                 `json:"-"`
+	Query        string                 `json:"query"`
+	Variables    map[string]interface{} `json:"variables"`
 }
 
 // gqlServer stands up an httptest server that captures the last GraphQL

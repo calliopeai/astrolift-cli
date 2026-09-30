@@ -70,9 +70,19 @@ clusterIssuer:
 # which only controls Chart.yaml condition gating).
 # -----------------------------------------------------------------------------
 
-# cert-manager: ACME / private-CA TLS issuance.
+# cert-manager: ACME / private-CA TLS issuance. The dependency in Chart.yaml
+# has no `alias`, so Helm only forwards subchart values nested under the
+# literal, hyphenated `cert-manager:` key below. `certManager.enabled` here
+# is condition-only (Chart.yaml: condition: certManager.enabled), and
+# anything else set under `certManager:` never reaches the subchart. This
+# was defect 3 of #1695: `installCRDs` silently no-opped, cert-manager's own
+# CRDs never installed, and the startupapicheck hook spun to
+# BackoffLimitExceeded on "the cert-manager CRDs are not yet installed".
 # Upstream values: https://github.com/cert-manager/cert-manager/tree/master/deploy/charts/cert-manager
 certManager:
+  enabled: false
+
+cert-manager:
   enabled: false
   installCRDs: true
 
