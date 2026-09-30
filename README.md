@@ -625,3 +625,9 @@ tool identities, drains all pages, and prints the recorded terminal result.
 Controller actions require live attachment. This adapter negotiates AHP 1.0.0
 and tests its attachment messages with the official Go SDK transport, whose
 published module is pinned at v0.9.0.
+
+`astro agent quarantine ls --json` lists active dispatch quarantines visible to
+this credential in the selected organization. `astro agent quarantine clear
+<quarantine-uuid> --yes` performs the authorized, audited recovery mutation.
+Without `--yes` it asks for confirmation; noninteractive calls must supply the
+flag. Clearing permits future dispatch and does not restart a stopped task.
