@@ -1,153 +1,242 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/spf13/cobra"
 )
 
-// PermsDiagnoseResult is the shape returned by the myPermissions GraphQL query.
+// PermsDiagnoseResult contains account information, never write authority.
 type PermsDiagnoseResult struct {
-	Username    string   `json:"username"`
-	Email       string   `json:"email"`
-	OrgSlug     string   `json:"orgSlug"`
-	Roles       []string `json:"roles"`
-	Permissions []string `json:"permissions"`
-	Missing     []string `json:"missingCommon"`
-	AppContext  *struct {
-		Permissions []string `json:"permissions"`
-	} `json:"appContext,omitempty"`
+	User          permissionIdentity    `json:"user"`
+	Organization  orgRef                `json:"organization"`
+	AccountGrants accountGrantSummary   `json:"accountGrants"`
+	GrantSources  []permissionEntry     `json:"grantSources"`
+	AppContext    *appPermissionSummary `json:"appContext,omitempty"`
+	Diagnosis     *permissionDiagnosis  `json:"diagnosis,omitempty"`
 }
 
-// diagnosePermissionsQuery is the GraphQL query for permission diagnostics.
-// The backend myPermissions resolver returns the full effective permission set
-// for the calling user. Falls back gracefully if the resolver isn't available.
-const diagnosePermissionsQuery = `
-query DiagnosePermissions($appSlug: String) {
-  myPermissions(appSlug: $appSlug) {
-    username
-    email
-    orgSlug
-    roles
-    permissions
-    missingCommon
-    appContext {
-      permissions
-    }
+type permissionEntry struct {
+	Slug       string   `json:"slug"`
+	Resource   string   `json:"resource"`
+	Action     string   `json:"action"`
+	GrantedVia []string `json:"grantedVia"`
+}
+
+type appPermissionSummary struct {
+	ID             string   `json:"id"`
+	Slug           string   `json:"slug"`
+	Interpretation string   `json:"interpretation"`
+	Permissions    []string `json:"viewerPermissions"`
+}
+
+type permissionTraceStep struct {
+	Check  string `json:"check"`
+	Result bool   `json:"result"`
+	Detail string `json:"detail"`
+}
+
+type permissionDiagnosis struct {
+	Interpretation string                `json:"interpretation"`
+	UserID         string                `json:"userId"`
+	Username       string                `json:"username"`
+	Permission     string                `json:"permission"`
+	Granted        bool                  `json:"granted"`
+	IsSuperuser    bool                  `json:"isSuperuser"`
+	Steps          []permissionTraceStep `json:"steps"`
+}
+
+const diagnosePermissionsQuery = `query($userId: ID!) {
+  astroliftMyPermissions
+  effectivePermissions(userId: $userId) { slug resource action grantedVia }
+}`
+
+const appPermissionsQuery = `query($slug: String!) {
+  astroliftApp(slug: $slug) { id slug viewerPermissions }
+}`
+
+const permissionDiagnosisQuery = `query($userId: ID!, $permission: String!, $scopeType: String, $scopeId: String) {
+  permissionDiagnose(userId: $userId, permission: $permission, scopeType: $scopeType, scopeId: $scopeId) {
+    userId username permission granted isSuperuser steps { check result detail }
   }
 }`
 
-// permsCmd is the top-level `astro perms` command group.
 var permsCmd = &cobra.Command{
 	Use:   "perms",
 	Short: "Permission diagnostics and inspection",
-	Long: `Inspect and diagnose permissions for the current authenticated user.
-
-These commands help operators and developers understand what actions
-they can perform on the platform and why specific operations might fail.`,
+	Long:  "Inspect informational account grants and permission traces in the selected organization.",
 }
 
-// permsDiagnoseCmd implements `astro perms diagnose`.
 var permsDiagnoseCmd = &cobra.Command{
 	Use:   "diagnose [app-slug]",
-	Short: "Show effective permissions for the current user (and optionally an app)",
-	Long: `Fetch and display the effective permission set for the current
-authenticated user across the platform.
+	Short: "Inspect account grants and optionally diagnose one permission",
+	Long: `Show your account grants in the selected organization and their sources.
+An optional app slug adds an informational app grant summary.
 
-When an app slug is provided, also shows app-scoped permissions.
+--permission <slug> requests the server's account-level diagnostic trace.
+An app slug checks that app's actual GUID; otherwise --scope-type and --scope-id
+may name ORG, TEAM, PROJECT, APP or AGENT. Without a target the diagnostic checks
+the selected organization context.
 
-Useful for diagnosing 'permission denied' errors: run this command
-to see exactly which permissions you hold, then cross-reference against
-the operation that failed.`,
+These summaries and traces do not establish the current credential's authority,
+or evaluate a mutation's environment and approval requirements. They never
+approve, preflight or execute another operation. A successfully retrieved trace
+exits zero even when its account-level verdict is denied.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
-		if ctx == nil {
-			ctx = context.Background()
-		}
-
-		debug, _ := cmd.Flags().GetBool("debug")
-		client, _, _, err := loadActiveClient(ctx, debug)
-		if err != nil {
-			return err
-		}
-
-		appSlug := ""
-		if len(args) == 1 {
-			appSlug = args[0]
-		}
-
-		variables := map[string]interface{}{}
-		if appSlug != "" {
-			variables["appSlug"] = appSlug
-		}
-
-		var gqlResp struct {
-			MyPermissions *PermsDiagnoseResult `json:"myPermissions"`
-		}
-		if err := client.GraphQL(ctx, diagnosePermissionsQuery, variables, &gqlResp); err != nil {
-			return fmt.Errorf("fetching permissions: %w", err)
-		}
-		if gqlResp.MyPermissions == nil {
-			return fmt.Errorf("myPermissions query returned no data — is this platform version supported?")
-		}
-		result := gqlResp.MyPermissions
-
-		asJSON, _ := cmd.Flags().GetBool("json")
-		if asJSON {
-			return renderJSON(cmd, result)
-		}
-
-		// Human-readable output
-		fmt.Fprintf(cmd.OutOrStdout(), "User:   %s\n", result.Username)
-		fmt.Fprintf(cmd.OutOrStdout(), "Email:  %s\n", result.Email)
-		fmt.Fprintf(cmd.OutOrStdout(), "Org:    %s\n", result.OrgSlug)
-		fmt.Fprintln(cmd.OutOrStdout())
-
-		if len(result.Roles) > 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "Roles:")
-			for _, r := range result.Roles {
-				fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", r)
-			}
-			fmt.Fprintln(cmd.OutOrStdout())
-		}
-
-		if len(result.Permissions) > 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "Effective permissions:")
-			for _, p := range result.Permissions {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s\n", p)
-			}
-			fmt.Fprintln(cmd.OutOrStdout())
-		}
-
-		if appSlug != "" && result.AppContext != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "App-scoped (%s):\n", appSlug)
-			if len(result.AppContext.Permissions) > 0 {
-				for _, p := range result.AppContext.Permissions {
-					fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s\n", p)
-				}
-			} else {
-				fmt.Fprintln(cmd.OutOrStdout(), "  (no app-scoped permissions — are you a member?)")
-			}
-			fmt.Fprintln(cmd.OutOrStdout())
-		}
-
-		if len(result.Missing) > 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "Common permissions you do NOT hold:")
-			for _, m := range result.Missing {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✗ %s\n", m)
-			}
-			fmt.Fprintln(cmd.OutOrStdout())
-			fmt.Fprintf(cmd.OutOrStdout(),
-				"Hint: ask an org admin to grant you the missing permissions.\n"+
-					"Run `astro perms diagnose --json` for the full machine-readable report.\n")
-		}
-
-		return nil
+		return permissionCommandError(cmd, runPermsDiagnose(cmd, args))
 	},
+}
+
+func runPermsDiagnose(cmd *cobra.Command, args []string) error {
+	permission, _ := cmd.Flags().GetString("permission")
+	scopeType, _ := cmd.Flags().GetString("scope-type")
+	scopeID, _ := cmd.Flags().GetString("scope-id")
+	permission, scopeID = strings.TrimSpace(permission), strings.TrimSpace(scopeID)
+	scopeType = strings.ToUpper(strings.TrimSpace(scopeType))
+	if cmd.Flags().Changed("permission") && permission == "" {
+		return fmt.Errorf("--permission requires a nonempty permission slug")
+	}
+	if (scopeType == "") != (scopeID == "") {
+		return fmt.Errorf("--scope-type and --scope-id must be supplied together")
+	}
+	if scopeType != "" {
+		switch scopeType {
+		case "ORG", "TEAM", "PROJECT", "APP", "AGENT":
+		default:
+			return fmt.Errorf("--scope-type must be ORG, TEAM, PROJECT, APP or AGENT")
+		}
+		if permission == "" {
+			return fmt.Errorf("--scope-type and --scope-id require --permission")
+		}
+		if len(args) != 0 {
+			return fmt.Errorf("pass an app slug or explicit scope flags, not both")
+		}
+	}
+	client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+	if err != nil {
+		return err
+	}
+	org, err := resolveOrg(cmd, cmd.Context(), client, cfg)
+	if err != nil {
+		return err
+	}
+	user, err := fetchPermissionIdentity(cmd, client)
+	if err != nil {
+		return err
+	}
+	var response struct {
+		Permissions []string          `json:"astroliftMyPermissions"`
+		Sources     []permissionEntry `json:"effectivePermissions"`
+	}
+	userID := fmt.Sprint(user.UserID)
+	if err := client.GraphQL(cmd.Context(), diagnosePermissionsQuery,
+		map[string]interface{}{"userId": userID}, &response); err != nil {
+		return fmt.Errorf("fetching account grants: %w", err)
+	}
+	if response.Permissions == nil || response.Sources == nil {
+		return fmt.Errorf("server returned no account grant report")
+	}
+	result := PermsDiagnoseResult{
+		User: *user, Organization: org,
+		AccountGrants: accountGrantSummary{Interpretation: accountGrantNotice, Permissions: response.Permissions},
+		GrantSources:  response.Sources,
+	}
+	if len(args) == 1 {
+		var response struct {
+			App *appPermissionSummary `json:"astroliftApp"`
+		}
+		if err := client.GraphQL(cmd.Context(), appPermissionsQuery,
+			map[string]interface{}{"slug": args[0]}, &response); err != nil {
+			return fmt.Errorf("fetching app grant summary: %w", err)
+		}
+		if response.App == nil || response.App.ID == "" || response.App.Slug != args[0] || response.App.Permissions == nil {
+			return fmt.Errorf("app %q has no visible verified grant summary in the selected organization", args[0])
+		}
+		response.App.Interpretation = "Account grants on this app; not the current credential's authority or an environment-specific action check."
+		result.AppContext = response.App
+		if permission != "" {
+			scopeType, scopeID = "APP", response.App.ID
+		}
+	}
+	if permission != "" {
+		variables := map[string]interface{}{"userId": userID, "permission": permission}
+		if scopeType != "" {
+			variables["scopeType"], variables["scopeId"] = scopeType, scopeID
+		}
+		var response struct {
+			Diagnosis *permissionDiagnosis `json:"permissionDiagnose"`
+		}
+		if err := client.GraphQL(cmd.Context(), permissionDiagnosisQuery, variables, &response); err != nil {
+			return fmt.Errorf("fetching account diagnostic: %w", err)
+		}
+		if response.Diagnosis == nil || response.Diagnosis.UserID != userID || response.Diagnosis.Permission != permission || response.Diagnosis.Steps == nil {
+			return fmt.Errorf("server returned no matching account diagnostic")
+		}
+		response.Diagnosis.Interpretation = diagnosisNotice
+		result.Diagnosis = response.Diagnosis
+	}
+	// The server can reflect request text in traces. Remove the current
+	// credential even from otherwise permitted informational fields.
+	redactPermissionReport(client, &result)
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, result)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "User: %s (id %d)\nOrg:  %s (%s)\n", result.User.Username, result.User.UserID, result.Organization.Slug, result.Organization.ID)
+	printAccountPermissions(cmd, &result.AccountGrants)
+	fmt.Fprintln(cmd.OutOrStdout(), "\nGrant sources (account-level):")
+	for _, source := range result.GrantSources {
+		fmt.Fprintf(cmd.OutOrStdout(), "  %s: %s\n", source.Slug, strings.Join(source.GrantedVia, ", "))
+	}
+	if result.AppContext != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "\nApp %s (%s): %s\n", result.AppContext.Slug, result.AppContext.ID, result.AppContext.Interpretation)
+		for _, slug := range result.AppContext.Permissions {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", slug)
+		}
+	}
+	if result.Diagnosis != nil {
+		diagnosis := result.Diagnosis
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n%s: granted=%t\n", diagnosis.Interpretation, diagnosis.Permission, diagnosis.Granted)
+		for _, step := range diagnosis.Steps {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s: %t — %s\n", step.Check, step.Result, step.Detail)
+		}
+	}
+	return nil
+}
+
+func redactPermissionReport(client *api.Client, result *PermsDiagnoseResult) {
+	result.Organization = redactPermissionOrg(client, result.Organization)
+	redactStrings := func(values []string) {
+		for i, value := range values {
+			values[i] = client.RedactDiagnostic(value)
+		}
+	}
+	redactStrings(result.AccountGrants.Permissions)
+	for i := range result.GrantSources {
+		source := &result.GrantSources[i]
+		source.Slug = client.RedactDiagnostic(source.Slug)
+		source.Resource = client.RedactDiagnostic(source.Resource)
+		source.Action = client.RedactDiagnostic(source.Action)
+		redactStrings(source.GrantedVia)
+	}
+	if result.AppContext != nil {
+		result.AppContext.ID = client.RedactDiagnostic(result.AppContext.ID)
+		result.AppContext.Slug = client.RedactDiagnostic(result.AppContext.Slug)
+		redactStrings(result.AppContext.Permissions)
+	}
+	if result.Diagnosis != nil {
+		diagnosis := result.Diagnosis
+		diagnosis.Username = client.RedactDiagnostic(diagnosis.Username)
+		diagnosis.Permission = client.RedactDiagnostic(diagnosis.Permission)
+		for i := range diagnosis.Steps {
+			step := &diagnosis.Steps[i]
+			step.Check = client.RedactDiagnostic(step.Check)
+			step.Detail = client.RedactDiagnostic(step.Detail)
+		}
+	}
 }
 
 // permsListCmd implements `astro perms list` — raw list of all platform permissions.
@@ -200,6 +289,9 @@ Useful when writing custom roles or debugging access control.`,
 }
 
 func init() {
+	permsDiagnoseCmd.Flags().String("permission", "", "Request an informational account diagnostic for one permission slug")
+	permsDiagnoseCmd.Flags().String("scope-type", "", "Diagnostic target: ORG, TEAM, PROJECT, APP or AGENT (requires --scope-id)")
+	permsDiagnoseCmd.Flags().String("scope-id", "", "Actual target GUID (requires --scope-type and --permission)")
 	permsCmd.AddCommand(permsDiagnoseCmd, permsListCmd)
 	rootCmd.AddCommand(permsCmd)
 }
