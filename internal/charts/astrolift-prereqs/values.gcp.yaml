@@ -44,9 +44,8 @@ rookCeph:
 
 # cert-manager: enabled. Workload Identity binding for Cloud DNS dns-01 lives
 # in the GCP terraform tree; the ClusterIssuer below wires the GSA + project.
-# `certManager.enabled` is condition-only. Real subchart values go under
-# the hyphenated `cert-manager:` key below, because the dependency has no
-# `alias` (see values.yaml, #1695 defect 3).
+# The camelCase block gates the dependency; Helm forwards settings under
+# the dependency name because cert-manager has no alias.
 certManager:
   enabled: true
 
@@ -102,6 +101,8 @@ strimzi:
 redis-operator:
   enabled: false
 redisOperator:
+  enabled: false
+opensearch-operator:
   enabled: false
 vault:
   enabled: false

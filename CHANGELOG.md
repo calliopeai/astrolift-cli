@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Reconcile the embedded prerequisite chart with canonical opscode chart 0.1.1,
+  retaining cert-manager fixes and adding its existing OpenSearch operator/node
+  sysctl support. Refresh requires an exact published source revision; offline CI
+  verifies the complete committed source/archive inventory instead of silently
+  copying an unrelated sibling checkout.
+
 ## 0.7.1 — 2026-09-30
 
 ### Added

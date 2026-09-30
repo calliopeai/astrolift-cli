@@ -1,0 +1,51 @@
+{{- $operator := index .Values "opensearch-operator" -}}
+{{- if and $operator.enabled .Values.opensearchNodeSysctl.enabled -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "astrolift-prereqs.fullname" . }}-opensearch-sysctl
+  labels:
+    {{- include "astrolift-prereqs.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opensearch-node-sysctl
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: opensearch-node-sysctl
+  template:
+    metadata:
+      labels:
+        {{- include "astrolift-prereqs.labels" . | nindent 8 }}
+        app.kubernetes.io/component: opensearch-node-sysctl
+    spec:
+      automountServiceAccountToken: false
+      priorityClassName: system-node-critical
+      nodeSelector:
+        {{- toYaml .Values.opensearchNodeSysctl.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.opensearchNodeSysctl.tolerations | nindent 8 }}
+      containers:
+        - name: sysctl
+          image: {{ .Values.opensearchNodeSysctl.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ceu"]
+          args:
+            - >-
+              sysctl -w vm.max_map_count={{ .Values.opensearchNodeSysctl.value }};
+              exec sleep 2147483647
+          securityContext:
+            allowPrivilegeEscalation: true
+            privileged: true
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+            seccompProfile:
+              type: Unconfined
+          resources:
+            requests:
+              cpu: 5m
+              memory: 4Mi
+            limits:
+              cpu: 50m
+              memory: 16Mi
+{{- end -}}
