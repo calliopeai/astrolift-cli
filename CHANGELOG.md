@@ -8,6 +8,12 @@
   setup without overwriting it when omitted. Box wait timeouts name workspace
   setup as a possible cause (#112).
 
+- `astro operator domains list|create|update|verify` audits and manages visible
+  organization-owned/platform-shared DNS zones (#92). Creation explicitly
+  defaults to `tenant_apps`; sparse updates preserve unrelated config. JSON
+  exposes ownership, defaults, provisioning and TXT proof, and verification
+  exits nonzero while proof is pending. Shared writes remain server-authorized.
+
 - `astro app register --manifest-raw` sends the local manifest when source
   connections cannot fetch the repository (#90).
 - `astro app set-build-mode` changes the mode and strategy together without
