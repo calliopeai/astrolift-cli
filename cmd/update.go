@@ -224,7 +224,7 @@ func fetchJSON(ctx context.Context, url, token string, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if isReleaseAccessStatus(resp.StatusCode) {
 		return &releaseAccessError{
 			Status:    resp.StatusCode,
@@ -253,7 +253,7 @@ func downloadFile(ctx context.Context, url, token string, dst *os.File) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if isReleaseAccessStatus(resp.StatusCode) {
 		return &releaseAccessError{
 			Status:    resp.StatusCode,
