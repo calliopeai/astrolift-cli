@@ -235,7 +235,7 @@ func agentSessionAction(cmd *cobra.Command, snapshot json.RawMessage) (json.RawM
 			if err != nil {
 				return nil, err
 			}
-			defer handle.Close()
+			defer func() { _ = handle.Close() }()
 			reader = handle
 		}
 		raw, err := io.ReadAll(io.LimitReader(reader, 256*1024+1))
