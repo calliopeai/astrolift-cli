@@ -186,10 +186,10 @@ func scaffoldManifest(path string, cmd *cobra.Command) error {
 		appSlug = "my-app"
 	}
 
-	port := 8080
-	cpuLimit := "500m"
-	memLimit := "256Mi"
-	fwNote := "# No framework detected — using generic defaults."
+	var port = 8080
+	var cpuLimit = "500m"
+	var memLimit = "256Mi"
+	var fwNote = "# No framework detected — using generic defaults."
 
 	if fw != nil {
 		port = fw.Port
@@ -245,9 +245,9 @@ memory_limit = %q
 	}
 
 	if fw != nil {
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Detected: %s\n", fw.Name)
+		fmt.Fprintf(cmd.OutOrStdout(), "Detected: %s\n", fw.Name)
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Created %s\n", path)
-	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Edit the file, then run `astro app register`.")
+	fmt.Fprintf(cmd.OutOrStdout(), "Created %s\n", path)
+	fmt.Fprintln(cmd.OutOrStdout(), "Edit the file, then run `astro app register`.")
 	return nil
 }

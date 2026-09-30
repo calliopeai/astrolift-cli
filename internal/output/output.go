@@ -17,7 +17,6 @@ const (
 )
 
 // Writer handles formatted output to stdout/stderr.
-// Human-facing void methods are best effort; JSON returns serialization/write errors.
 type Writer struct {
 	out    io.Writer
 	errOut io.Writer

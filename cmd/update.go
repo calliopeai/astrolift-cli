@@ -69,7 +69,7 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Checking for latest release…")
+	fmt.Fprintln(cmd.OutOrStdout(), "Checking for latest release…")
 
 	token := githubToken()
 	var release githubRelease
@@ -94,11 +94,11 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 		cmp = -1
 	}
 	if cmp >= 0 {
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Already at latest version %s — nothing to do.\n", Version)
+		fmt.Fprintf(cmd.OutOrStdout(), "Already at latest version %s — nothing to do.\n", Version)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current: %s → Latest: %s\n", Version, release.TagName)
+	fmt.Fprintf(cmd.OutOrStdout(), "Current: %s → Latest: %s\n", Version, release.TagName)
 
 	// Determine the correct asset name for this OS/arch
 	assetName := resolveAssetName()
@@ -123,8 +123,8 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	}
 
 	if dryRun {
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "[dry-run] Would download: %s\n", downloadURL)
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] No changes made.")
+		fmt.Fprintf(cmd.OutOrStdout(), "[dry-run] Would download: %s\n", downloadURL)
+		fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] No changes made.")
 		return nil
 	}
 
@@ -138,13 +138,12 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 		return fmt.Errorf("resolving symlink: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Downloading %s…\n", assetName)
+	fmt.Fprintf(cmd.OutOrStdout(), "Downloading %s…\n", assetName)
 
 	tmpFile, err := os.CreateTemp("", "astro-update-*")
 	if err != nil {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
-	// Downloaded archive cleanup is best effort.
 	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if err := downloadFile(ctx, downloadURL, token, tmpFile); err != nil {
@@ -163,7 +162,6 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	if err != nil {
 		return fmt.Errorf("extracting binary: %w", err)
 	}
-	// Extracted temporary file cleanup is best effort.
 	defer func() { _ = os.Remove(binaryPath) }()
 
 	// Make executable
@@ -184,8 +182,8 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	}
 	_ = os.Remove(backup)
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated to %s at %s\n", release.TagName, self)
-	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Run `astro version` to confirm.")
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated to %s at %s\n", release.TagName, self)
+	fmt.Fprintln(cmd.OutOrStdout(), "Run `astro version` to confirm.")
 	return nil
 }
 
@@ -226,7 +224,6 @@ func fetchJSON(ctx context.Context, url, token string, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	// Response read errors are handled separately; closing the reader is best effort.
 	defer func() { _ = resp.Body.Close() }()
 	if isReleaseAccessStatus(resp.StatusCode) {
 		return &releaseAccessError{
@@ -256,7 +253,6 @@ func downloadFile(ctx context.Context, url, token string, dst *os.File) error {
 	if err != nil {
 		return err
 	}
-	// Response read errors are handled separately; closing the reader is best effort.
 	defer func() { _ = resp.Body.Close() }()
 	if isReleaseAccessStatus(resp.StatusCode) {
 		return &releaseAccessError{
@@ -287,14 +283,12 @@ func extractFromTarGz(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Read-only archive close is best effort; read errors are returned below.
 	defer func() { _ = f.Close() }()
 
 	gz, err := gzip.NewReader(f)
 	if err != nil {
 		return "", err
 	}
-	// Read-only decompressor close is best effort.
 	defer func() { _ = gz.Close() }()
 
 	tr := tar.NewReader(gz)
@@ -327,7 +321,6 @@ func extractFromZip(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Read-only archive close is best effort; read errors are returned below.
 	defer func() { _ = r.Close() }()
 
 	for _, f := range r.File {
@@ -337,7 +330,6 @@ func extractFromZip(path string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			// Read-only archive member close is best effort.
 			defer func() { _ = rc.Close() }()
 			out, err := os.CreateTemp("", "astro-new-*.exe")
 			if err != nil {

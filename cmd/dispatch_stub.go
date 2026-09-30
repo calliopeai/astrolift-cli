@@ -136,7 +136,6 @@ func (s *stubDispatcher) register(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("registration request: %w", err)
 	}
-	// Response read errors are handled separately; closing the reader is best effort.
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
@@ -173,7 +172,7 @@ func (s *stubDispatcher) heartbeat(ctx context.Context) {
 			s.setHeaders(req)
 			resp, err := s.httpClient.Do(req)
 			if err == nil {
-				_ = resp.Body.Close() // Response cleanup is best effort.
+				_ = resp.Body.Close()
 			}
 		}
 	}
@@ -209,7 +208,6 @@ func (s *stubDispatcher) fetchAndAdvance(ctx context.Context, out *os.File) {
 	if err != nil {
 		return
 	}
-	// Response read errors are handled separately; closing the reader is best effort.
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
@@ -268,14 +266,14 @@ func (s *stubDispatcher) advanceTask(ctx context.Context, taskID string, out *os
 		}
 		s.mu.Unlock()
 
-		_, _ = fmt.Fprintf(out, "  task %-12s → %s\n", taskID[:min(12, len(taskID))], status)
+		fmt.Fprintf(out, "  task %-12s → %s\n", taskID[:min(12, len(taskID))], status)
 
 		errMsg := ""
 		if shouldFail && status == "failed" {
 			errMsg = "stub: simulated failure (STUB_FAILURE_RATE)"
 		}
 		if err := s.reportStatus(ctx, taskID, status, errMsg); err != nil {
-			_, _ = fmt.Fprintf(out, "  warning: status report failed for %s: %v\n", taskID, err)
+			fmt.Fprintf(out, "  warning: status report failed for %s: %v\n", taskID, err)
 		}
 	}
 
@@ -313,7 +311,7 @@ func (s *stubDispatcher) reportStatus(ctx context.Context, taskID, status, errMs
 	if err != nil {
 		return err
 	}
-	_ = resp.Body.Close() // Response cleanup is best effort.
+	_ = resp.Body.Close()
 	return nil
 }
 
@@ -366,14 +364,14 @@ func (s *stubDispatcher) serveHTTP(ctx context.Context, out *os.File) {
 				s.mu.Unlock()
 
 				for _, line := range logs {
-					_, _ = fmt.Fprintf(w, "data: %s\n\n", line)
+					fmt.Fprintf(w, "data: %s\n\n", line)
 					flusher.Flush()
 				}
 
 				terminal := status == "completed" || status == "failed" ||
 					status == "cancelled" || status == "timed_out"
 				if !exists || terminal {
-					_, _ = fmt.Fprintf(w, "event: done\ndata: %s\n\n", status)
+					fmt.Fprintf(w, "event: done\ndata: %s\n\n", status)
 					flusher.Flush()
 					return
 				}
@@ -393,9 +391,9 @@ func (s *stubDispatcher) serveHTTP(ctx context.Context, out *os.File) {
 		_ = srv.Shutdown(shutCtx)
 	}()
 
-	_, _ = fmt.Fprintf(out, "Stub HTTP server listening on :%d\n", stubPort)
+	fmt.Fprintf(out, "Stub HTTP server listening on :%d\n", stubPort)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		_, _ = fmt.Fprintf(out, "Stub HTTP server error: %v\n", err)
+		fmt.Fprintf(out, "Stub HTTP server error: %v\n", err)
 	}
 }
 
@@ -475,10 +473,10 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	defer stop()
 
 	out := os.Stdout
-	_, _ = fmt.Fprintf(out, "Stub dispatcher %q starting\n", stub.name)
-	_, _ = fmt.Fprintf(out, "  Controller:   %s\n", apiURL)
-	_, _ = fmt.Fprintf(out, "  Delay:        %s\n", stubDelay)
-	_, _ = fmt.Fprintf(out, "  Failure rate: %.0f%%\n", failureRate*100)
+	fmt.Fprintf(out, "Stub dispatcher %q starting\n", stub.name)
+	fmt.Fprintf(out, "  Controller:   %s\n", apiURL)
+	fmt.Fprintf(out, "  Delay:        %s\n", stubDelay)
+	fmt.Fprintf(out, "  Failure rate: %.0f%%\n", failureRate*100)
 
 	// Register with the Controller
 	regCtx, regCancel := context.WithTimeout(ctx, 15*time.Second)
@@ -489,9 +487,9 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	regCancel()
 
 	if stub.dispatcherID != "" {
-		_, _ = fmt.Fprintf(out, "  Dispatcher ID: %s\n", stub.dispatcherID)
+		fmt.Fprintf(out, "  Dispatcher ID: %s\n", stub.dispatcherID)
 	}
-	_, _ = fmt.Fprintln(out, "Registered. Polling for tasks... (ctrl-c to stop)")
+	fmt.Fprintln(out, "Registered. Polling for tasks... (ctrl-c to stop)")
 
 	// Start HTTP server for log streaming (non-blocking)
 	go stub.serveHTTP(ctx, out)
@@ -502,7 +500,7 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	// Poll for tasks (blocks until ctx cancelled)
 	stub.poll(ctx, out)
 
-	_, _ = fmt.Fprintln(out, "Stub dispatcher stopped.")
+	fmt.Fprintln(out, "Stub dispatcher stopped.")
 	return nil
 }
 

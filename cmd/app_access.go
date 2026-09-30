@@ -76,16 +76,16 @@ func renderAppAccess(cmd *cobra.Command, a *appAccess) error {
 	}
 	out := cmd.OutOrStdout()
 	if !a.Restricted {
-		_, _ = fmt.Fprintf(out, "%s: open to every signed-in user of the cluster's central auth.\n", a.AppSlug)
+		fmt.Fprintf(out, "%s: open to every signed-in user of the cluster's central auth.\n", a.AppSlug)
 	} else {
-		_, _ = fmt.Fprintf(out, "%s: only these may enter.\n  groups: %s\n  users:  %s\n", a.AppSlug,
+		fmt.Fprintf(out, "%s: only these may enter.\n  groups: %s\n  users:  %s\n", a.AppSlug,
 			dashIfEmpty(strings.Join(a.Groups, ", ")), dashIfEmpty(strings.Join(a.Users, ", ")))
 	}
 	if a.ManagedByManifest {
-		_, _ = fmt.Fprintln(out, "Set by [ingress.access] in astrolift.toml; change it there.")
+		fmt.Fprintln(out, "Set by [ingress.access] in astrolift.toml; change it there.")
 	}
 	if len(a.EnforcedOn) == 0 {
-		_, _ = fmt.Fprintln(out, "Not enforced yet: none of this app's clusters is on the Envoy edge.")
+		fmt.Fprintln(out, "Not enforced yet: none of this app's clusters is on the Envoy edge.")
 	}
 	return nil
 }
@@ -123,12 +123,12 @@ func runAppAccessChange(cmd *cobra.Command, ctx context.Context, client *api.Cli
 			return fmt.Errorf("%d user(s) would lose access (%s): pass --yes to confirm",
 				len(preview.P.Losing), strings.Join(preview.P.Losing, ", "))
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d user(s) would lose access: %s\nContinue? [y/N] ",
+		fmt.Fprintf(cmd.OutOrStdout(), "%d user(s) would lose access: %s\nContinue? [y/N] ",
 			len(preview.P.Losing), strings.Join(preview.P.Losing, ", "))
 		var answer string
 		_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
 		if !strings.EqualFold(strings.TrimSpace(answer), "y") {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 			return nil
 		}
 	}

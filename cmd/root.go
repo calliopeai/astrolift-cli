@@ -62,7 +62,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the CLI version",
 	Run: func(cmd *cobra.Command, args []string) {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), versionString())
+		fmt.Fprintln(cmd.OutOrStdout(), versionString())
 	},
 }
 

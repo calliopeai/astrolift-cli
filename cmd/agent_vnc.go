@@ -120,13 +120,13 @@ func runAgentVNC(cmd *cobra.Command, ctx context.Context, client *api.Client, cf
 		})
 	}
 	if agentVNCURLOnly {
-		_, _ = fmt.Fprintln(out, consoleURL)
+		fmt.Fprintln(out, consoleURL)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(out, "Task:    %s (%s)\n", task.ID, task.Status)
-	_, _ = fmt.Fprintf(out, "Console: %s\n", consoleURL)
-	_, _ = fmt.Fprintln(out, "\nOpen the console URL in a browser signed in to Astrolift.")
+	fmt.Fprintf(out, "Task:    %s (%s)\n", task.ID, task.Status)
+	fmt.Fprintf(out, "Console: %s\n", consoleURL)
+	fmt.Fprintln(out, "\nOpen the console URL in a browser signed in to Astrolift.")
 	return nil
 }
 

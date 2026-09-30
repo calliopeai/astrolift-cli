@@ -94,7 +94,7 @@ func runCiSetup(cmd *cobra.Command, ctx context.Context, client *api.Client, app
 
 	// 1. Webhook -----------------------------------------------------------
 	if ciSetupSkipWebhook {
-		_, _ = fmt.Fprintln(out, "Webhook: skipped (--skip-webhook)")
+		fmt.Fprintln(out, "Webhook: skipped (--skip-webhook)")
 	} else {
 		var resp struct {
 			Result struct {
@@ -114,16 +114,16 @@ func runCiSetup(cmd *cobra.Command, ctx context.Context, client *api.Client, app
 			return fmt.Errorf("webhook install failed: %s", firstMutationError(resp.Result.Errors))
 		}
 		if d := resp.Result.Data; d != nil {
-			_, _ = fmt.Fprintf(out, "Webhook: %s (hook %s)\n", d.Status, d.HookID)
-			_, _ = fmt.Fprintf(out, "  receiver: %s\n", d.ReceiverURL)
+			fmt.Fprintf(out, "Webhook: %s (hook %s)\n", d.Status, d.HookID)
+			fmt.Fprintf(out, "  receiver: %s\n", d.ReceiverURL)
 		} else {
-			_, _ = fmt.Fprintln(out, "Webhook: installed")
+			fmt.Fprintln(out, "Webhook: installed")
 		}
 	}
 
 	// 2. Secrets -----------------------------------------------------------
 	if ciSetupSkipSecrets {
-		_, _ = fmt.Fprintln(out, "Secrets: skipped (--skip-secrets)")
+		fmt.Fprintln(out, "Secrets: skipped (--skip-secrets)")
 	} else {
 		var resp struct {
 			Result struct {
@@ -143,17 +143,17 @@ func runCiSetup(cmd *cobra.Command, ctx context.Context, client *api.Client, app
 			return fmt.Errorf("secrets push failed: %s", firstMutationError(resp.Result.Errors))
 		}
 		if d := resp.Result.Data; d != nil {
-			_, _ = fmt.Fprintf(out, "Secrets: pushed to %s\n", d.Repo)
-			_, _ = fmt.Fprintf(out, "  %s (deploy token ****%s)\n",
+			fmt.Fprintf(out, "Secrets: pushed to %s\n", d.Repo)
+			fmt.Fprintf(out, "  %s (deploy token ****%s)\n",
 				strings.Join(d.SecretNames, ", "), d.RotatedTokenLast4)
 		} else {
-			_, _ = fmt.Fprintln(out, "Secrets: pushed")
+			fmt.Fprintln(out, "Secrets: pushed")
 		}
 	}
 
 	// 3. Workflow ----------------------------------------------------------
 	if ciSetupSkipWorkflow {
-		_, _ = fmt.Fprintln(out, "Workflow: skipped (--skip-workflow)")
+		fmt.Fprintln(out, "Workflow: skipped (--skip-workflow)")
 	} else {
 		var resp struct {
 			Result struct {
@@ -173,20 +173,20 @@ func runCiSetup(cmd *cobra.Command, ctx context.Context, client *api.Client, app
 			return fmt.Errorf("workflow push failed: %s", firstMutationError(resp.Result.Errors))
 		}
 		if d := resp.Result.Data; d != nil {
-			_, _ = fmt.Fprintf(out, "Workflow: %s\n", d.Status)
+			fmt.Fprintf(out, "Workflow: %s\n", d.Status)
 			// The workflow lands as created/updated on the deploy branch
 			// (commit_sha), or as a PR if the branch is protected (pr_url).
 			if d.PrURL != nil && *d.PrURL != "" {
-				_, _ = fmt.Fprintf(out, "  PR: %s\n", *d.PrURL)
+				fmt.Fprintf(out, "  PR: %s\n", *d.PrURL)
 			} else if d.CommitSha != nil && *d.CommitSha != "" {
-				_, _ = fmt.Fprintf(out, "  commit: %s\n", *d.CommitSha)
+				fmt.Fprintf(out, "  commit: %s\n", *d.CommitSha)
 			}
 		} else {
-			_, _ = fmt.Fprintln(out, "Workflow: pushed")
+			fmt.Fprintln(out, "Workflow: pushed")
 		}
 	}
 
-	_, _ = fmt.Fprintf(out, "\nCI setup complete for %s.\n", appSlug)
+	fmt.Fprintf(out, "\nCI setup complete for %s.\n", appSlug)
 	return nil
 }
 

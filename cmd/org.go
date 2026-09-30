@@ -100,11 +100,11 @@ func orgFlagValue(cmd *cobra.Command) string {
 
 func pickOrg(cmd *cobra.Command, orgs []orgRef) (orgRef, error) {
 	out := cmd.ErrOrStderr()
-	_, _ = fmt.Fprintln(out, "Select an organization:")
+	fmt.Fprintln(out, "Select an organization:")
 	for i, o := range orgs {
-		_, _ = fmt.Fprintf(out, "  [%d] %s (%s)\n", i+1, o.Slug, o.Name)
+		fmt.Fprintf(out, "  [%d] %s (%s)\n", i+1, o.Slug, o.Name)
 	}
-	_, _ = fmt.Fprint(out, "> ")
+	fmt.Fprint(out, "> ")
 	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
 		return orgRef{}, fmt.Errorf("reading selection: %w", err)
@@ -131,13 +131,13 @@ func runOrgList(cmd *cobra.Command, args []string) error {
 		return renderJSON(cmd, orgs)
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "ACTIVE\tSLUG\tNAME\tID")
+	fmt.Fprintln(w, "ACTIVE\tSLUG\tNAME\tID")
 	for _, o := range orgs {
 		active := ""
 		if o.Slug == cfg.DefaultOrg {
 			active = "*"
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", active, o.Slug, o.Name, o.ID)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", active, o.Slug, o.Name, o.ID)
 	}
 	return w.Flush()
 }
@@ -158,7 +158,7 @@ func runOrgUse(cmd *cobra.Command, args []string) error {
 			if err := cfg.Save(); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Default organization set to %s (%s)\n", o.Slug, o.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "Default organization set to %s (%s)\n", o.Slug, o.Name)
 			return nil
 		}
 	}
@@ -183,7 +183,7 @@ func runOrgCurrent(cmd *cobra.Command, args []string) error {
 	} else if cfg.DefaultOrg != "" {
 		src = "default (astro org use)"
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s (%s)  [%s]\n", org.Slug, org.Name, src)
+	fmt.Fprintf(cmd.OutOrStdout(), "%s (%s)  [%s]\n", org.Slug, org.Name, src)
 	return nil
 }
 

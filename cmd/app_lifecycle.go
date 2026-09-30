@@ -48,6 +48,7 @@ var (
 
 	appDeployEnv      string
 	appDeployImageTag string
+	appDeployRef      string
 	appDeployWait     bool
 
 	appRollbackEnv string
@@ -140,7 +141,7 @@ const startDeploymentMutation = `mutation($input: StartDeploymentInput!) {
   startDeployment(input: $input) {
     ok
     errors { code message field }
-    data { id status environmentName imageTag registeredAppSlug triggerKind createdAt }
+    data { id status environmentName imageTag commitSha branch registeredAppSlug triggerKind createdAt }
   }
 }`
 
@@ -237,6 +238,8 @@ type deploymentSummary struct {
 	Status          string `json:"status"`
 	EnvironmentName string `json:"environmentName"`
 	ImageTag        string `json:"imageTag"`
+	CommitSHA       string `json:"commitSha"`
+	Branch          string `json:"branch"`
 	CreatedAt       string `json:"createdAt"`
 	// Populated on failed/aborted deployments; empty otherwise.
 	AbortedReason string `json:"abortedReason"`
@@ -478,14 +481,14 @@ func runAppList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 
 	out := cmd.OutOrStdout()
 	if len(resp.Apps) == 0 {
-		_, _ = fmt.Fprintln(out, "No apps found.")
+		fmt.Fprintln(out, "No apps found.")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "SLUG\tNAME\tSTATUS\tREPO\tLAST DEPLOYED")
+	fmt.Fprintln(w, "SLUG\tNAME\tSTATUS\tREPO\tLAST DEPLOYED")
 	for _, a := range resp.Apps {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			a.Slug, a.Name, appStatusLabel(a.ProvisioningStatus, a.IsActive, a.IsArchived),
 			dashIfEmpty(a.SourceRepo), shortTime(a.LastDeployedAt),
 		)
@@ -493,7 +496,7 @@ func runAppList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d app(s).\n", len(resp.Apps))
+	fmt.Fprintf(out, "\n%d app(s).\n", len(resp.Apps))
 	return nil
 }
 
@@ -543,49 +546,49 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 
 	a := result.App
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "App:          %s (%s)\n", a.Name, a.Slug)
+	fmt.Fprintf(out, "App:          %s (%s)\n", a.Name, a.Slug)
 	if a.Description != "" {
-		_, _ = fmt.Fprintf(out, "Description:  %s\n", a.Description)
+		fmt.Fprintf(out, "Description:  %s\n", a.Description)
 	}
-	_, _ = fmt.Fprintf(out, "Status:       %s\n", appStatusLabel(a.ProvisioningStatus, a.IsActive, a.IsArchived))
+	fmt.Fprintf(out, "Status:       %s\n", appStatusLabel(a.ProvisioningStatus, a.IsActive, a.IsArchived))
 	if a.ProvisioningError != "" {
-		_, _ = fmt.Fprintf(out, "Error:        %s\n", a.ProvisioningError)
+		fmt.Fprintf(out, "Error:        %s\n", a.ProvisioningError)
 	}
-	_, _ = fmt.Fprintf(out, "Org/Project:  %s / %s\n", a.OrganizationSlug, dashIfEmpty(a.ProjectSlug))
+	fmt.Fprintf(out, "Org/Project:  %s / %s\n", a.OrganizationSlug, dashIfEmpty(a.ProjectSlug))
 	source := dashIfEmpty(a.SourceRepo)
 	if a.SourceKind != "" && a.SourceRepo != "" {
 		source = fmt.Sprintf("%s %s", a.SourceKind, a.SourceRepo)
 	}
-	_, _ = fmt.Fprintf(out, "Source:       %s\n", source)
+	fmt.Fprintf(out, "Source:       %s\n", source)
 	if a.DefaultBranch != "" {
-		_, _ = fmt.Fprintf(out, "Branch:       %s\n", a.DefaultBranch)
+		fmt.Fprintf(out, "Branch:       %s\n", a.DefaultBranch)
 	}
 	if a.BuildMode != "" {
-		_, _ = fmt.Fprintf(out, "Build mode:   %s\n", a.BuildMode)
+		fmt.Fprintf(out, "Build mode:   %s\n", a.BuildMode)
 	}
 	if a.K8sNamespace != "" {
-		_, _ = fmt.Fprintf(out, "Namespace:    %s\n", a.K8sNamespace)
+		fmt.Fprintf(out, "Namespace:    %s\n", a.K8sNamespace)
 	}
 	if host := a.ManagedHostname; host != "" {
-		_, _ = fmt.Fprintf(out, "Hostname:     %s\n", host)
+		fmt.Fprintf(out, "Hostname:     %s\n", host)
 	} else if a.Subdomain != "" {
-		_, _ = fmt.Fprintf(out, "Subdomain:    %s\n", a.Subdomain)
+		fmt.Fprintf(out, "Subdomain:    %s\n", a.Subdomain)
 	}
 
 	if d := a.LatestDeployment; d != nil {
-		_, _ = fmt.Fprintln(out, "\nLatest deployment:")
-		_, _ = fmt.Fprintf(out, "  %s  env=%s  image=%s  (%s)\n",
+		fmt.Fprintln(out, "\nLatest deployment:")
+		fmt.Fprintf(out, "  %s  env=%s  image=%s  (%s)\n",
 			d.Status, d.EnvironmentName, dashIfEmpty(d.ImageTag), shortTime(&d.CreatedAt))
 	}
 
-	_, _ = fmt.Fprintln(out, "\nWorkloads:")
+	fmt.Fprintln(out, "\nWorkloads:")
 	if len(result.Workloads) == 0 {
-		_, _ = fmt.Fprintln(out, "  (none)")
+		fmt.Fprintln(out, "  (none)")
 	} else {
 		w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-		_, _ = fmt.Fprintln(w, "  NAME\tKIND\tREPLICAS\tCPU\tMEMORY\tPUBLIC")
+		fmt.Fprintln(w, "  NAME\tKIND\tREPLICAS\tCPU\tMEMORY\tPUBLIC")
 		for _, wl := range result.Workloads {
-			_, _ = fmt.Fprintf(w, "  %s\t%s\t%d\t%s\t%s\t%s\n",
+			fmt.Fprintf(w, "  %s\t%s\t%d\t%s\t%s\t%s\n",
 				wl.Slug, wl.Kind, wl.Replicas,
 				dashIfEmpty(wl.CPULimit), dashIfEmpty(wl.MemoryLimit), yesNo(wl.IsPublic))
 		}
@@ -594,12 +597,12 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 		}
 	}
 
-	_, _ = fmt.Fprintln(out, "\nEnvironments:")
+	fmt.Fprintln(out, "\nEnvironments:")
 	if len(result.Environments) == 0 {
-		_, _ = fmt.Fprintln(out, "  (none)")
+		fmt.Fprintln(out, "  (none)")
 	} else {
 		w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-		_, _ = fmt.Fprintln(w, "  NAME\tURL\tDEPLOYS\tCLUSTER")
+		fmt.Fprintln(w, "  NAME\tURL\tDEPLOYS\tCLUSTER")
 		for _, e := range result.Environments {
 			cluster := "-"
 			if e.ClusterSlug != nil && *e.ClusterSlug != "" {
@@ -609,7 +612,7 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 			if e.DeploysPaused {
 				deploys = "paused"
 			}
-			_, _ = fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n", e.Name, dashIfEmpty(e.URL), deploys, cluster)
+			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n", e.Name, dashIfEmpty(e.URL), deploys, cluster)
 		}
 		if err := w.Flush(); err != nil {
 			return err
@@ -626,7 +629,10 @@ var appDeployCmd = &cobra.Command{
 	Long: `Starts a deployment via the startDeployment GraphQL mutation. The app
 slug comes from --app or the local astrolift.toml.
 
---image-tag is required (the container image tag or digest to deploy).
+--image-tag is required for ci_pushed apps. For platform_build, omit it to
+build the registered deploy branch and tag the image with its resolved commit.
+For build_mode=none, omit it to use the images declared in the manifest.
+--ref selects a source branch, tag, or commit; the API pins it before scheduling.
 --env selects the target environment (default: production).
 With --wait, blocks until the deployment reaches a terminal state, polling
 astroliftDeployment and surfacing status transitions.
@@ -646,15 +652,16 @@ Exit codes: 0 success, 1 deploy failure.`,
 }
 
 func runAppDeploy(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
-	if strings.TrimSpace(appDeployImageTag) == "" {
-		return fmt.Errorf("--image-tag is required (the image tag or digest to deploy)")
-	}
-
 	input := map[string]interface{}{
 		"appSlug":         slug,
 		"environmentName": appDeployEnv,
-		"imageTag":        appDeployImageTag,
 		"triggerKind":     "manual",
+	}
+	if tag := strings.TrimSpace(appDeployImageTag); tag != "" {
+		input["imageTag"] = tag
+	}
+	if ref := strings.TrimSpace(appDeployRef); ref != "" {
+		input["sourceRef"] = ref
 	}
 
 	deployCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -680,10 +687,17 @@ func runAppDeploy(cmd *cobra.Command, ctx context.Context, client *api.Client, s
 	}
 
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "Deployment started: %s\n", d.ID)
-	_, _ = fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
-	_, _ = fmt.Fprintf(out, "Image:              %s\n", d.ImageTag)
-	_, _ = fmt.Fprintf(out, "Status:             %s\n", d.Status)
+	fmt.Fprintf(out, "Deployment started: %s\n", d.ID)
+	fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
+	if _, err := fmt.Fprintf(out, "Image:              %s\n", dashIfEmpty(d.ImageTag)); err != nil {
+		return err
+	}
+	if d.CommitSHA != "" {
+		if _, err := fmt.Fprintf(out, "Source commit:      %s\n", d.CommitSHA); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(out, "Status:             %s\n", d.Status)
 
 	if !appDeployWait {
 		return nil
@@ -696,7 +710,7 @@ func runAppDeploy(cmd *cobra.Command, ctx context.Context, client *api.Client, s
 // a non-success state or the wait times out.
 func waitForDeployment(cmd *cobra.Command, ctx context.Context, client *api.Client, id string) error {
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(out, "Waiting for terminal state...")
+	fmt.Fprintln(out, "Waiting for terminal state...")
 
 	pollCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
@@ -713,14 +727,14 @@ func waitForDeployment(cmd *cobra.Command, ctx context.Context, client *api.Clie
 		if resp.Deployment != nil {
 			status := resp.Deployment.Status
 			if status != last {
-				_, _ = fmt.Fprintf(out, "  → %s\n", status)
+				fmt.Fprintf(out, "  → %s\n", status)
 				last = status
 			}
 			if done, ok := deploymentTerminal(status); done {
-				_, _ = fmt.Fprintf(out, "Final status: %s\n", status)
+				fmt.Fprintf(out, "Final status: %s\n", status)
 				if !ok {
 					if reason := resp.Deployment.AbortedReason; reason != "" {
-						_, _ = fmt.Fprintf(out, "Reason: %s\n", reason)
+						fmt.Fprintf(out, "Reason: %s\n", reason)
 					}
 					return fmt.Errorf("deployment ended in %q", status)
 				}
@@ -777,18 +791,18 @@ func runAppRollback(cmd *cobra.Command, ctx context.Context, client *api.Client,
 			return err
 		}
 		id = running.ID
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Resolved running deployment for %s/%s: %s (image %s)\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "Resolved running deployment for %s/%s: %s (image %s)\n",
 			slug, appRollbackEnv, id, dashIfEmpty(running.ImageTag))
 	}
 
 	if !appRollbackYes {
 		noPrompt, _ := cmd.Root().PersistentFlags().GetBool("no-prompt")
 		if !noPrompt {
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Roll back deployment %s? [y/N] ", id)
+			fmt.Fprintf(cmd.OutOrStdout(), "Roll back deployment %s? [y/N] ", id)
 			var answer string
 			_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
 			}
 		}
@@ -813,10 +827,10 @@ func runAppRollback(cmd *cobra.Command, ctx context.Context, client *api.Client,
 		return renderJSON(cmd, d)
 	}
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "Rollback started:   %s\n", d.ID)
-	_, _ = fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
-	_, _ = fmt.Fprintf(out, "Image:              %s\n", d.ImageTag)
-	_, _ = fmt.Fprintf(out, "Status:             %s\n", d.Status)
+	fmt.Fprintf(out, "Rollback started:   %s\n", d.ID)
+	fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
+	fmt.Fprintf(out, "Image:              %s\n", d.ImageTag)
+	fmt.Fprintf(out, "Status:             %s\n", d.Status)
 	return nil
 }
 
@@ -905,11 +919,11 @@ func runAppPromote(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 		return renderJSON(cmd, d)
 	}
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "Promotion started:  %s\n", d.ID)
-	_, _ = fmt.Fprintf(out, "From → To:          %s → %s\n", from, to)
-	_, _ = fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
-	_, _ = fmt.Fprintf(out, "Image:              %s\n", d.ImageTag)
-	_, _ = fmt.Fprintf(out, "Status:             %s\n", d.Status)
+	fmt.Fprintf(out, "Promotion started:  %s\n", d.ID)
+	fmt.Fprintf(out, "From → To:          %s → %s\n", from, to)
+	fmt.Fprintf(out, "Environment:        %s\n", d.EnvironmentName)
+	fmt.Fprintf(out, "Image:              %s\n", d.ImageTag)
+	fmt.Fprintf(out, "Status:             %s\n", d.Status)
 	return nil
 }
 
@@ -993,56 +1007,56 @@ func runAppDeregister(cmd *cobra.Command, ctx context.Context, client *api.Clien
 		return renderJSON(cmd, d)
 	}
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "\nDeregister workflow started: %s\n", d.WorkflowID)
+	fmt.Fprintf(out, "\nDeregister workflow started: %s\n", d.WorkflowID)
 	for _, r := range d.StillLiveResources {
-		_, _ = fmt.Fprintf(out, "  still live: %s\n", r)
+		fmt.Fprintf(out, "  still live: %s\n", r)
 	}
-	_, _ = fmt.Fprintln(out, "\nTeardown begins after a ~5-minute grace window; within it the run can be")
-	_, _ = fmt.Fprintln(out, "cancelled (cancelAstroliftDeregister mutation with the workflow id above).")
-	_, _ = fmt.Fprintln(out, "Re-running deregister retries any partially-failed teardown.")
+	fmt.Fprintln(out, "\nTeardown begins after a ~5-minute grace window; within it the run can be")
+	fmt.Fprintln(out, "cancelled (cancelAstroliftDeregister mutation with the workflow id above).")
+	fmt.Fprintln(out, "Re-running deregister retries any partially-failed teardown.")
 	return nil
 }
 
 // printDeregisterPreview renders the AstroliftDeregisterPreview inventory —
 // what the teardown workflow will destroy — before anything is mutated.
 func printDeregisterPreview(out io.Writer, p *deregisterPreview) {
-	_, _ = fmt.Fprintf(out, "App:                  %s (%s)\n", p.AppName, p.AppSlug)
-	_, _ = fmt.Fprintf(out, "Resources to destroy: %d\n", p.TotalResourceCount)
+	fmt.Fprintf(out, "App:                  %s (%s)\n", p.AppName, p.AppSlug)
+	fmt.Fprintf(out, "Resources to destroy: %d\n", p.TotalResourceCount)
 	if len(p.K8sObjects) > 0 {
-		_, _ = fmt.Fprintf(out, "  k8s objects (%d):\n", len(p.K8sObjects))
+		fmt.Fprintf(out, "  k8s objects (%d):\n", len(p.K8sObjects))
 		for _, o := range p.K8sObjects {
-			_, _ = fmt.Fprintf(out, "    %s/%s %s/%s\n", o.ClusterSlug, o.Namespace, o.Kind, o.Name)
+			fmt.Fprintf(out, "    %s/%s %s/%s\n", o.ClusterSlug, o.Namespace, o.Kind, o.Name)
 		}
 	}
 	if len(p.ManagedServices) > 0 {
-		_, _ = fmt.Fprintf(out, "  managed services (%d) — data is destroyed:\n", len(p.ManagedServices))
+		fmt.Fprintf(out, "  managed services (%d) — data is destroyed:\n", len(p.ManagedServices))
 		for _, s := range p.ManagedServices {
-			_, _ = fmt.Fprintf(out, "    %s (%s/%s, env %s, %s)\n", s.Name, s.Kind, s.Variant, s.EnvironmentName, s.Status)
+			fmt.Fprintf(out, "    %s (%s/%s, env %s, %s)\n", s.Name, s.Kind, s.Variant, s.EnvironmentName, s.Status)
 		}
 	}
 	if len(p.SecretRefs) > 0 {
-		_, _ = fmt.Fprintf(out, "  secret refs (%d):\n", len(p.SecretRefs))
+		fmt.Fprintf(out, "  secret refs (%d):\n", len(p.SecretRefs))
 		for _, s := range p.SecretRefs {
-			_, _ = fmt.Fprintf(out, "    %s (env %s, prefix %s)\n", s.BundleSlug, s.EnvironmentName, s.Prefix)
+			fmt.Fprintf(out, "    %s (env %s, prefix %s)\n", s.BundleSlug, s.EnvironmentName, s.Prefix)
 		}
 	}
 	if len(p.DeployTokens) > 0 {
-		_, _ = fmt.Fprintf(out, "  deploy tokens (%d):\n", len(p.DeployTokens))
+		fmt.Fprintf(out, "  deploy tokens (%d):\n", len(p.DeployTokens))
 		for _, tok := range p.DeployTokens {
-			_, _ = fmt.Fprintf(out, "    %s (…%s)\n", tok.Name, tok.Last4)
+			fmt.Fprintf(out, "    %s (…%s)\n", tok.Name, tok.Last4)
 		}
 	}
 	if len(p.IdentityRoles) > 0 {
-		_, _ = fmt.Fprintf(out, "  identity roles (%d):\n", len(p.IdentityRoles))
+		fmt.Fprintf(out, "  identity roles (%d):\n", len(p.IdentityRoles))
 		for _, r := range p.IdentityRoles {
-			_, _ = fmt.Fprintf(out, "    %s %s %s\n", r.ClusterSlug, r.Kind, r.RoleArnOrPrincipal)
+			fmt.Fprintf(out, "    %s %s %s\n", r.ClusterSlug, r.Kind, r.RoleArnOrPrincipal)
 		}
 	}
 	if p.SourceWebhook != nil && p.SourceWebhook.Installed {
-		_, _ = fmt.Fprintf(out, "  source webhook:       %s\n", p.SourceWebhook.Repo)
+		fmt.Fprintf(out, "  source webhook:       %s\n", p.SourceWebhook.Repo)
 	}
 	if p.RegistryRepoURI != "" {
-		_, _ = fmt.Fprintf(out, "  registry repo:        %s\n", p.RegistryRepoURI)
+		fmt.Fprintf(out, "  registry repo:        %s\n", p.RegistryRepoURI)
 	}
 }
 
@@ -1120,7 +1134,7 @@ func runAppLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 	}
 	logMetaNotes(cmd, meta)
 	if capped {
-		_, _ = fmt.Fprintln(cmd.ErrOrStderr(),
+		fmt.Fprintln(cmd.ErrOrStderr(),
 			"note: the log window has more lines than were scanned; narrow --since for older lines")
 	}
 
@@ -1237,7 +1251,7 @@ func paginateAppLogs(ctx context.Context, client *api.Client, base map[string]in
 
 // printLogLine renders one log line as "<timestamp> <message>".
 func printLogLine(out io.Writer, l appLogLine) {
-	_, _ = fmt.Fprintf(out, "%s %s\n", l.Timestamp, l.Message)
+	fmt.Fprintf(out, "%s %s\n", l.Timestamp, l.Message)
 }
 
 // logMetaNotes surfaces page-level caveats (no historical backend / retention)
@@ -1245,11 +1259,11 @@ func printLogLine(out io.Writer, l appLogLine) {
 func logMetaNotes(cmd *cobra.Command, meta appLogPage) {
 	errOut := cmd.ErrOrStderr()
 	if !meta.HistoricalAvailable {
-		_, _ = fmt.Fprintln(errOut,
+		fmt.Fprintln(errOut,
 			"note: this cluster has no historical log backend configured (live tail only)")
 	}
 	if meta.ReachedRetention {
-		_, _ = fmt.Fprintln(errOut,
+		fmt.Fprintln(errOut,
 			"note: earlier lines were discarded by the log backend (retention window)")
 	}
 }
@@ -1346,7 +1360,8 @@ func init() {
 
 	// deploy
 	appDeployCmd.Flags().StringVar(&appDeployEnv, "env", "production", "Target environment")
-	appDeployCmd.Flags().StringVar(&appDeployImageTag, "image-tag", "", "Container image tag or digest to deploy (required)")
+	appDeployCmd.Flags().StringVar(&appDeployImageTag, "image-tag", "", "Container image tag or digest (required for ci_pushed; platform builds default to the source commit)")
+	appDeployCmd.Flags().StringVar(&appDeployRef, "ref", "", "Source branch, tag, or commit (default: registered deploy branch)")
 	appDeployCmd.Flags().BoolVar(&appDeployWait, "wait", false, "Block until the deployment reaches a terminal state")
 
 	// rollback

@@ -155,8 +155,8 @@ func runAgentSend(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	}
 
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "Queued for task %s.\n", taskID)
-	_, _ = fmt.Fprintln(out, "The agent applies it at its next turn boundary; it is not delivered yet.")
+	fmt.Fprintf(out, "Queued for task %s.\n", taskID)
+	fmt.Fprintln(out, "The agent applies it at its next turn boundary; it is not delivered yet.")
 	return nil
 }
 

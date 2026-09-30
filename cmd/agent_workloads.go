@@ -150,17 +150,17 @@ func runAgentWorkloadsList(cmd *cobra.Command, ctx context.Context, client *api.
 
 	if len(workloads) == 0 {
 		if agentWorkloadsProject != "" {
-			_, _ = fmt.Fprintf(out, "No agent workloads found in project %q.\n", agentWorkloadsProject)
+			fmt.Fprintf(out, "No agent workloads found in project %q.\n", agentWorkloadsProject)
 		} else {
-			_, _ = fmt.Fprintln(out, "No agent workloads found.")
+			fmt.Fprintln(out, "No agent workloads found.")
 		}
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "SLUG\tGUID\tPROJECT\tAPP\tMODE\tRUNNING\tLAST RUN\tSOURCE")
+	fmt.Fprintln(w, "SLUG\tGUID\tPROJECT\tAPP\tMODE\tRUNNING\tLAST RUN\tSOURCE")
 	for _, a := range workloads {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
 			a.Slug, a.ID, a.ProjectSlug, a.AppSlug,
 			runModeLabel(a), a.RunningCount, lastRunLabel(a), a.SourceRepo,
 		)
@@ -168,7 +168,7 @@ func runAgentWorkloadsList(cmd *cobra.Command, ctx context.Context, client *api.
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d agent workload(s) shown.\n", len(workloads))
+	fmt.Fprintf(out, "\n%d agent workload(s) shown.\n", len(workloads))
 	return nil
 }
 

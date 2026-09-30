@@ -200,7 +200,6 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		}
 		return fmt.Errorf("connecting exec socket (%s): %w", wsURL, err)
 	}
-	// The relay result is authoritative; connection cleanup is best effort.
 	defer func() { _ = conn.Close() }()
 
 	if len(command) == 0 {
@@ -222,7 +221,7 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 			// SIGINT handler below covers it, but an operator whose Ctrl-C
 			// now interrupts the remote rather than the shell they think they
 			// are in deserves to know which mode they are in (#72).
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+			fmt.Fprintf(cmd.ErrOrStderr(),
 				"warning: could not put the terminal in raw mode (%v); Ctrl-C will "+
 					"interrupt the remote process rather than being passed through\n", merr)
 		}
@@ -338,11 +337,11 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		}
 		switch frame.Type {
 		case "stdout":
-			_, _ = fmt.Fprint(out, frame.Data)
+			fmt.Fprint(out, frame.Data)
 		case "stderr":
-			_, _ = fmt.Fprint(errOut, frame.Data)
+			fmt.Fprint(errOut, frame.Data)
 		case "error":
-			_, _ = fmt.Fprintln(errOut, "exec error: "+frame.Message)
+			fmt.Fprintln(errOut, "exec error: "+frame.Message)
 		case "exit":
 			if restore != nil {
 				restore()

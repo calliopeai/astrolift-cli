@@ -277,21 +277,21 @@ func resolveOnboardTarget(target string) (string, error) {
 func (r onboardReport) render(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 	if r.DryRun {
-		_, _ = fmt.Fprintf(out, "Dry run: nothing written.\n\n")
+		fmt.Fprintf(out, "Dry run: nothing written.\n\n")
 	}
 
 	if r.Auth.Authenticated {
-		_, _ = fmt.Fprintf(out, "Auth: %s\n", r.Auth.Source)
+		fmt.Fprintf(out, "Auth: %s\n", r.Auth.Source)
 	} else {
-		_, _ = fmt.Fprintf(out, "Auth: NOT configured\n")
+		fmt.Fprintf(out, "Auth: NOT configured\n")
 	}
 	if r.Auth.Hint != "" {
-		_, _ = fmt.Fprintf(out, "      %s\n", r.Auth.Hint)
+		fmt.Fprintf(out, "      %s\n", r.Auth.Hint)
 	}
 	if r.APIURL != "" {
-		_, _ = fmt.Fprintf(out, "Install: %s\n", r.APIURL)
+		fmt.Fprintf(out, "Install: %s\n", r.APIURL)
 	}
-	_, _ = fmt.Fprintln(out)
+	fmt.Fprintln(out)
 
 	for _, w := range r.Written {
 		verb := "wrote"
@@ -301,15 +301,15 @@ func (r onboardReport) render(cmd *cobra.Command) error {
 		if w.Skipped {
 			verb = "skipped"
 		}
-		_, _ = fmt.Fprintf(out, "  %-12s %s", verb, w.Path)
+		fmt.Fprintf(out, "  %-12s %s", verb, w.Path)
 		if w.Detail != "" {
-			_, _ = fmt.Fprintf(out, "  (%s)", w.Detail)
+			fmt.Fprintf(out, "  (%s)", w.Detail)
 		}
-		_, _ = fmt.Fprintln(out)
+		fmt.Fprintln(out)
 	}
 
 	if !r.Auth.Authenticated {
-		_, _ = fmt.Fprintf(out, "\nNext: authenticate, then re-run to confirm.\n")
+		fmt.Fprintf(out, "\nNext: authenticate, then re-run to confirm.\n")
 	}
 	return nil
 }

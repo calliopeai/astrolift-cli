@@ -126,27 +126,27 @@ func runAppDomainsList(cmd *cobra.Command, ctx context.Context, client *api.Clie
 
 	out := cmd.OutOrStdout()
 	if len(resp.Domains) == 0 {
-		_, _ = fmt.Fprintf(out, "No custom domains for app %q.\n", appSlug)
+		fmt.Fprintf(out, "No custom domains for app %q.\n", appSlug)
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "HOSTNAME\tACTIVE\tVALIDATION METHOD\tDNS VALIDATION\tCERT STATE\tCERT EXPIRES")
+	fmt.Fprintln(w, "HOSTNAME\tACTIVE\tVALIDATION METHOD\tDNS VALIDATION\tCERT STATE\tCERT EXPIRES")
 	for _, d := range resp.Domains {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			d.Hostname, yesNo(d.IsActive), dashIfEmpty(d.ValidationMethod), dashIfEmpty(d.CertState),
 			dashIfEmpty(d.CertificateState), shortTime(d.CertExpiresAt))
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d domain(s) shown.\n", len(resp.Domains))
+	fmt.Fprintf(out, "\n%d domain(s) shown.\n", len(resp.Domains))
 	for _, d := range resp.Domains {
 		if msg := strings.TrimSpace(d.LastValidationError); msg != "" {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "note: %s: validation error: %s\n", d.Hostname, msg)
+			fmt.Fprintf(cmd.ErrOrStderr(), "note: %s: validation error: %s\n", d.Hostname, msg)
 		}
 		if msg := strings.TrimSpace(d.LastCertificateError); msg != "" {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "note: %s: certificate error: %s\n", d.Hostname, msg)
+			fmt.Fprintf(cmd.ErrOrStderr(), "note: %s: certificate error: %s\n", d.Hostname, msg)
 		}
 	}
 	return nil

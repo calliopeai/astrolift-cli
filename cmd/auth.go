@@ -79,7 +79,7 @@ MCP gateway alike.`,
 		defer cancelStart()
 
 		if !asJSON {
-			_, _ = fmt.Fprintf(out, "Starting login flow against %s...\n", entry.APIURL)
+			fmt.Fprintf(out, "Starting login flow against %s...\n", entry.APIURL)
 		}
 		clientKind, err := auth.ClientKindForScope(loginScope)
 		if err != nil {
@@ -105,7 +105,7 @@ MCP gateway alike.`,
 				return err
 			}
 		} else {
-			_, _ = fmt.Fprintf(out, "\nOpen this URL in your browser to complete login:\n  %s\n\n", session.LoginURL)
+			fmt.Fprintf(out, "\nOpen this URL in your browser to complete login:\n  %s\n\n", session.LoginURL)
 		}
 
 		if !loginNoBrowser && !loginNoWait {
@@ -114,7 +114,7 @@ MCP gateway alike.`,
 
 		if loginNoWait {
 			if !asJSON {
-				_, _ = fmt.Fprintf(out,
+				fmt.Fprintf(out,
 					"Not waiting. Finish in the browser, then run:\n  astro auth wait --session-id %s %s\n",
 					session.SessionID, serverSlug,
 				)
@@ -123,7 +123,7 @@ MCP gateway alike.`,
 		}
 
 		if !asJSON {
-			_, _ = fmt.Fprintln(out, "Waiting for authentication...")
+			fmt.Fprintln(out, "Waiting for authentication...")
 		}
 		return awaitLogin(cmd, serverSlug, entry.APIURL, session)
 	},
@@ -173,7 +173,7 @@ func awaitLogin(cmd *cobra.Command, serverSlug, apiURL string, session *auth.Log
 			ExpiresAt:     creds.ExpiresAt.Format(time.RFC3339),
 		})
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Logged in to %s.\n", apiURL)
+	fmt.Fprintf(cmd.OutOrStdout(), "Logged in to %s.\n", apiURL)
 	return nil
 }
 
@@ -245,14 +245,14 @@ var authLogoutCmd = &cobra.Command{
 			signOutErr := auth.SignOut(ctx, entry.APIURL, creds.RefreshToken)
 			cancel()
 			if signOutErr != nil {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not end the session at %s: %v\n", entry.APIURL, signOutErr)
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not end the session at %s: %v\n", entry.APIURL, signOutErr)
 			}
 		}
 
 		if err := config.DeleteCredentials(serverSlug); err != nil {
 			return err
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Logged out of %s.\n", serverSlug)
+		fmt.Fprintf(cmd.OutOrStdout(), "Logged out of %s.\n", serverSlug)
 		return nil
 	},
 }
@@ -266,7 +266,7 @@ var authStatusCmd = &cobra.Command{
 			return err
 		}
 		if cfg.CurrentServer == "" && strings.TrimSpace(viper.GetString("server")) == "" {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Not logged in. No current server.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Not logged in. No current server.")
 			return nil
 		}
 		serverSlug, entry, err := selectedServer(cfg, nil)
@@ -282,7 +282,7 @@ var authStatusCmd = &cobra.Command{
 		if creds.IsExpired(time.Minute) {
 			state = "EXPIRED — run `astro auth refresh`"
 		}
-		_, _ = fmt.Fprintf(
+		fmt.Fprintf(
 			cmd.OutOrStdout(),
 			"Server:     %s\nAPI URL:    %s\nExpires at: %s\nState:      %s\n",
 			serverSlug, entry.APIURL,
@@ -317,7 +317,7 @@ var authRefreshCmd = &cobra.Command{
 		if err := config.SaveCredentials(serverSlug, fresh); err != nil {
 			return err
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Token refreshed.")
+		fmt.Fprintln(cmd.OutOrStdout(), "Token refreshed.")
 		return nil
 	},
 }

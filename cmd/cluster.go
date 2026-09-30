@@ -234,21 +234,21 @@ func runClusterBootstrap(cmd *cobra.Command, _ []string) error {
 	}
 
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "Cluster:        %s (%s)\n", cluster.Name, cluster.Slug)
-	_, _ = fmt.Fprintf(out, "Provider:       %s\n", cluster.ProviderPluginSlug)
-	_, _ = fmt.Fprintf(out, "Cloud overlay:  %s\n", cloud)
-	_, _ = fmt.Fprintf(out, "Auth method:    %s\n", cluster.AuthMethod)
-	_, _ = fmt.Fprintf(out, "Chart version:  %s\n", charts.PinnedChartVersion)
-	_, _ = fmt.Fprintf(out, "Namespace:      %s\n", clusterBootstrapNamespace)
-	_, _ = fmt.Fprintf(out, "Release name:   %s\n", clusterBootstrapReleaseName)
+	fmt.Fprintf(out, "Cluster:        %s (%s)\n", cluster.Name, cluster.Slug)
+	fmt.Fprintf(out, "Provider:       %s\n", cluster.ProviderPluginSlug)
+	fmt.Fprintf(out, "Cloud overlay:  %s\n", cloud)
+	fmt.Fprintf(out, "Auth method:    %s\n", cluster.AuthMethod)
+	fmt.Fprintf(out, "Chart version:  %s\n", charts.PinnedChartVersion)
+	fmt.Fprintf(out, "Namespace:      %s\n", clusterBootstrapNamespace)
+	fmt.Fprintf(out, "Release name:   %s\n", clusterBootstrapReleaseName)
 	if clusterBootstrapDryRun {
-		_, _ = fmt.Fprintln(out, "Mode:           dry-run (no cluster changes)")
+		fmt.Fprintln(out, "Mode:           dry-run (no cluster changes)")
 	} else if clusterBootstrapUpgrade {
-		_, _ = fmt.Fprintln(out, "Mode:           upgrade --install")
+		fmt.Fprintln(out, "Mode:           upgrade --install")
 	} else {
-		_, _ = fmt.Fprintln(out, "Mode:           install")
+		fmt.Fprintln(out, "Mode:           install")
 	}
-	_, _ = fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "")
 
 	kubeSrc, err := buildKubeconfigSource(ctx, client, cluster, clusterBootstrapKubeconfig)
 	if err != nil {
@@ -304,7 +304,7 @@ func runClusterBootstrap(cmd *cobra.Command, _ []string) error {
 	// in the cluster, so there's no bootstrap to record.
 	if !clusterBootstrapDryRun {
 		if err := recordBootstrapRun(ctx, client, cluster, cloud, result, installErr, startedAt, endedAt); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to record bootstrap run on control plane: %v\n", err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to record bootstrap run on control plane: %v\n", err)
 		}
 	}
 
@@ -424,7 +424,7 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 		return fmt.Errorf("applying astrolift-agent Secret: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(),
+	fmt.Fprintf(cmd.OutOrStdout(),
 		"Installed agent key + Secret on cluster %s (key %s). Run `astro operator cluster deploy-agent --slug %s` to (re)land the Deployment.\n",
 		cluster.Slug, map[bool]string{true: "rotated", false: "issued"}[key.Rotated], cluster.Slug)
 	return nil
@@ -521,7 +521,7 @@ func runClusterDeployAgent(cmd *cobra.Command, ctx context.Context, client *api.
 		return fmt.Errorf("agent deploy failed: %s", firstMutationError(resp.Result.Errors))
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Keep-alive agent applied to cluster %s.\n", cluster.Slug)
+	fmt.Fprintf(cmd.OutOrStdout(), "Keep-alive agent applied to cluster %s.\n", cluster.Slug)
 	return nil
 }
 
@@ -649,23 +649,23 @@ func defaultKubeconfigPath() (string, error) {
 
 func renderInstallResult(out io.Writer, result *bootstrap.InstallResult, installErr error) {
 	if result == nil {
-		_, _ = fmt.Fprintln(out, "")
-		_, _ = fmt.Fprintln(out, "Result:        no result returned")
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "Result:        no result returned")
 		return
 	}
-	_, _ = fmt.Fprintln(out, "")
-	_, _ = fmt.Fprintf(out, "Release:       %s (revision %d, status %s)\n",
+	fmt.Fprintln(out, "")
+	fmt.Fprintf(out, "Release:       %s (revision %d, status %s)\n",
 		result.Release.Name, result.Release.Version, result.Release.Status,
 	)
 	if result.RenderedOnly {
-		_, _ = fmt.Fprintln(out, "Dry-run completed — review the rendered manifests above.")
+		fmt.Fprintln(out, "Dry-run completed — review the rendered manifests above.")
 	} else if installErr == nil {
-		_, _ = fmt.Fprintln(out, "Bootstrap complete.")
-		_, _ = fmt.Fprintln(out, "Next step:     run `astro operator cluster bring-into-management --slug <slug>`")
+		fmt.Fprintln(out, "Bootstrap complete.")
+		fmt.Fprintln(out, "Next step:     run `astro operator cluster bring-into-management --slug <slug>`")
 	}
 	if len(result.SubchartStatus) > 0 {
-		_, _ = fmt.Fprintln(out, "")
-		_, _ = fmt.Fprintln(out, "Subcharts in this release:")
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "Subcharts in this release:")
 		// Stable-ordered output — operators eyeball the same list across runs.
 		order := []string{
 			"certManager", "externalDns", "ingressNginx", "metallb",
@@ -677,7 +677,7 @@ func renderInstallResult(out io.Writer, result *bootstrap.InstallResult, install
 			if status == "" {
 				status = "disabled"
 			}
-			_, _ = fmt.Fprintf(out, "  %-16s %s\n", k+":", status)
+			fmt.Fprintf(out, "  %-16s %s\n", k+":", status)
 		}
 	}
 }
