@@ -1,8 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.7.1 — 2026-09-30
 
 ### Added
+
+- `astro onboard` installs the bundled skills and offline guides and writes
+  MCP configuration for the selected install; `--dry-run` reports the plan
+  without changing files or performing authentication.
+- `astro api graphql` runs a document with the selected server credentials
+  and explicit or saved organization; unknown organizations fail before the
+  request is sent.
+- `astro box ensure --image` accepts an explicit image for a one-off box.
+  This does not supply the cluster image catalog or separate custom-image
+  capability requested by CLI #86; that acceptance remains open.
+- `astro apply -f <file.toml>` creates or updates declared agent environment
+  specs and supports a write-free `--dry-run`; env-spec upsert also exposes
+  `--non-root` without changing omitted settings.
+- Exact workflow executions can be inspected, watched, stopped and cleaned
+  up, including recorded stage history. Workflow imports support `--replace`,
+  new manifest imports are activated before launch, and `workflow gate`/`gates`
+  expose pending approval gates.
+- Project resources expose cost and provider links.
 
 - Add `astro whoami [--permissions]` with server-verified identity in the
   verified selected organization. The optional account grant summary is
@@ -78,6 +96,14 @@
   (calliopeai/astrolift-cli#91, calliopeai/astrolift-cli#99).
 
 ### Fixed
+
+- `astro auth logout` attempts to end the selected device-flow session at
+  the server before clearing local credentials; unreachable servers produce
+  a warning while local logout still succeeds.
+- Agent log following survives a rolling tail window; task inspection
+  exposes recorded failures and task operations retain organization selection.
+- Bootstrap launch fields match the API, failed bootstrap releases roll back,
+  and prerequisite chart handling installs the CRDs before dependent issuers.
 
 - `astro app deploy` allows omitting `--image-tag` for platform builds and apps
   using manifest images. The API resolves platform builds to a commit before
