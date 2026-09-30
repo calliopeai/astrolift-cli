@@ -292,6 +292,46 @@ most 200 visible zones without pagination; a full-sized result emits a warning
 on stderr, and cannot establish a complete install-wide audit. Deletion and
 provisioning repair commands are not exposed here.
 
+## Inspect identity and account grants
+
+```bash
+astro whoami --org platform
+astro whoami --permissions --json
+astro perms diagnose
+astro perms diagnose my-app --permission app.deploy
+astro perms diagnose --permission app.deploy --scope-type PROJECT --scope-id <project-guid>
+```
+
+`whoami` reads your current profile from the selected server after verifying the
+selected organization. `--permissions` adds the account grants held somewhere in
+that organization. `perms diagnose` also reports their role-binding sources and,
+with an app slug, the account's grants on that visible app. These are
+**informational summaries**: they do not establish that a bearer credential can
+act on a target. A grant on a sibling project cannot approve an operation here.
+
+`--permission` requests the server's existing account diagnostic, preserving its
+verdict and trace. An app slug resolves to its actual app GUID. Explicit
+`--scope-type` and `--scope-id` must be supplied together; supported types are
+`ORG`, `TEAM`, `PROJECT`, `APP` and the existing `AGENT` scope. With no target, the
+server diagnoses the selected organization context. A retrieved denied verdict
+is a successful diagnostic and exits zero; failure to retrieve a matching trace
+exits nonzero. This diagnostic does not establish credential limits or evaluate
+a mutation's environment and approval requirements, and is never used to
+authorize or preflight another command.
+
+With `--json`, data goes to stdout and retrieval errors produce a JSON error on
+stderr while returning nonzero. Structured GraphQL errors preserve the server's
+message, code, reason, path and declared current/requested version fields when
+present. HTTP refusals without a GraphQL error report the status. Raw error
+bodies and arbitrary extensions are excluded; `--debug` reports GraphQL status
+and byte count without dumping the response. The current bearer value is
+redacted if reflected in diagnostic text. Credentials are not displayed or
+decoded to guess identity or scopes.
+
+The early-refusal acceptance in app #1867 remains partial: the existing account
+diagnostic is not an operation-specific authorization contract. Enforcement
+continues on the server; this change introduces no generic command preflight.
+
 ## Commands
 
 | Group | Purpose |
