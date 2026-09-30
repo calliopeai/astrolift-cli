@@ -238,6 +238,60 @@ the status note above.)
 
 ---
 
+## Managed DNS zones
+
+Managed zones supply platform hostnames for tenant apps and preview environments.
+They are separate from an app's custom domains (`astro app domains list`). Select
+an organization with `--org` or `astro org use`; `--server` selects its registered
+endpoint and credentials without changing the saved default. Permissions,
+canonical zone names, proof of control and provisioning are enforced by the API.
+
+```bash
+astro operator domains list --org acme
+astro operator domains list --org acme --json | jq '.[] | select(.defaultFor == "none")'
+astro operator domains create apps.example.com --dns-driver route53 --org acme
+astro operator domains create previews.example.com --dns-driver route53 --default-for preview_envs --org acme
+astro operator domains update <domain-id> --default-for both --org acme --json
+astro operator domains update <domain-id> --wildcard=false --org acme
+```
+
+Creation explicitly sends `defaultFor=tenant_apps`, `organizationScoped=true`
+and `isWildcardManaged=false`. `--default-for` accepts `tenant_apps`,
+`preview_envs`, `both` or `none`; `none` excludes the zone from automatic default
+matching. Existing organization/environment bindings may still use it. Updates
+send only supplied settings, so correcting `default_for` preserves DNS config and
+wildcard settings. Use the ID returned by `list` for updates; the zone and DNS
+driver cannot be changed by the current API.
+
+`--shared` on creation asks for a platform-shared zone; the server requires
+platform-operator permission for every shared write. Organization-owned writes
+require the server's domain configuration permission. Neither flag bypasses the
+server's authorization checks. With the current API, domain writes need an
+organization-scoped token with `admin` scope and the owner's actual
+`provider_plugin.configure` permission; `astro auth login --scope clusters`
+does not grant that permission. Team-scoped tokens cannot act on these
+organization resources. Reads use `provider_plugin.read` (`read:clusters`).
+
+`--dns-config <file.json>` accepts a JSON object for provider-specific settings.
+It is not printed or read back. On update it replaces the **entire** DNS config;
+omit it to preserve the saved config. An existing hosted zone may require proof
+of control. The create result and JSON list expose the required TXT record; after
+publishing it, run:
+
+```bash
+astro operator domains verify apps.example.com --org acme --json
+```
+
+Verification returns a nonzero exit status while proof remains pending, even
+when the API successfully performed the lookup. JSON includes `zone`, `verified`
+and `message`. Creating or verifying a zone may start asynchronous provisioning;
+a successful command does not prove delegation, TLS issuance or app readiness.
+Use `list` to inspect verification, provisioning, nameservers and validation
+records (`--json` exposes the full returned status). The API currently lists at
+most 200 visible zones without pagination; a full-sized result emits a warning
+on stderr, and cannot establish a complete install-wide audit. Deletion and
+provisioning repair commands are not exposed here.
+
 ## Commands
 
 | Group | Purpose |
@@ -252,7 +306,7 @@ the status note above.)
 | `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, control, and delete organization workflows. `validate --server` is authoritative for the selected install. `run-manifest <file.toml>` collapses `import` → `create --bind` → activation → `run` into one call, resolving each `agent_dispatch` stage's declared agent against the org's registered workloads (`--dry-run` shows the resolved bindings; `--no-run` leaves the imported definition disabled for review). `import --replace` upserts the org's own definition sharing the manifest's slug instead of always creating a new one: in place when the stage kinds are unchanged, so configured Workflows, bindings and schedules keep working untouched, otherwise as a new version with every configured Workflow repointed to it, or a clear refusal (nothing changed) when a repoint would break one's bindings. Launching enables only the newly imported definition through the platform update API and requires workflow update permission. Use `definition <slug>` to review an import and `definition-enable <slug>` to enable it explicitly; `workflow run` never enables existing definitions implicitly. `run-cancel <slug>` stops an in-flight run — cooperatively by default so a run that owns external resources tears them down, or `--terminate --reason <text>` to hard-kill a wedged one; `--run <guid>` picks a run other than the newest, `--yes` is the confirmation (no prompt), and a run that is already terminal is refused before anything is sent. `run-show <slug>` prints a run stage by stage: order, kind, role, status, attempt, timings, and for a `human_gate` its gate state (pending / approved / rejected / closed) plus the approvers the stage declares, so "waiting on approval, and on whom" is read from the platform. Deciding a gate is not a CLI operation. Repository registration separately reconciles `workflows/**/*.toml`. |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. `render` prints the manifests the platform would apply (`astroliftRenderedManifest`) for pre-merge review. |
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `project resources` discovers the selected cluster's full provider catalogue and manages project-owned shared services and their app/agent attachments. |
-| `astro operator` | Operator (admin) cluster, provider, and federation management. |
+| `astro operator` | Cluster, provider, and federation management, plus `domains list/create/update/verify` for organization-owned and visible platform-shared managed DNS zones. Shared writes require platform-operator permission. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
