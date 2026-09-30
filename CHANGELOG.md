@@ -4,6 +4,10 @@
 
 ### Added
 
+- `astro agent env-spec upsert --box-workspace[=false]` explicitly changes box
+  setup without overwriting it when omitted. Box wait timeouts name workspace
+  setup as a possible cause (#112).
+
 - `astro app register --manifest-raw` sends the local manifest when source
   connections cannot fetch the repository (#90).
 - `astro app set-build-mode` changes the mode and strategy together without
