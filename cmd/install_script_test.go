@@ -144,7 +144,7 @@ func stubReleaseAPI(t *testing.T, token, archiveName, archivePath, checksumsPath
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{
+		_, _ = fmt.Fprintf(w, `{
   "url": "https://api.github.com/repos/calliopeai/astrolift-cli/releases/1",
   "id": 1,
   "tag_name": "v9.9.9",

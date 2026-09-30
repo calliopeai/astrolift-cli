@@ -99,17 +99,17 @@ query ListPipelines($limit: Int!) {
 
 	if pipelineListJSON {
 		b, _ := json.MarshalIndent(resp.Pipelines, "", "  ")
-		fmt.Fprintln(cmd.OutOrStdout(), string(b))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(b))
 		return nil
 	}
 
 	if len(resp.Pipelines) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No pipelines found. Create one with `astro pipeline` or register a TOML file.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No pipelines found. Create one with `astro pipeline` or register a TOML file.")
 		return nil
 	}
 
 	for _, p := range resp.Pipelines {
-		fmt.Fprintf(cmd.OutOrStdout(), "  %-30s  %s (branch: %s)\n", p.Name, p.RepoURL, p.DefaultBranch)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %-30s  %s (branch: %s)\n", p.Name, p.RepoURL, p.DefaultBranch)
 	}
 	return nil
 }
@@ -173,13 +173,13 @@ mutation TriggerPipelineRun($pipelineId: GUID!, $ref: String) {
 
 	if !mutResp.TriggerPipelineRun.Ok {
 		for _, e := range mutResp.TriggerPipelineRun.Errors {
-			fmt.Fprintf(cmd.ErrOrStderr(), "error: %s: %s\n", e.Code, e.Message)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "error: %s: %s\n", e.Code, e.Message)
 		}
 		return fmt.Errorf("trigger failed")
 	}
 
 	run := mutResp.TriggerPipelineRun.Data
-	fmt.Fprintf(cmd.OutOrStdout(), "Triggered run #%d (id: %s) — status: %s\n", run.RunNumber, run.ID, run.Status)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Triggered run #%d (id: %s) — status: %s\n", run.RunNumber, run.ID, run.Status)
 	return nil
 }
 
@@ -238,7 +238,7 @@ query ListPipelineRuns($pipelineId: String!, $limit: Int!) {
 	}
 
 	if len(resp.Runs) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No pipeline runs found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No pipeline runs found.")
 		return nil
 	}
 
@@ -249,7 +249,7 @@ query ListPipelineRuns($pipelineId: String!, $limit: Int!) {
 			t2, _ := time.Parse(time.RFC3339, *r.FinishedAt)
 			duration = fmt.Sprintf("%ds", int(t2.Sub(t1).Seconds()))
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  #%-4d  %-10s  %-12s  %s  (%s)\n",
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  #%-4d  %-10s  %-12s  %s  (%s)\n",
 			r.RunNumber, r.Status, r.TriggerKind, r.TriggerRef, duration)
 	}
 	return nil
@@ -295,12 +295,12 @@ mutation CancelPipelineRun($runId: GUID!) {
 
 	if !resp.Cancel.Ok {
 		for _, e := range resp.Cancel.Errors {
-			fmt.Fprintf(cmd.ErrOrStderr(), "error: %s: %s\n", e.Code, e.Message)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "error: %s: %s\n", e.Code, e.Message)
 		}
 		return fmt.Errorf("cancel failed")
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Run %s cancelled.\n", runID)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Run %s cancelled.\n", runID)
 	return nil
 }
 

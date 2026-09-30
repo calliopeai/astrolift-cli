@@ -136,7 +136,8 @@ func (s *stubDispatcher) register(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("registration request: %w", err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled separately; closing the reader is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("registration rejected with HTTP %d", resp.StatusCode)
@@ -172,7 +173,7 @@ func (s *stubDispatcher) heartbeat(ctx context.Context) {
 			s.setHeaders(req)
 			resp, err := s.httpClient.Do(req)
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close() // Response cleanup is best effort.
 			}
 		}
 	}
@@ -208,7 +209,8 @@ func (s *stubDispatcher) fetchAndAdvance(ctx context.Context, out *os.File) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled separately; closing the reader is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return
@@ -266,14 +268,14 @@ func (s *stubDispatcher) advanceTask(ctx context.Context, taskID string, out *os
 		}
 		s.mu.Unlock()
 
-		fmt.Fprintf(out, "  task %-12s → %s\n", taskID[:min(12, len(taskID))], status)
+		_, _ = fmt.Fprintf(out, "  task %-12s → %s\n", taskID[:min(12, len(taskID))], status)
 
 		errMsg := ""
 		if shouldFail && status == "failed" {
 			errMsg = "stub: simulated failure (STUB_FAILURE_RATE)"
 		}
 		if err := s.reportStatus(ctx, taskID, status, errMsg); err != nil {
-			fmt.Fprintf(out, "  warning: status report failed for %s: %v\n", taskID, err)
+			_, _ = fmt.Fprintf(out, "  warning: status report failed for %s: %v\n", taskID, err)
 		}
 	}
 
@@ -311,7 +313,7 @@ func (s *stubDispatcher) reportStatus(ctx context.Context, taskID, status, errMs
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup is best effort.
 	return nil
 }
 
@@ -364,14 +366,14 @@ func (s *stubDispatcher) serveHTTP(ctx context.Context, out *os.File) {
 				s.mu.Unlock()
 
 				for _, line := range logs {
-					fmt.Fprintf(w, "data: %s\n\n", line)
+					_, _ = fmt.Fprintf(w, "data: %s\n\n", line)
 					flusher.Flush()
 				}
 
 				terminal := status == "completed" || status == "failed" ||
 					status == "cancelled" || status == "timed_out"
 				if !exists || terminal {
-					fmt.Fprintf(w, "event: done\ndata: %s\n\n", status)
+					_, _ = fmt.Fprintf(w, "event: done\ndata: %s\n\n", status)
 					flusher.Flush()
 					return
 				}
@@ -391,9 +393,9 @@ func (s *stubDispatcher) serveHTTP(ctx context.Context, out *os.File) {
 		_ = srv.Shutdown(shutCtx)
 	}()
 
-	fmt.Fprintf(out, "Stub HTTP server listening on :%d\n", stubPort)
+	_, _ = fmt.Fprintf(out, "Stub HTTP server listening on :%d\n", stubPort)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		fmt.Fprintf(out, "Stub HTTP server error: %v\n", err)
+		_, _ = fmt.Fprintf(out, "Stub HTTP server error: %v\n", err)
 	}
 }
 
@@ -473,10 +475,10 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	defer stop()
 
 	out := os.Stdout
-	fmt.Fprintf(out, "Stub dispatcher %q starting\n", stub.name)
-	fmt.Fprintf(out, "  Controller:   %s\n", apiURL)
-	fmt.Fprintf(out, "  Delay:        %s\n", stubDelay)
-	fmt.Fprintf(out, "  Failure rate: %.0f%%\n", failureRate*100)
+	_, _ = fmt.Fprintf(out, "Stub dispatcher %q starting\n", stub.name)
+	_, _ = fmt.Fprintf(out, "  Controller:   %s\n", apiURL)
+	_, _ = fmt.Fprintf(out, "  Delay:        %s\n", stubDelay)
+	_, _ = fmt.Fprintf(out, "  Failure rate: %.0f%%\n", failureRate*100)
 
 	// Register with the Controller
 	regCtx, regCancel := context.WithTimeout(ctx, 15*time.Second)
@@ -487,9 +489,9 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	regCancel()
 
 	if stub.dispatcherID != "" {
-		fmt.Fprintf(out, "  Dispatcher ID: %s\n", stub.dispatcherID)
+		_, _ = fmt.Fprintf(out, "  Dispatcher ID: %s\n", stub.dispatcherID)
 	}
-	fmt.Fprintln(out, "Registered. Polling for tasks... (ctrl-c to stop)")
+	_, _ = fmt.Fprintln(out, "Registered. Polling for tasks... (ctrl-c to stop)")
 
 	// Start HTTP server for log streaming (non-blocking)
 	go stub.serveHTTP(ctx, out)
@@ -500,7 +502,7 @@ func runDispatchStub(cmd *cobra.Command, _ []string) error {
 	// Poll for tasks (blocks until ctx cancelled)
 	stub.poll(ctx, out)
 
-	fmt.Fprintln(out, "Stub dispatcher stopped.")
+	_, _ = fmt.Fprintln(out, "Stub dispatcher stopped.")
 	return nil
 }
 

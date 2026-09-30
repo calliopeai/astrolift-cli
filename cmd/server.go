@@ -47,9 +47,9 @@ var serverAddCmd = &cobra.Command{
 		if err := cfg.Save(); err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Added server %s -> %s\n", slug, apiURL)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added server %s -> %s\n", slug, apiURL)
 		if cfg.CurrentServer == slug {
-			fmt.Fprintf(cmd.OutOrStdout(), "Set as current server. Run `astro auth login` to authenticate.\n")
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Set as current server. Run `astro auth login` to authenticate.\n")
 		}
 		return nil
 	},
@@ -64,7 +64,7 @@ var serverListCmd = &cobra.Command{
 			return err
 		}
 		if len(cfg.Servers) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "No servers registered. Run `astro server add <slug> <api-url>`.")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No servers registered. Run `astro server add <slug> <api-url>`.")
 			return nil
 		}
 		slugs := make([]string, 0, len(cfg.Servers))
@@ -73,14 +73,14 @@ var serverListCmd = &cobra.Command{
 		}
 		sort.Strings(slugs)
 
-		fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-40s %s\n", "SLUG", "API URL", "CURRENT")
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-40s %s\n", "SLUG", "API URL", "CURRENT")
 		for _, slug := range slugs {
 			entry := cfg.Servers[slug]
 			marker := ""
 			if slug == cfg.CurrentServer {
 				marker = "*"
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-40s %s\n", slug, entry.APIURL, marker)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-40s %s\n", slug, entry.APIURL, marker)
 		}
 		return nil
 	},
@@ -103,7 +103,7 @@ var serverUseCmd = &cobra.Command{
 		if err := cfg.Save(); err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Switched to %s\n", slug)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Switched to %s\n", slug)
 		return nil
 	},
 }
@@ -133,7 +133,7 @@ var serverRemoveCmd = &cobra.Command{
 		if err := cfg.Save(); err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Removed %s\n", slug)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Removed %s\n", slug)
 		return nil
 	},
 }

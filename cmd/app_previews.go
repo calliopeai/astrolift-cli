@@ -439,7 +439,7 @@ func previewCostLabel(usd *float64) string {
 // would print a cleared trail as though it were current.
 func writePreviewPinDetail(out io.Writer, p previewEnvironment) {
 	if !p.IsPinned {
-		fmt.Fprintf(out, "Pinned:           %s\n", yesNo(false))
+		_, _ = fmt.Fprintf(out, "Pinned:           %s\n", yesNo(false))
 		return
 	}
 	// pinnedByEmail is null when the account that set the pin has since been
@@ -448,10 +448,10 @@ func writePreviewPinDetail(out io.Writer, p previewEnvironment) {
 	if p.PinnedByEmail != nil {
 		pinnedBy = *p.PinnedByEmail
 	}
-	fmt.Fprintf(out, "Pinned:           yes (exempt from TTL expiry and max-active eviction)\n")
-	fmt.Fprintf(out, "Pinned at:        %s\n", shortTime(p.PinnedAt))
-	fmt.Fprintf(out, "Pinned by:        %s\n", dashIfEmpty(pinnedBy))
-	fmt.Fprintf(out, "Pin reason:       %s\n", dashIfEmpty(p.PinReason))
+	_, _ = fmt.Fprintf(out, "Pinned:           yes (exempt from TTL expiry and max-active eviction)\n")
+	_, _ = fmt.Fprintf(out, "Pinned at:        %s\n", shortTime(p.PinnedAt))
+	_, _ = fmt.Fprintf(out, "Pinned by:        %s\n", dashIfEmpty(pinnedBy))
+	_, _ = fmt.Fprintf(out, "Pin reason:       %s\n", dashIfEmpty(p.PinReason))
 }
 
 // ---- transport --------------------------------------------------------------
@@ -598,17 +598,17 @@ func runAppPreviewsList(cmd *cobra.Command, ctx context.Context, client *api.Cli
 
 	if len(rows) == 0 {
 		if previewsListAll {
-			fmt.Fprintf(out, "No preview environments for app %q.\n", appSlug)
+			_, _ = fmt.Fprintf(out, "No preview environments for app %q.\n", appSlug)
 		} else {
-			fmt.Fprintf(out, "No active preview environments for app %q (--all includes torn-down ones).\n", appSlug)
+			_, _ = fmt.Fprintf(out, "No active preview environments for app %q (--all includes torn-down ones).\n", appSlug)
 		}
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "PR\tBRANCH\tSTATUS\tHOSTNAME\tLAST DEPLOYED\tTTL UNTIL\tPINNED")
+	_, _ = fmt.Fprintln(w, "PR\tBRANCH\tSTATUS\tHOSTNAME\tLAST DEPLOYED\tTTL UNTIL\tPINNED")
 	for _, p := range rows {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			previewPRLabel(p), dashIfEmpty(p.Branch), dashIfEmpty(p.Status),
 			dashIfEmpty(p.Hostname), shortTime(p.LastDeployedAt), shortTime(&p.TTLUntil),
 			yesNo(p.IsPinned),
@@ -617,9 +617,9 @@ func runAppPreviewsList(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "\n%d preview(s) shown.\n", len(rows))
+	_, _ = fmt.Fprintf(out, "\n%d preview(s) shown.\n", len(rows))
 	if truncated {
-		fmt.Fprintf(cmd.ErrOrStderr(),
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 			"note: only the %d most recent previews were scanned\n", previewsPageSize*previewsMaxPages)
 	}
 	return nil
@@ -661,29 +661,29 @@ func runAppPreviewsShow(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	}
 
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "App:              %s\n", dashIfEmpty(p.RegisteredAppSlug))
-	fmt.Fprintf(out, "PR:               %s\n", previewPRLabel(p))
-	fmt.Fprintf(out, "Branch:           %s\n", dashIfEmpty(p.Branch))
-	fmt.Fprintf(out, "Status:           %s\n", dashIfEmpty(p.Status))
+	_, _ = fmt.Fprintf(out, "App:              %s\n", dashIfEmpty(p.RegisteredAppSlug))
+	_, _ = fmt.Fprintf(out, "PR:               %s\n", previewPRLabel(p))
+	_, _ = fmt.Fprintf(out, "Branch:           %s\n", dashIfEmpty(p.Branch))
+	_, _ = fmt.Fprintf(out, "Status:           %s\n", dashIfEmpty(p.Status))
 	if u := previewURL(p); u != "" {
-		fmt.Fprintf(out, "URL:              %s\n", u)
+		_, _ = fmt.Fprintf(out, "URL:              %s\n", u)
 	} else {
-		fmt.Fprintln(out, "URL:              - (no hostname assigned yet)")
+		_, _ = fmt.Fprintln(out, "URL:              - (no hostname assigned yet)")
 	}
-	fmt.Fprintf(out, "Namespace:        %s\n", dashIfEmpty(p.Namespace))
-	fmt.Fprintf(out, "Commit:           %s\n", dashIfEmpty(p.CommitSha))
-	fmt.Fprintf(out, "Last deployed:    %s\n", shortTime(p.LastDeployedAt))
-	fmt.Fprintf(out, "TTL until:        %s\n", shortTime(&p.TTLUntil))
+	_, _ = fmt.Fprintf(out, "Namespace:        %s\n", dashIfEmpty(p.Namespace))
+	_, _ = fmt.Fprintf(out, "Commit:           %s\n", dashIfEmpty(p.CommitSha))
+	_, _ = fmt.Fprintf(out, "Last deployed:    %s\n", shortTime(p.LastDeployedAt))
+	_, _ = fmt.Fprintf(out, "TTL until:        %s\n", shortTime(&p.TTLUntil))
 	writePreviewPinDetail(out, p)
 	if previewIsTornDown(p) {
-		fmt.Fprintf(out, "Torn down:        %s\n", shortTime(p.TornDownAt))
+		_, _ = fmt.Fprintf(out, "Torn down:        %s\n", shortTime(p.TornDownAt))
 	}
 	if p.PRURL != "" {
-		fmt.Fprintf(out, "Pull request:     %s\n", p.PRURL)
+		_, _ = fmt.Fprintf(out, "Pull request:     %s\n", p.PRURL)
 	}
-	fmt.Fprintf(out, "Resources:        %s\n", previewResourcesLabel(p.AggregateResources))
-	fmt.Fprintf(out, "Estimated cost:   %s\n", previewCostLabel(p.EstimatedDailyCostUSD))
-	fmt.Fprintf(out, "ID:               %s\n", p.ID)
+	_, _ = fmt.Fprintf(out, "Resources:        %s\n", previewResourcesLabel(p.AggregateResources))
+	_, _ = fmt.Fprintf(out, "Estimated cost:   %s\n", previewCostLabel(p.EstimatedDailyCostUSD))
+	_, _ = fmt.Fprintf(out, "ID:               %s\n", p.ID)
 	return nil
 }
 
@@ -793,18 +793,18 @@ func runAppPreviewsOpen(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	// A building or failed preview still has a hostname; say so rather than
 	// silently opening a URL that will not resolve.
 	if !strings.EqualFold(p.Status, "running") {
-		fmt.Fprintf(cmd.ErrOrStderr(),
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 			"note: preview is %s, not running; the URL may not resolve yet\n", dashIfEmpty(p.Status))
 	}
 
 	out := cmd.OutOrStdout()
 	if previewsOpenURLOnly {
-		fmt.Fprintln(out, target)
+		_, _ = fmt.Fprintln(out, target)
 		return nil
 	}
-	fmt.Fprintln(out, target)
+	_, _ = fmt.Fprintln(out, target)
 	if err := openBrowser(target); err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "note: could not open a browser (%v); the URL is above\n", err)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "note: could not open a browser (%v); the URL is above\n", err)
 	}
 	return nil
 }
@@ -852,12 +852,12 @@ func runAppPreviewsTeardown(cmd *cobra.Command, ctx context.Context, client *api
 		if noPrompt {
 			return fmt.Errorf("teardown needs confirmation: pass --yes (--no-prompt is set)")
 		}
-		fmt.Fprintf(out, "Tear down preview %s for %s (%s)? [y/N] ",
+		_, _ = fmt.Fprintf(out, "Tear down preview %s for %s (%s)? [y/N] ",
 			previewPRLabel(p), appSlug, dashIfEmpty(p.Hostname))
 		var answer string
 		_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
 		if !strings.EqualFold(strings.TrimSpace(answer), "y") {
-			fmt.Fprintln(out, "Aborted.")
+			_, _ = fmt.Fprintln(out, "Aborted.")
 			return nil
 		}
 	}
@@ -888,8 +888,8 @@ func runAppPreviewsTeardown(cmd *cobra.Command, ctx context.Context, client *api
 			TeardownRequested: true,
 		})
 	}
-	fmt.Fprintf(out, "Teardown requested for preview %s (%s).\n", previewPRLabel(p), dashIfEmpty(p.Hostname))
-	fmt.Fprintln(out, "The namespace, DNS record and dedicated services are removed asynchronously.")
+	_, _ = fmt.Fprintf(out, "Teardown requested for preview %s (%s).\n", previewPRLabel(p), dashIfEmpty(p.Hostname))
+	_, _ = fmt.Fprintln(out, "The namespace, DNS record and dedicated services are removed asynchronously.")
 	return nil
 }
 
@@ -1020,15 +1020,15 @@ func runAppPreviewsSetPinned(
 
 	out := cmd.OutOrStdout()
 	if pinned {
-		fmt.Fprintf(out, "Pinned preview %s for %s (%s).\n",
+		_, _ = fmt.Fprintf(out, "Pinned preview %s for %s (%s).\n",
 			previewPRLabel(updated), appSlug, dashIfEmpty(updated.Hostname))
 		// The reason comes off the returned row, not off the flag: the server
 		// truncates it to 512 characters, and echoing the flag would report a
 		// justification longer than the one on the record.
 		if updated.PinReason != "" {
-			fmt.Fprintf(out, "Reason: %s\n", updated.PinReason)
+			_, _ = fmt.Fprintf(out, "Reason: %s\n", updated.PinReason)
 		}
-		fmt.Fprintln(out, "It is exempt from TTL expiry and max-active eviction until it is unpinned.")
+		_, _ = fmt.Fprintln(out, "It is exempt from TTL expiry and max-active eviction until it is unpinned.")
 		return nil
 	}
 	// Unpinning something that was never pinned is a no-op success server-side.
@@ -1036,13 +1036,13 @@ func runAppPreviewsSetPinned(
 	// unpin, and claiming a state change that never happened is worse than
 	// saying nothing changed.
 	if !p.IsPinned {
-		fmt.Fprintf(out, "Preview %s for %s (%s) was not pinned; nothing changed.\n",
+		_, _ = fmt.Fprintf(out, "Preview %s for %s (%s) was not pinned; nothing changed.\n",
 			previewPRLabel(updated), appSlug, dashIfEmpty(updated.Hostname))
 		return nil
 	}
-	fmt.Fprintf(out, "Unpinned preview %s for %s (%s).\n",
+	_, _ = fmt.Fprintf(out, "Unpinned preview %s for %s (%s).\n",
 		previewPRLabel(updated), appSlug, dashIfEmpty(updated.Hostname))
-	fmt.Fprintf(out, "The garbage collector can reclaim it again; its TTL is %s.\n", shortTime(&updated.TTLUntil))
+	_, _ = fmt.Fprintf(out, "The garbage collector can reclaim it again; its TTL is %s.\n", shortTime(&updated.TTLUntil))
 	return nil
 }
 

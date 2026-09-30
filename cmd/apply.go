@@ -286,14 +286,14 @@ func runApply(
 	for _, p := range plans {
 		switch {
 		case p.Create:
-			fmt.Fprintf(out, "create  env-spec %s\n", p.Slug)
+			_, _ = fmt.Fprintf(out, "create  env-spec %s\n", p.Slug)
 		case p.noop():
-			fmt.Fprintf(out, "unchanged env-spec %s\n", p.Slug)
+			_, _ = fmt.Fprintf(out, "unchanged env-spec %s\n", p.Slug)
 			continue
 		default:
-			fmt.Fprintf(out, "update  env-spec %s\n", p.Slug)
+			_, _ = fmt.Fprintf(out, "update  env-spec %s\n", p.Slug)
 			for _, c := range p.Changes {
-				fmt.Fprintf(out, "  %s: %s -> %s\n", c.Field, formatValue(c.Old), formatValue(c.New))
+				_, _ = fmt.Fprintf(out, "  %s: %s -> %s\n", c.Field, formatValue(c.Old), formatValue(c.New))
 			}
 		}
 		if dryRun {
@@ -334,7 +334,7 @@ func runApply(
 		}
 	}
 	if dryRun {
-		fmt.Fprintln(out, "dry run: nothing was changed")
+		_, _ = fmt.Fprintln(out, "dry run: nothing was changed")
 	}
 	return nil
 }

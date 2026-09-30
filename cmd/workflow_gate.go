@@ -108,13 +108,13 @@ func runWorkflowGates(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	}
 	out := cmd.OutOrStdout()
 	if len(gates) == 0 {
-		fmt.Fprintln(out, "No pending gates.")
+		_, _ = fmt.Fprintln(out, "No pending gates.")
 		return nil
 	}
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "DEFINITION\tROLE\tAPPROVERS\tSTARTED\tRUN")
+	_, _ = fmt.Fprintln(w, "DEFINITION\tROLE\tAPPROVERS\tSTARTED\tRUN")
 	for _, g := range gates {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			g.DefinitionSlug, dashIfEmpty(g.StageRole), dashIfEmpty(strings.Join(g.StageApprovers, ", ")),
 			shortTime(g.StartedAt), g.RunGUID)
 	}
@@ -220,10 +220,10 @@ func runWorkflowGate(cmd *cobra.Command, ctx context.Context, client *api.Client
 		})
 	}
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "Decision recorded: %s (%s)\n", decision, slug)
-	fmt.Fprintf(out, "Run:        %s\n", match.RunGUID)
+	_, _ = fmt.Fprintf(out, "Decision recorded: %s (%s)\n", decision, slug)
+	_, _ = fmt.Fprintf(out, "Run:        %s\n", match.RunGUID)
 	if workflowGateNote != "" {
-		fmt.Fprintf(out, "Note:       %s\n", workflowGateNote)
+		_, _ = fmt.Fprintf(out, "Note:       %s\n", workflowGateNote)
 	}
 	return nil
 }

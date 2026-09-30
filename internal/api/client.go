@@ -81,7 +81,8 @@ func (c *Client) GraphQL(ctx context.Context, query string, variables map[string
 	if err != nil {
 		return fmt.Errorf("graphql request: %w", err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled below; cleanup is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -207,7 +208,8 @@ func (c *Client) Get(ctx context.Context, path string, target interface{}) error
 	if err != nil {
 		return fmt.Errorf("get %s: %w", path, err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled below; cleanup is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return ErrUnauthorized
@@ -243,7 +245,8 @@ func (c *Client) Post(ctx context.Context, path string, body interface{}, target
 	if err != nil {
 		return fmt.Errorf("post %s: %w", path, err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled below; cleanup is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return ErrUnauthorized
@@ -273,12 +276,12 @@ func (c *Client) Stream(ctx context.Context, path string) (io.ReadCloser, error)
 		return nil, fmt.Errorf("stream %s: %w", path, err)
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		resp.Body.Close()
+		_ = resp.Body.Close() // Response cleanup is best effort.
 		return nil, ErrUnauthorized
 	}
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close() // Response cleanup is best effort.
 		return nil, fmt.Errorf("stream %s returned %d: %s", path, resp.StatusCode, body)
 	}
 	return resp.Body, nil

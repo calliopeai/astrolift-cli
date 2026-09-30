@@ -48,7 +48,7 @@ Exits non-zero when the server reports incompatible.`,
 				status.UpgradeURL,
 			)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(),
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(),
 			"CLI %s is compatible with this platform.\nLatest stable: %s\n",
 			Version, status.LatestStable,
 		)
@@ -73,7 +73,7 @@ upgrade path so the operator can re-install via brew/scoop/curl.`,
 		if err := client.Get(ctx, fmt.Sprintf("/api/cli/v1/compat/%s/", Version), &status); err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Latest stable CLI: %s\nUpgrade: %s\n",
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Latest stable CLI: %s\nUpgrade: %s\n",
 			status.LatestStable, status.UpgradeURL,
 		)
 		return nil

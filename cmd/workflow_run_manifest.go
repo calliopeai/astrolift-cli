@@ -138,7 +138,7 @@ func runWorkflowRunManifest(
 	}
 
 	if runManifestDryRun {
-		fmt.Fprintf(out, "Manifest OK: %s (%s), %d stage(s) — nothing persisted.\n\n",
+		_, _ = fmt.Fprintf(out, "Manifest OK: %s (%s), %d stage(s) — nothing persisted.\n\n",
 			preview.Definition.Name, preview.Definition.Slug, len(preview.Stages))
 		printStageBindings(out, bindings)
 		return nil
@@ -152,7 +152,7 @@ func runWorkflowRunManifest(
 	if imported.CreatedSlug == "" {
 		return fmt.Errorf("import succeeded but returned no definition slug")
 	}
-	fmt.Fprintf(out, "Imported definition: %s\n", imported.CreatedSlug)
+	_, _ = fmt.Fprintf(out, "Imported definition: %s\n", imported.CreatedSlug)
 
 	name := runManifestName
 	if name == "" {
@@ -164,9 +164,9 @@ func runWorkflowRunManifest(
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Configured workflow:  %s (%s)\n", wf.Name, wf.Slug)
+	_, _ = fmt.Fprintf(out, "Configured workflow:  %s (%s)\n", wf.Name, wf.Slug)
 	if len(bindings) > 0 {
-		fmt.Fprintln(out)
+		_, _ = fmt.Fprintln(out)
 		printStageBindings(out, bindings)
 	}
 
@@ -188,14 +188,14 @@ func runWorkflowRunManifest(
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out)
 	if runID != "" {
-		fmt.Fprintf(out, "Run ID:         %s\n", runID)
+		_, _ = fmt.Fprintf(out, "Run ID:         %s\n", runID)
 	}
 	if workflowRunID != "" {
-		fmt.Fprintf(out, "WorkflowRun ID: %s\n", workflowRunID)
+		_, _ = fmt.Fprintf(out, "WorkflowRun ID: %s\n", workflowRunID)
 	}
-	fmt.Fprintf(out, "\nWatch it with `astro workflow runs %s --watch`.\n", wf.Slug)
+	_, _ = fmt.Fprintf(out, "\nWatch it with `astro workflow runs %s --watch`.\n", wf.Slug)
 	return nil
 }
 
@@ -480,17 +480,17 @@ func startConfiguredWorkflow(
 
 func printStageBindings(out interface{ Write([]byte) (int, error) }, bindings []stageBinding) {
 	if len(bindings) == 0 {
-		fmt.Fprintln(out, "No agent_dispatch stages to bind.")
+		_, _ = fmt.Fprintln(out, "No agent_dispatch stages to bind.")
 		return
 	}
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "STAGE\tAGENT\tWORKLOAD GUID\tBOUND BY")
+	_, _ = fmt.Fprintln(w, "STAGE\tAGENT\tWORKLOAD GUID\tBOUND BY")
 	for _, b := range bindings {
 		agent := b.Agent
 		if agent == "" {
 			agent = "-"
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", b.Order, agent, b.GUID, b.Source)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", b.Order, agent, b.GUID, b.Source)
 	}
 	_ = w.Flush()
 }
