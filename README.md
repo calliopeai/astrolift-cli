@@ -569,6 +569,12 @@ unknown organization fails before any task operation is sent.
 reason in text and JSON output. This remains available for failures before a
 pod starts, when there are no pod logs to inspect.
 
+When supported by the server, task inspection and box waiting also report the
+latest startup reason, such as insufficient CPU capacity. Task and box list JSON
+includes the optional `startupDiagnostic` observation (phase, reason, message,
+pod name and observation time). A pending observation is recoverable; it does
+not end the task or box. Older servers continue to return their existing records.
+
 ## Recover queued agent input
 
 Save a UUID and the original message before sending, then use

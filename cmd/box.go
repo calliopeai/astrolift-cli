@@ -105,20 +105,21 @@ const agentBoxPodsQuery = `query($slug: String!) {
 
 // agentBox mirrors the AstroliftAgentBox GraphQL type.
 type agentBox struct {
-	Slug                string   `json:"slug"`
-	Name                string   `json:"name"`
-	Status              string   `json:"status"`
-	AgentSlug           string   `json:"agentSlug"`
-	EnvironmentSpecSlug string   `json:"environmentSpecSlug"`
-	Image               string   `json:"image"`
-	IdleTimeoutSeconds  int      `json:"idleTimeoutSeconds"`
-	SessionName         string   `json:"sessionName"`
-	AttachCommand       []string `json:"attachCommand"`
-	Namespace           string   `json:"namespace"`
-	PodName             string   `json:"podName"`
-	LastError           string   `json:"lastError"`
-	CreatedAt           string   `json:"createdAt"`
-	StartedAt           *string  `json:"startedAt"`
+	StartupDiagnostic   *startupDiagnostic `json:"startupDiagnostic,omitempty"`
+	Slug                string             `json:"slug"`
+	Name                string             `json:"name"`
+	Status              string             `json:"status"`
+	AgentSlug           string             `json:"agentSlug"`
+	EnvironmentSpecSlug string             `json:"environmentSpecSlug"`
+	Image               string             `json:"image"`
+	IdleTimeoutSeconds  int                `json:"idleTimeoutSeconds"`
+	SessionName         string             `json:"sessionName"`
+	AttachCommand       []string           `json:"attachCommand"`
+	Namespace           string             `json:"namespace"`
+	PodName             string             `json:"podName"`
+	LastError           string             `json:"lastError"`
+	CreatedAt           string             `json:"createdAt"`
+	StartedAt           *string            `json:"startedAt"`
 	// Liveness. Nullable on the wire and kept nullable here: a box that has
 	// never been attached and one attached at an unknown time are different
 	// facts, and flattening both to "" would let a consumer read the first as
@@ -355,6 +356,7 @@ func waitForBox(cmd *cobra.Command, ctx context.Context, client *api.Client, box
 
 	deadline := time.Now().Add(boxWaitTimeout)
 	last := box.Status
+	lastDiagnostic := ""
 	for {
 		select {
 		case <-ctx.Done():
@@ -371,6 +373,11 @@ func waitForBox(cmd *cobra.Command, ctx context.Context, client *api.Client, box
 		if fetched == nil {
 			return nil, fmt.Errorf("box %s is gone", box.Slug)
 		}
+		diagnostic := fetched.StartupDiagnostic.summary()
+		if diagnostic != "" && diagnostic != lastDiagnostic {
+			fmt.Fprintf(out, "  Startup: %s\n", diagnostic)
+		}
+		lastDiagnostic = diagnostic
 		if fetched.Status != last {
 			fmt.Fprintf(out, "  → %s\n", fetched.Status)
 			last = fetched.Status
@@ -398,7 +405,7 @@ func getBox(ctx context.Context, client *api.Client, slug string) (*agentBox, er
 	var resp struct {
 		AgentBox *agentBox `json:"agentBox"`
 	}
-	if err := client.GraphQL(getCtx, getBoxQuery, map[string]interface{}{"slug": slug}, &resp); err != nil {
+	if err := queryStartupDiagnostic(getCtx, client, getBoxQuery, map[string]interface{}{"slug": slug}, &resp); err != nil {
 		return nil, fmt.Errorf("fetching box: %w", err)
 	}
 	return resp.AgentBox, nil
@@ -436,7 +443,7 @@ func runBoxList(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg
 	var resp struct {
 		AgentBoxes []agentBox `json:"agentBoxes"`
 	}
-	if err := client.GraphQL(listCtx, listBoxesQuery,
+	if err := queryStartupDiagnostic(listCtx, client, listBoxesQuery,
 		map[string]interface{}{"orgId": org.ID, "includeEnded": boxListAll}, &resp); err != nil {
 		return fmt.Errorf("listing boxes: %w", err)
 	}
@@ -515,7 +522,9 @@ func runBoxRm(cmd *cobra.Command, ctx context.Context, client *api.Client, slug 
 		if !noPrompt {
 			fmt.Fprintf(cmd.OutOrStdout(), "Destroy box %s and kill its session? [y/N] ", slug)
 			var answer string
-			_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
+			if _, err := fmt.Fscan(cmd.InOrStdin(), &answer); err != nil {
+				return fmt.Errorf("reading confirmation: %w", err)
+			}
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
