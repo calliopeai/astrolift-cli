@@ -200,7 +200,7 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		}
 		return fmt.Errorf("connecting exec socket (%s): %w", wsURL, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if len(command) == 0 {
 		command = []string{"sh"}

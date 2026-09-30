@@ -69,6 +69,7 @@ func gqlServerFunc(t *testing.T, respond func(gqlRequest) map[string]interface{}
 		if err := json.Unmarshal(body, &req); err != nil {
 			t.Errorf("decoding request body: %v", err)
 		}
+		req.Organization = r.Header.Get("X-Astrolift-Organization")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": respond(req)})
 	}))
 }
