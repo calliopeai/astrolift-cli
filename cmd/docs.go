@@ -124,7 +124,7 @@ func exportPortableDocs(destination string, force bool) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("creating temporary docs tree: %w", err)
 	}
-	defer os.RemoveAll(temporary)
+	defer func() { _ = os.RemoveAll(temporary) }()
 
 	guideDir := filepath.Join(temporary, "guides")
 	if err := os.MkdirAll(guideDir, 0o755); err != nil {
@@ -171,7 +171,7 @@ func exportManPages(destination string, force bool) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("creating temporary man tree: %w", err)
 	}
-	defer os.RemoveAll(temporary)
+	defer func() { _ = os.RemoveAll(temporary) }()
 	if err := generateManTree(temporary); err != nil {
 		return 0, err
 	}
@@ -235,9 +235,10 @@ func normalizeManTree(destination string, generatedAt time.Time) error {
 				continue
 			}
 			normalized = appendWrappedRoff(normalized, line, noFill)
-			if line == ".nf" {
+			switch line {
+			case ".nf":
 				noFill = true
-			} else if line == ".fi" {
+			case ".fi":
 				noFill = false
 			}
 		}

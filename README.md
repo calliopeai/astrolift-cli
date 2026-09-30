@@ -133,6 +133,11 @@ astro app init                  # writes astrolift.toml
 astro app register --project-id <project-uuid> --source-repo myorg/my-service
 astro app deploy --image-tag sha-deadbeef --wait   # --env defaults to production
 
+# Platform-built apps resolve the deploy branch and tag the image with its commit.
+astro app deploy --wait
+astro app deploy --ref release/v2 --wait         # branch, tag, or commit
+# Apps with build_mode = "none" use images declared in their saved manifest.
+
 # 4. Watch it run
 astro app list                  # apps in the org
 astro app show                  # status, source, workloads, environments
@@ -142,6 +147,63 @@ astro app exec -- bash          # interactive shell (wraps `astro exec`)
 astro exec --app web -- ps aux  # one-off command in a running pod
 # astro app rollback            # roll back the running deployment
 ```
+
+### Registering before a source connection is configured
+
+Pass `--manifest-raw` to send the local manifest with registration, creating its
+workloads even when the platform cannot fetch the repository:
+
+```bash
+astro app register --project-id <uuid> --source-repo myorg/my-app --manifest-raw
+```
+
+Without the flag, registration uses the existing repository-based behavior.
+
+### Changing who builds the image
+
+`--build-mode` on `register` only sets the mode at creation. To change it on an
+app that already exists:
+
+```bash
+astro app set-build-mode my-service ci_pushed       # your CI builds and pushes
+astro app set-build-mode my-service platform_build  # the platform builds in-cluster
+astro app set-build-mode my-service none            # no image at all
+
+# Pick a non-default builder while switching
+astro app set-build-mode my-service platform_build --build-strategy buildpacks
+```
+
+Reach for `ci_pushed` when the platform builder cannot produce the image — a
+source repo it cannot clone, or no builder on the cluster — and your CI already
+can. Push the image to the registry first; the next `astro app deploy` rolls out
+the tag you pass rather than trying to produce one.
+
+The command sets `build_strategy` alongside the mode, because the deploy
+pipeline decides whether to build from the strategy, not the mode. Flipping only
+the mode would leave an app that reports `ci_pushed` and still runs a platform
+build on every deploy. A Dockerfile path or build context saved at registration
+is left untouched, so switching back and forth loses nothing.
+
+### Preparing a box workspace
+
+Use `astro agent env-spec upsert <slug> --agent-type codex --box-workspace`
+to prepare the spec's configured repositories, dependencies and MCP before its
+box session starts. Use `--box-workspace=false` to turn setup off. Omitting the
+flag preserves the existing setting and compatibility with older servers. Box
+readiness waits for setup; a slow workspace can exceed the attach timeout.
+
+### Deploying a platform-built app
+
+A platform-built app can deploy without an image tag. The platform resolves its
+deploy branch and uses that commit for the build. Select another branch, tag or
+commit with `--ref`:
+
+```bash
+astro app deploy --app my-service
+astro app deploy --app my-service --ref release/1.2
+```
+
+CI-pushed apps still require `--image-tag`; apps with build mode `none` do not.
 
 ### From CI
 
@@ -176,13 +238,67 @@ the status note above.)
 
 ---
 
+## Managed DNS zones
+
+Managed zones supply platform hostnames for tenant apps and preview environments.
+They are separate from an app's custom domains (`astro app domains list`). Select
+an organization with `--org` or `astro org use`; `--server` selects its registered
+endpoint and credentials without changing the saved default. Permissions,
+canonical zone names, proof of control and provisioning are enforced by the API.
+
+```bash
+astro operator domains list --org acme
+astro operator domains list --org acme --json | jq '.[] | select(.defaultFor == "none")'
+astro operator domains create apps.example.com --dns-driver route53 --org acme
+astro operator domains create previews.example.com --dns-driver route53 --default-for preview_envs --org acme
+astro operator domains update <domain-id> --default-for both --org acme --json
+astro operator domains update <domain-id> --wildcard=false --org acme
+```
+
+Creation explicitly sends `defaultFor=tenant_apps`, `organizationScoped=true`
+and `isWildcardManaged=false`. `--default-for` accepts `tenant_apps`,
+`preview_envs`, `both` or `none`; `none` excludes the zone from automatic default
+matching. Existing organization/environment bindings may still use it. Updates
+send only supplied settings, so correcting `default_for` preserves DNS config and
+wildcard settings. Use the ID returned by `list` for updates; the zone and DNS
+driver cannot be changed by the current API.
+
+`--shared` on creation asks for a platform-shared zone; the server requires
+platform-operator permission for every shared write. Organization-owned writes
+require the server's domain configuration permission. Neither flag bypasses the
+server's authorization checks. With the current API, domain writes need an
+organization-scoped token with `admin` scope and the owner's actual
+`provider_plugin.configure` permission; `astro auth login --scope clusters`
+does not grant that permission. Team-scoped tokens cannot act on these
+organization resources. Reads use `provider_plugin.read` (`read:clusters`).
+
+`--dns-config <file.json>` accepts a JSON object for provider-specific settings.
+It is not printed or read back. On update it replaces the **entire** DNS config;
+omit it to preserve the saved config. An existing hosted zone may require proof
+of control. The create result and JSON list expose the required TXT record; after
+publishing it, run:
+
+```bash
+astro operator domains verify apps.example.com --org acme --json
+```
+
+Verification returns a nonzero exit status while proof remains pending, even
+when the API successfully performed the lookup. JSON includes `zone`, `verified`
+and `message`. Creating or verifying a zone may start asynchronous provisioning;
+a successful command does not prove delegation, TLS issuance or app readiness.
+Use `list` to inspect verification, provisioning, nameservers and validation
+records (`--json` exposes the full returned status). The API currently lists at
+most 200 visible zones without pagination; a full-sized result emits a warning
+on stderr, and cannot establish a complete install-wide audit. Deletion and
+provisioning repair commands are not exposed here.
+
 ## Commands
 
 | Group | Purpose |
 |---|---|
 | `astro server` | Manage Astrolift installs the CLI knows about (add / list / use / remove). One install = one DNS zone + database. |
 | `astro auth` | Browser device-flow login, logout, status, refresh, plus `wait` for the relay path. `login --no-wait` starts the flow, reports the session (`--json` makes it an object), and exits instead of blocking for fifteen minutes; `auth wait --session-id <id>` finishes it once a human has approved. That is how a browserless caller hands a login off. `login --no-browser` waits without launching a browser. |
-| `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `pods`, `rollback`, `promote`) plus sub-resources. `app secrets` (`list`/`create`/`delete`) drives `setAppSecret`/`deleteAppSecret`; `list` returns metadata only (key, environment, source, who last touched it) and never a value, `create` is an upsert reading the value from `--value`/`--stdin`/a hidden prompt and never echoing it, and both report a queued proposal id instead of an applied write on installs that require secret-change approval. `app services list` and `app domains list` are read-only views of the managed services and custom domains bound to one app (`astroliftManagedServicesPage` / `astroliftAppDomains`); provisioning a managed service is `astro project resources`, and there is no domain create/remove from the CLI yet. `app events` (also `app events list`) reads `astroliftEventsPage` for the app's deploy/secret/scale/health activity, filterable by `--type`/`--severity`/`--search`. `tokens`, `members`, `jobs`, and `audit` remain unimplemented placeholders. `deploy` needs `--image-tag`; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `app pods` lists the pods `exec` picks from — the pod name for `--pod` and container names for `-c`, with `--workload`/`--ready` to narrow. `promote --from <env> --to <env>` moves an env's running deployment (image+config) to another via `promoteDeployment`. `app previews` drives per-PR preview environments (`list`, `show`, `logs`, `open`, `teardown`, `pin`, `unpin`); pick one with `--pr <n>`, or `--branch <name>` for a manual preview, which carries no PR number. `previews logs` is `app logs` pointed at the environment the platform synthesized for the preview, so `--since`/`--tail`/`-f`/`--level`/`--search` behave identically. `previews pin` exempts a preview from garbage collection on both axes — TTL expiry *and* max-active eviction — until someone runs `unpin`, which is what separates it from extending a TTL; `--reason <text>` records why, and `list`/`show` surface the pin. `unpin` clears the whole record (who, when, why), is a no-op on an unpinned preview, and unlike `pin` is allowed on a torn-down one so stale state can always be cleared. |
+| `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `pods`, `rollback`, `promote`) plus sub-resources. `app secrets` (`list`/`create`/`delete`) drives `setAppSecret`/`deleteAppSecret`; `list` returns metadata only (key, environment, source, who last touched it) and never a value, `create` is an upsert reading the value from `--value`/`--stdin`/a hidden prompt and never echoing it, and both report a queued proposal id instead of an applied write on installs that require secret-change approval. `app services list` and `app domains list` are read-only views of the managed services and custom domains bound to one app (`astroliftManagedServicesPage` / `astroliftAppDomains`); provisioning a managed service is `astro project resources`, and there is no domain create/remove from the CLI yet. `app events` (also `app events list`) reads `astroliftEventsPage` for the app's deploy/secret/scale/health activity, filterable by `--type`/`--severity`/`--search`. `tokens`, `members`, `jobs`, and `audit` remain unimplemented placeholders. `deploy` requires `--image-tag` for CI-pushed apps; platform builds resolve the deploy branch or `--ref` to a commit, and apps using manifest images can omit it; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `app pods` lists the pods `exec` picks from — the pod name for `--pod` and container names for `-c`, with `--workload`/`--ready` to narrow. `promote --from <env> --to <env>` moves an env's running deployment (image+config) to another via `promoteDeployment`. `app previews` drives per-PR preview environments (`list`, `show`, `logs`, `open`, `teardown`, `pin`, `unpin`); pick one with `--pr <n>`, or `--branch <name>` for a manual preview, which carries no PR number. `previews logs` is `app logs` pointed at the environment the platform synthesized for the preview, so `--since`/`--tail`/`-f`/`--level`/`--search` behave identically. `previews pin` exempts a preview from garbage collection on both axes — TTL expiry *and* max-active eviction — until someone runs `unpin`, which is what separates it from extending a TTL; `--reason <text>` records why, and `list`/`show` surface the pin. `unpin` clears the whole record (who, when, why), is a no-op on an unpinned preview, and unlike `pin` is allowed on a torn-down one so stale state can always be cleared. |
 | `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
 | `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`, `workloads`, `vnc`, `send`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <workflow-slug>` is the distinct WorkflowDefinition seam (`runWorkflowDefinition`). `workloads ls` enumerates the org's registered `kind=agent` workloads, carrying both the slug `dispatch` takes and the GUID `workflow create --bind` takes. `vnc <task-id>` resolves a task to the absolute console URL that serves its live VNC viewer (the stored `vnc_url` is a root-relative WebSocket relay path, not openable). `send <task-id> <input>` queues a follow-up prompt for a task that is already running (`--stdin` for multi-line input; `--json`) — the steering channel: the message is applied at the agent's next turn boundary, so a send means queued, not read, and `deliveredAt` is what answers that. The task must be running, and not every agent runtime can accept a follow-up prompt; one that cannot leaves the message queued rather than dropping it. |
 | `astro apply` | Declarative agent environment specs: `apply -f <file.toml>` reads `[[env_spec]]` tables and makes the platform match. A missing spec is created, a spec that differs is updated field by field with the diff printed, and an unchanged spec is left alone, so a second apply is a no-op. Only keys present in the file are managed. `--dry-run` prints the plan and changes nothing. |
@@ -190,7 +306,7 @@ the status note above.)
 | `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, control, and delete organization workflows. `validate --server` is authoritative for the selected install. `run-manifest <file.toml>` collapses `import` → `create --bind` → activation → `run` into one call, resolving each `agent_dispatch` stage's declared agent against the org's registered workloads (`--dry-run` shows the resolved bindings; `--no-run` leaves the imported definition disabled for review). `import --replace` upserts the org's own definition sharing the manifest's slug instead of always creating a new one: in place when the stage kinds are unchanged, so configured Workflows, bindings and schedules keep working untouched, otherwise as a new version with every configured Workflow repointed to it, or a clear refusal (nothing changed) when a repoint would break one's bindings. Launching enables only the newly imported definition through the platform update API and requires workflow update permission. Use `definition <slug>` to review an import and `definition-enable <slug>` to enable it explicitly; `workflow run` never enables existing definitions implicitly. `run-cancel <slug>` stops an in-flight run — cooperatively by default so a run that owns external resources tears them down, or `--terminate --reason <text>` to hard-kill a wedged one; `--run <guid>` picks a run other than the newest, `--yes` is the confirmation (no prompt), and a run that is already terminal is refused before anything is sent. `run-show <slug>` prints a run stage by stage: order, kind, role, status, attempt, timings, and for a `human_gate` its gate state (pending / approved / rejected / closed) plus the approvers the stage declares, so "waiting on approval, and on whom" is read from the platform. Deciding a gate is not a CLI operation. Repository registration separately reconciles `workflows/**/*.toml`. |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. `render` prints the manifests the platform would apply (`astroliftRenderedManifest`) for pre-merge review. |
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `project resources` discovers the selected cluster's full provider catalogue and manages project-owned shared services and their app/agent attachments. |
-| `astro operator` | Operator (admin) cluster, provider, and federation management. |
+| `astro operator` | Cluster, provider, and federation management, plus `domains list/create/update/verify` for organization-owned and visible platform-shared managed DNS zones. Shared writes require platform-operator permission. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |

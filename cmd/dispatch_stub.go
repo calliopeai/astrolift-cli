@@ -136,7 +136,7 @@ func (s *stubDispatcher) register(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("registration request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("registration rejected with HTTP %d", resp.StatusCode)
@@ -172,7 +172,7 @@ func (s *stubDispatcher) heartbeat(ctx context.Context) {
 			s.setHeaders(req)
 			resp, err := s.httpClient.Do(req)
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}
 	}
@@ -208,7 +208,7 @@ func (s *stubDispatcher) fetchAndAdvance(ctx context.Context, out *os.File) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return
@@ -311,7 +311,7 @@ func (s *stubDispatcher) reportStatus(ctx context.Context, taskID, status, errMs
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return nil
 }
 
