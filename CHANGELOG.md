@@ -4,6 +4,19 @@
 
 ### Added
 
+- Add `astro whoami [--permissions]` with server-verified identity in the
+  verified selected organization. The optional account grant summary is
+  explicitly informational, not target authorization or credential limits.
+- Correct `astro perms diagnose [app-slug]` to the actual account grant and
+  role-binding queries; `--permission` optionally retrieves the existing
+  account diagnostic trace on an app GUID or explicit scope. Preserve denied
+  verdicts and reasons without approving or preflighting another operation
+  (app #1867 remains partial).
+- Preserve safe typed GraphQL/HTTP errors, including declared version metadata,
+  and emit structured retrieval errors on stderr for JSON identity/permission
+  inspection. Exclude raw error bodies, arbitrary extensions and GraphQL debug
+  response dumps; redact the current bearer value from reflected diagnostics.
+
 - Add `agent send --request-id` and `agent input-receipt` to recover queued
   steering after a lost reply without submitting a duplicate instruction.
 
