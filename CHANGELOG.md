@@ -22,6 +22,13 @@
 - `astro app set-build-mode` changes the mode and strategy together without
   overwriting the saved Dockerfile or build context (#89).
 
+- Stop task cancellation and box removal when confirmation input fails, and
+  reject an update whose extracted binary cannot be closed successfully.
+
+- Show agent startup diagnostics during task inspection and box waiting, and
+  preserve them in task/box JSON. Reads fall back on older servers without
+  hiding permission or transport failures or retrying mutations.
+
 - `astro app access show|allow|deny|clear [app] [--group g] [--user email]`
   restricts who may enter an app behind central auth (astrolift-app#2132). A
   change that would lock someone out names them and asks first (`--yes` to

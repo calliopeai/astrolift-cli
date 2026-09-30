@@ -166,17 +166,18 @@ type workflowInstance struct {
 
 // agentTask mirrors the AstroliftAgentTask GraphQL type.
 type agentTask struct {
-	ID             string      `json:"id"`
-	Status         string      `json:"status"`
-	CallbackURL    string      `json:"callbackUrl"`
-	Result         interface{} `json:"result"`
-	FailureMessage *string     `json:"failureMessage,omitempty"`
-	CreatedAt      string      `json:"createdAt"`
-	StartedAt      *string     `json:"startedAt"`
-	FinishedAt     *string     `json:"finishedAt"`
-	VNCEnabled     bool        `json:"vncEnabled"`
-	VNCURL         string      `json:"vncUrl"`
-	SnapshotURL    *string     `json:"snapshotUrl"`
+	StartupDiagnostic *startupDiagnostic `json:"startupDiagnostic,omitempty"`
+	ID                string             `json:"id"`
+	Status            string             `json:"status"`
+	CallbackURL       string             `json:"callbackUrl"`
+	Result            interface{}        `json:"result"`
+	FailureMessage    *string            `json:"failureMessage,omitempty"`
+	CreatedAt         string             `json:"createdAt"`
+	StartedAt         *string            `json:"startedAt"`
+	FinishedAt        *string            `json:"finishedAt"`
+	VNCEnabled        bool               `json:"vncEnabled"`
+	VNCURL            string             `json:"vncUrl"`
+	SnapshotURL       *string            `json:"snapshotUrl"`
 }
 
 // noneMutationResult is the NoneTypeMutationResult envelope (cancelTask). Its
@@ -348,7 +349,7 @@ func runAgentList(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	var resp struct {
 		AgentTasks []agentTask `json:"agentTasks"`
 	}
-	if err := client.GraphQL(listCtx, agentTasksQuery, vars, &resp); err != nil {
+	if err := queryStartupDiagnostic(listCtx, client, agentTasksQuery, vars, &resp); err != nil {
 		return fmt.Errorf("listing tasks: %w", err)
 	}
 
@@ -501,7 +502,9 @@ func runAgentCancel(cmd *cobra.Command, ctx context.Context, client *api.Client,
 		if !noPrompt {
 			fmt.Fprintf(cmd.OutOrStdout(), "Cancel task %s? [y/N] ", taskID)
 			var answer string
-			_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
+			if _, err := fmt.Fscan(cmd.InOrStdin(), &answer); err != nil {
+				return fmt.Errorf("reading confirmation: %w", err)
+			}
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
@@ -552,7 +555,7 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 	var resp struct {
 		AgentTask *agentTask `json:"agentTask"`
 	}
-	if err := client.GraphQL(inspectCtx, agentTaskQuery,
+	if err := queryStartupDiagnostic(inspectCtx, client, agentTaskQuery,
 		map[string]interface{}{"id": taskID}, &resp); err != nil {
 		return fmt.Errorf("fetching task: %w", err)
 	}
@@ -568,6 +571,9 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 
 	fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
 	fmt.Fprintf(out, "Status:        %s\n", t.Status)
+	if diagnostic := t.StartupDiagnostic.summary(); diagnostic != "" {
+		fmt.Fprintf(out, "Startup:       %s\n", diagnostic)
+	}
 	if t.FailureMessage != nil && strings.TrimSpace(*t.FailureMessage) != "" {
 		if _, err := fmt.Fprintf(out, "Failure:       %s\n", *t.FailureMessage); err != nil {
 			return err

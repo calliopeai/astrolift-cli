@@ -306,13 +306,8 @@ func extractFromTarGz(path string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if _, err := io.Copy(out, tr); err != nil {
-				_ = out.Close()
-				_ = os.Remove(out.Name())
-				return "", err
-			}
-			if err := out.Close(); err != nil {
-				_ = os.Remove(out.Name())
+			if err := writeExtractedBinary(out, tr); err != nil {
+				_ = os.Remove(out.Name()) // Failed extraction cleanup is best effort.
 				return "", err
 			}
 			return out.Name(), nil
@@ -340,17 +335,26 @@ func extractFromZip(path string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if _, err := io.Copy(out, rc); err != nil {
-				_ = out.Close()
-				_ = os.Remove(out.Name())
-				return "", err
-			}
-			if err := out.Close(); err != nil {
-				_ = os.Remove(out.Name())
+			if err := writeExtractedBinary(out, rc); err != nil {
+				_ = os.Remove(out.Name()) // Failed extraction cleanup is best effort.
 				return "", err
 			}
 			return out.Name(), nil
 		}
 	}
 	return "", fmt.Errorf("binary 'astro.exe' not found in zip archive")
+}
+
+// writeExtractedBinary closes the output before its path can be installed.
+// Preserve a copy failure even if closing the partial output also fails.
+func writeExtractedBinary(out io.WriteCloser, source io.Reader) error {
+	_, copyErr := io.Copy(out, source)
+	closeErr := out.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeErr != nil {
+		return fmt.Errorf("closing extracted binary: %w", closeErr)
+	}
+	return nil
 }
