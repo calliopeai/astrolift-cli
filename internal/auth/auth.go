@@ -223,7 +223,7 @@ func SignOut(ctx context.Context, apiURL, refreshToken string) error {
 	if err != nil {
 		return fmt.Errorf("auth/signout: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
