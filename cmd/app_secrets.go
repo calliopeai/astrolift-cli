@@ -196,21 +196,21 @@ func runAppSecretsList(cmd *cobra.Command, ctx context.Context, client *api.Clie
 
 	out := cmd.OutOrStdout()
 	if len(resp.Secrets) == 0 {
-		_, _ = fmt.Fprintf(out, "No secrets found for app %q.\n", appSlug)
+		fmt.Fprintf(out, "No secrets found for app %q.\n", appSlug)
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "KEY\tENVIRONMENT\tSOURCE\tSCOPE\tSET VIA\tLAST EDITED\tEXPIRES")
+	fmt.Fprintln(w, "KEY\tENVIRONMENT\tSOURCE\tSCOPE\tSET VIA\tLAST EDITED\tEXPIRES")
 	for _, s := range resp.Secrets {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			s.Key, dashIfEmpty(s.EnvironmentName), dashIfEmpty(s.Source), dashIfEmpty(s.Scope),
 			dashIfEmpty(s.SetVia), shortTime(s.LastEditedAt), shortTime(s.ExpiresAt))
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d secret(s) shown.\n", len(resp.Secrets))
+	fmt.Fprintf(out, "\n%d secret(s) shown.\n", len(resp.Secrets))
 	return nil
 }
 
@@ -310,11 +310,11 @@ func runAppSecretsDelete(cmd *cobra.Command, ctx context.Context, client *api.Cl
 		if noPrompt {
 			return fmt.Errorf("delete needs confirmation: pass --yes (--no-prompt is set)")
 		}
-		_, _ = fmt.Fprintf(out, "Delete secret %s on app %s? [y/N] ", key, appSlug)
+		fmt.Fprintf(out, "Delete secret %s on app %s? [y/N] ", key, appSlug)
 		var answer string
 		_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
 		if !strings.EqualFold(strings.TrimSpace(answer), "y") {
-			_, _ = fmt.Fprintln(out, "Aborted.")
+			fmt.Fprintln(out, "Aborted.")
 			return nil
 		}
 	}
@@ -341,11 +341,11 @@ func reportAppSecretWrite(cmd *cobra.Command, appSlug, key, verb string, data *a
 	}
 	out := cmd.OutOrStdout()
 	if data != nil && data.PendingProposalID != nil && *data.PendingProposalID != "" {
-		_, _ = fmt.Fprintf(out, "%s %s on %s requires approval; queued as proposal %s.\n", verb, key, appSlug, *data.PendingProposalID)
-		_, _ = fmt.Fprintln(out, "It applies once an approver reviews the change in the console.")
+		fmt.Fprintf(out, "%s %s on %s requires approval; queued as proposal %s.\n", verb, key, appSlug, *data.PendingProposalID)
+		fmt.Fprintln(out, "It applies once an approver reviews the change in the console.")
 		return nil
 	}
-	_, _ = fmt.Fprintf(out, "%s secret %s on app %s.\n", verb, key, appSlug)
+	fmt.Fprintf(out, "%s secret %s on app %s.\n", verb, key, appSlug)
 	return nil
 }
 
@@ -376,9 +376,9 @@ func readAppSecretValue(cmd *cobra.Command) (string, error) {
 	if !term.IsTerminal(fd) {
 		return "", fmt.Errorf("no value provided: pass --value, --stdin, or run in a terminal")
 	}
-	_, _ = fmt.Fprint(cmd.OutOrStdout(), "Value (hidden): ")
+	fmt.Fprint(cmd.OutOrStdout(), "Value (hidden): ")
 	b, err := term.ReadPassword(fd)
-	_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout())
 	if err != nil {
 		return "", fmt.Errorf("reading value: %w", err)
 	}

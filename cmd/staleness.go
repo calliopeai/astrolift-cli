@@ -99,7 +99,7 @@ func maybeNotifyStale(cmd *cobra.Command) {
 		return
 	}
 	if notice := stalenessNotice(Version, latest); notice != "" {
-		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), notice)
+		fmt.Fprintln(cmd.ErrOrStderr(), notice)
 	}
 }
 

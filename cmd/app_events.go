@@ -139,25 +139,25 @@ func runAppEventsList(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	out := cmd.OutOrStdout()
 	if len(resp.Page.Items) == 0 {
 		if resp.Page.Reason == "NO_DATA_YET" {
-			_, _ = fmt.Fprintf(out, "No events recorded yet for app %q.\n", appSlug)
+			fmt.Fprintf(out, "No events recorded yet for app %q.\n", appSlug)
 		} else {
-			_, _ = fmt.Fprintf(out, "No events matched for app %q.\n", appSlug)
+			fmt.Fprintf(out, "No events matched for app %q.\n", appSlug)
 		}
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "TIME\tTYPE\tSEVERITY\tRESOURCE")
+	fmt.Fprintln(w, "TIME\tTYPE\tSEVERITY\tRESOURCE")
 	for _, e := range resp.Page.Items {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 			shortTime(&e.OccurredAt), e.EventType, dashIfEmpty(e.Severity), appEventResourceLabel(e))
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d event(s) shown. Use --json for each event's full payload.\n", len(resp.Page.Items))
+	fmt.Fprintf(out, "\n%d event(s) shown. Use --json for each event's full payload.\n", len(resp.Page.Items))
 	if resp.Page.NextCursor != "" {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "note: more events are available; raise --limit to see them\n")
+		fmt.Fprintf(cmd.ErrOrStderr(), "note: more events are available; raise --limit to see them\n")
 	}
 	return nil
 }

@@ -42,6 +42,7 @@ var (
 	appRegisterSourceKind    string
 	appRegisterDescription   string
 	appRegisterManifestPath  string
+	appRegisterManifestRaw   bool
 	appRegisterDefaultBranch string
 	appRegisterBuildMode     string
 	appRegisterBuildStrategy string
@@ -138,6 +139,8 @@ var appRegisterCmd = &cobra.Command{
 the app slug and display name, and calls the registerApp GraphQL mutation.
 
 --project-id and --source-repo are required; all other flags are optional.
+Use --manifest-raw to send the local manifest when the platform cannot fetch it
+from the repository (for example, before configuring a source connection).
 
 --build-mode selects who publishes the container image. The platform default
 is ci_pushed, where your CI builds and pushes and the platform only rolls out
@@ -192,6 +195,10 @@ Example:
 		if appRegisterManifestPath != "" {
 			input["manifestPath"] = appRegisterManifestPath
 		}
+		// Inline registration also works before a source connection is configured.
+		if appRegisterManifestRaw {
+			input["manifestRaw"] = string(raw)
+		}
 		if appRegisterDefaultBranch != "" {
 			input["defaultBranch"] = appRegisterDefaultBranch
 		}
@@ -235,16 +242,16 @@ mutation RegisterApp($input: RegisterAppInput!) {
 		}
 
 		out := cmd.OutOrStdout()
-		_, _ = fmt.Fprintf(out, "Registered app:   %s (%s)\n", app.Name, app.Slug)
-		_, _ = fmt.Fprintf(out, "ID:               %s\n", app.ID)
-		_, _ = fmt.Fprintf(out, "Org:              %s\n", app.OrganizationSlug)
-		_, _ = fmt.Fprintf(out, "Project:          %s\n", app.ProjectSlug)
-		_, _ = fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
+		fmt.Fprintf(out, "Registered app:   %s (%s)\n", app.Name, app.Slug)
+		fmt.Fprintf(out, "ID:               %s\n", app.ID)
+		fmt.Fprintf(out, "Org:              %s\n", app.OrganizationSlug)
+		fmt.Fprintf(out, "Project:          %s\n", app.ProjectSlug)
+		fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
 		if app.Subdomain != "" {
-			_, _ = fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
+			fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
 		}
-		_, _ = fmt.Fprintln(out, "")
-		_, _ = fmt.Fprintln(out, "Next step: run `astro app deploy` to trigger the first deployment.")
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "Next step: run `astro app deploy` to trigger the first deployment.")
 		return nil
 	},
 }
@@ -286,6 +293,7 @@ func init() {
 	appRegisterCmd.Flags().StringVar(&appRegisterSourceKind, "source-kind", "github", "SCM kind: github, gitlab, bitbucket (default: github)")
 	appRegisterCmd.Flags().StringVar(&appRegisterDescription, "description", "", "Short description of the app")
 	appRegisterCmd.Flags().StringVar(&appRegisterManifestPath, "manifest-path", "", "Path to the manifest file within the repo (default: astrolift.toml)")
+	appRegisterCmd.Flags().BoolVar(&appRegisterManifestRaw, "manifest-raw", false, "Send the local manifest's contents with the registration, so workloads are created without the platform reading the repo (no source connection needed)")
 	appRegisterCmd.Flags().StringVar(&appRegisterDefaultBranch, "default-branch", "", "Default branch for deploys (default: the repo default)")
 	appRegisterCmd.Flags().StringVar(&appRegisterBuildMode, "build-mode", "", "Who publishes the image: ci_pushed (platform default), platform_build, none")
 	appRegisterCmd.Flags().StringVar(&appRegisterBuildStrategy, "build-strategy", "", "Builder the platform invokes under --build-mode platform_build: dockerfile (default), buildpacks, nixpacks, off")

@@ -145,9 +145,9 @@ func readAgentSecretValue(cmd *cobra.Command) (string, error) {
 	if !term.IsTerminal(fd) {
 		return "", fmt.Errorf("no value provided: pass --value, --stdin, or run in a terminal")
 	}
-	_, _ = fmt.Fprint(cmd.OutOrStdout(), "Value (hidden): ")
+	fmt.Fprint(cmd.OutOrStdout(), "Value (hidden): ")
 	b, err := term.ReadPassword(fd)
-	_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout())
 	if err != nil {
 		return "", fmt.Errorf("reading value: %w", err)
 	}
@@ -169,7 +169,7 @@ func runAgentSecretSet(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	if err := agentSecretMutErr(resp.Result, "set"); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Set %s on env-spec %s\n", envVar, slug)
+	fmt.Fprintf(cmd.OutOrStdout(), "Set %s on env-spec %s\n", envVar, slug)
 	return nil
 }
 
@@ -184,7 +184,7 @@ func runAgentSecretRm(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	if err := agentSecretMutErr(resp.Result, "delete"); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted %s on env-spec %s\n", envVar, slug)
+	fmt.Fprintf(cmd.OutOrStdout(), "Deleted %s on env-spec %s\n", envVar, slug)
 	return nil
 }
 
@@ -200,9 +200,9 @@ func runAgentSecretLs(cmd *cobra.Command, ctx context.Context, client *api.Clien
 		return renderJSON(cmd, resp.Rows)
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "ENV_VAR\tURI\tSTATUS")
+	fmt.Fprintln(w, "ENV_VAR\tURI\tSTATUS")
 	for _, r := range resp.Rows {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", r.EnvVar, r.URI, agentSecretStatusLabel(r))
+		fmt.Fprintf(w, "%s\t%s\t%s\n", r.EnvVar, r.URI, agentSecretStatusLabel(r))
 	}
 	return w.Flush()
 }

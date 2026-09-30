@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added
+
+- `astro agent env-spec upsert --box-workspace[=false]` explicitly changes box
+  setup without overwriting it when omitted. Box wait timeouts name workspace
+  setup as a possible cause (#112).
+
+- `astro operator domains list|create|update|verify` audits and manages visible
+  organization-owned/platform-shared DNS zones (#92). Creation explicitly
+  defaults to `tenant_apps`; sparse updates preserve unrelated config. JSON
+  exposes ownership, defaults, provisioning and TXT proof, and verification
+  exits nonzero while proof is pending. Shared writes remain server-authorized.
+
+- `astro app register --manifest-raw` sends the local manifest when source
+  connections cannot fetch the repository (#90).
+- `astro app set-build-mode` changes the mode and strategy together without
+  overwriting the saved Dockerfile or build context (#89).
+
 - Stop task cancellation and box removal when confirmation input fails, and
   reject an update whose extracted binary cannot be closed successfully.
 
@@ -43,6 +60,14 @@
   secret-change approval. `services`/`domains` are read-only for now; managed
   service provisioning remains `astro project resources`
   (calliopeai/astrolift-cli#91, calliopeai/astrolift-cli#99).
+
+### Fixed
+
+- `astro app deploy` allows omitting `--image-tag` for platform builds and apps
+  using manifest images. The API resolves platform builds to a commit before
+  scheduling or approval and uses that SHA as the default image tag. `--ref`
+  selects a branch, tag, or commit; the response includes the resolved commit.
+  CI-pushed apps still require an explicit image tag (#94).
 
 ## 0.7.0 — 2026-08-21
 

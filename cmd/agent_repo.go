@@ -99,12 +99,12 @@ func runAgentRegisterRepo(cmd *cobra.Command, ctx context.Context, client *api.C
 		// an agent beside other workloads: that agent is materialized by
 		// app registration, and this command only walks standalone agent
 		// packages.
-		_, _ = fmt.Fprintln(out, "No agent manifests registered.")
-		_, _ = fmt.Fprintln(out, "")
-		_, _ = fmt.Fprintln(out, "This command registers standalone agent packages —")
-		_, _ = fmt.Fprintln(out, "  agents/<slug>/astrolift.toml, each declaring a single kind = \"agent\" workload.")
-		_, _ = fmt.Fprintln(out, "An agent declared alongside other workloads in the root astrolift.toml is")
-		_, _ = fmt.Fprintln(out, "registered with the app instead; use `astro app register` for that repo.")
+		fmt.Fprintln(out, "No agent manifests registered.")
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "This command registers standalone agent packages —")
+		fmt.Fprintln(out, "  agents/<slug>/astrolift.toml, each declaring a single kind = \"agent\" workload.")
+		fmt.Fprintln(out, "An agent declared alongside other workloads in the root astrolift.toml is")
+		fmt.Fprintln(out, "registered with the app instead; use `astro app register` for that repo.")
 		return nil
 	}
 	for _, a := range resp.Result.Data.Agents {
@@ -112,9 +112,9 @@ func runAgentRegisterRepo(cmd *cobra.Command, ctx context.Context, client *api.C
 		if a.Created {
 			state = "created"
 		}
-		_, _ = fmt.Fprintf(out, "Agent %s (workload %s, %s) — %s\n", a.Slug, a.WorkloadSlug, state, a.ManifestPath)
+		fmt.Fprintf(out, "Agent %s (workload %s, %s) — %s\n", a.Slug, a.WorkloadSlug, state, a.ManifestPath)
 		for _, n := range a.SkillNotes {
-			_, _ = fmt.Fprintf(out, "  note: %s\n", n)
+			fmt.Fprintf(out, "  note: %s\n", n)
 		}
 	}
 	return nil

@@ -277,20 +277,20 @@ func runWorkflowDefinitions(cmd *cobra.Command, ctx context.Context, client *api
 
 	out := cmd.OutOrStdout()
 	if len(defs) == 0 {
-		_, _ = fmt.Fprintln(out, "No workflow definitions found.")
+		fmt.Fprintln(out, "No workflow definitions found.")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "SLUG\tNAME\tPATTERN\tSTAGES\tSCOPE\tENABLED")
+	fmt.Fprintln(w, "SLUG\tNAME\tPATTERN\tSTAGES\tSCOPE\tENABLED")
 	for _, d := range defs {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n",
 			d.Slug, d.Name, d.PatternKind, d.StageCount, definitionScope(d), yesNo(d.IsEnabled))
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d definition(s) shown.\n", len(defs))
+	fmt.Fprintf(out, "\n%d definition(s) shown.\n", len(defs))
 	return nil
 }
 
@@ -339,14 +339,14 @@ func runWorkflowDefinition(cmd *cobra.Command, ctx context.Context, client *api.
 	}
 
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "Definition:  %s (%s)\n", d.Name, d.Slug)
-	_, _ = fmt.Fprintf(out, "Pattern:     %s\n", d.PatternKind)
-	_, _ = fmt.Fprintf(out, "Scope:       %s\n", definitionScope(*d))
-	_, _ = fmt.Fprintf(out, "Enabled:     %s\n", yesNo(d.IsEnabled))
+	fmt.Fprintf(out, "Definition:  %s (%s)\n", d.Name, d.Slug)
+	fmt.Fprintf(out, "Pattern:     %s\n", d.PatternKind)
+	fmt.Fprintf(out, "Scope:       %s\n", definitionScope(*d))
+	fmt.Fprintf(out, "Enabled:     %s\n", yesNo(d.IsEnabled))
 	if d.Description != "" {
-		_, _ = fmt.Fprintf(out, "Description: %s\n", d.Description)
+		fmt.Fprintf(out, "Description: %s\n", d.Description)
 	}
-	_, _ = fmt.Fprintf(out, "Stages:      %d\n", len(resp.Stages))
+	fmt.Fprintf(out, "Stages:      %d\n", len(resp.Stages))
 	for _, s := range resp.Stages {
 		line := fmt.Sprintf("  [%d] %s on_failure=%s timeout=%ds", s.Order, s.Kind, s.OnFailure, s.TimeoutSeconds)
 		if s.FanOutCount != nil {
@@ -361,7 +361,7 @@ func runWorkflowDefinition(cmd *cobra.Command, ctx context.Context, client *api.
 		if s.OutputKey != "" {
 			line += " output_key=" + s.OutputKey
 		}
-		_, _ = fmt.Fprintln(out, line)
+		fmt.Fprintln(out, line)
 	}
 	return nil
 }
@@ -402,7 +402,7 @@ func runWorkflowClone(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	if resp.Result.Slug != nil && *resp.Result.Slug != "" {
 		created = *resp.Result.Slug
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Cloned definition: %s\n", created)
+	fmt.Fprintf(cmd.OutOrStdout(), "Cloned definition: %s\n", created)
 	return nil
 }
 
@@ -437,20 +437,20 @@ func runWorkflowList(cmd *cobra.Command, ctx context.Context, client *api.Client
 
 	out := cmd.OutOrStdout()
 	if len(resp.Workflows) == 0 {
-		_, _ = fmt.Fprintln(out, "No workflows found.")
+		fmt.Fprintln(out, "No workflows found.")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "SLUG\tNAME\tDEFINITION\tTRIGGER\tENABLED\tRUNS")
+	fmt.Fprintln(w, "SLUG\tNAME\tDEFINITION\tTRIGGER\tENABLED\tRUNS")
 	for _, wf := range resp.Workflows {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\n",
 			wf.Slug, wf.Name, wf.DefinitionSlug, wf.TriggerKind, yesNo(wf.IsEnabled), wf.RunCount)
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d workflow(s) shown.\n", len(resp.Workflows))
+	fmt.Fprintf(out, "\n%d workflow(s) shown.\n", len(resp.Workflows))
 	return nil
 }
 
@@ -528,13 +528,13 @@ func runWorkflowCreate(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	out := cmd.OutOrStdout()
 	wf := resp.Result.Workflow
 	if wf == nil {
-		_, _ = fmt.Fprintln(out, "Workflow created.")
+		fmt.Fprintln(out, "Workflow created.")
 		return nil
 	}
-	_, _ = fmt.Fprintf(out, "Created workflow: %s (%s)\n", wf.Name, wf.Slug)
-	_, _ = fmt.Fprintf(out, "ID:               %s\n", wf.GUID)
-	_, _ = fmt.Fprintf(out, "Trigger:          %s\n", wf.TriggerKind)
-	_, _ = fmt.Fprintf(out, "\nRun it with `astro workflow run %s`.\n", wf.Slug)
+	fmt.Fprintf(out, "Created workflow: %s (%s)\n", wf.Name, wf.Slug)
+	fmt.Fprintf(out, "ID:               %s\n", wf.GUID)
+	fmt.Fprintf(out, "Trigger:          %s\n", wf.TriggerKind)
+	fmt.Fprintf(out, "\nRun it with `astro workflow run %s`.\n", wf.Slug)
 	return nil
 }
 
@@ -646,12 +646,12 @@ func runWorkflowRunConfig(cmd *cobra.Command, ctx context.Context, client *api.C
 
 	out := cmd.OutOrStdout()
 	if resp.Result.RunID != nil {
-		_, _ = fmt.Fprintf(out, "Run ID:         %s\n", *resp.Result.RunID)
+		fmt.Fprintf(out, "Run ID:         %s\n", *resp.Result.RunID)
 	}
 	if resp.Result.WorkflowRunID != nil {
-		_, _ = fmt.Fprintf(out, "WorkflowRun ID: %s\n", *resp.Result.WorkflowRunID)
+		fmt.Fprintf(out, "WorkflowRun ID: %s\n", *resp.Result.WorkflowRunID)
 	}
-	_, _ = fmt.Fprintf(out, "\nWatch it with `astro workflow runs %s --watch`.\n", slug)
+	fmt.Fprintf(out, "\nWatch it with `astro workflow runs %s --watch`.\n", slug)
 	return nil
 }
 
@@ -705,14 +705,14 @@ func runWorkflowRuns(cmd *cobra.Command, ctx context.Context, client *api.Client
 	}
 
 	if len(runs) == 0 {
-		_, _ = fmt.Fprintln(out, "No runs found.")
+		fmt.Fprintln(out, "No runs found.")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "RUN ID\tSTATE\tSTARTED\tFINISHED")
+	fmt.Fprintln(w, "RUN ID\tSTATE\tSTARTED\tFINISHED")
 	for _, r := range runs {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 			r.GUID, r.CurrentState, shortTime(&r.StartedAt), shortTime(r.CompletedAt))
 	}
 	if err := w.Flush(); err != nil {
@@ -726,11 +726,11 @@ func runWorkflowRuns(cmd *cobra.Command, ctx context.Context, client *api.Client
 	// Runs come newest-first; watch the newest until it goes terminal.
 	newest := runs[0]
 	if workflowRunTerminal(newest) {
-		_, _ = fmt.Fprintf(out, "\nRun %s already terminal: %s\n", newest.GUID, newest.CurrentState)
+		fmt.Fprintf(out, "\nRun %s already terminal: %s\n", newest.GUID, newest.CurrentState)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(out, "\nWatching run %s...\n", newest.GUID)
+	fmt.Fprintf(out, "\nWatching run %s...\n", newest.GUID)
 	pollCtx, pollCancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer pollCancel()
 
@@ -759,11 +759,11 @@ func runWorkflowRuns(cmd *cobra.Command, ctx context.Context, client *api.Client
 			continue
 		}
 		if current.CurrentState != last {
-			_, _ = fmt.Fprintf(out, "  → %s\n", current.CurrentState)
+			fmt.Fprintf(out, "  → %s\n", current.CurrentState)
 			last = current.CurrentState
 		}
 		if workflowRunTerminal(*current) {
-			_, _ = fmt.Fprintf(out, "Final state: %s\n", current.CurrentState)
+			fmt.Fprintf(out, "Final state: %s\n", current.CurrentState)
 			return nil
 		}
 	}
@@ -826,12 +826,12 @@ func runWorkflowImport(cmd *cobra.Command, ctx context.Context, client *api.Clie
 
 	out := cmd.OutOrStdout()
 	if workflowImportPreview {
-		_, _ = fmt.Fprintln(out, "Preview OK — nothing persisted.")
+		fmt.Fprintln(out, "Preview OK — nothing persisted.")
 		if m := resp.Result.Manifest; m != nil && m.Definition != nil {
-			_, _ = fmt.Fprintf(out, "  workflow: %s (%s), pattern=%s, %d stage(s)\n",
+			fmt.Fprintf(out, "  workflow: %s (%s), pattern=%s, %d stage(s)\n",
 				m.Definition.Name, m.Definition.Slug, m.Definition.Pattern, len(m.Stages))
 		}
-		_, _ = fmt.Fprintln(out, "Run again without --preview to persist.")
+		fmt.Fprintln(out, "Run again without --preview to persist.")
 		return nil
 	}
 
@@ -846,16 +846,16 @@ func runWorkflowImport(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	}
 	switch mode {
 	case "updated_in_place":
-		_, _ = fmt.Fprintf(out, "Updated workflow definition in place: %s\n", created)
-		_, _ = fmt.Fprintln(out, "Configured Workflows, bindings and schedules keep working unchanged.")
+		fmt.Fprintf(out, "Updated workflow definition in place: %s\n", created)
+		fmt.Fprintln(out, "Configured Workflows, bindings and schedules keep working unchanged.")
 	case "versioned":
-		_, _ = fmt.Fprintf(out, "Versioned workflow definition: %s\n", created)
+		fmt.Fprintf(out, "Versioned workflow definition: %s\n", created)
 		if len(resp.Result.RepointedSlugs) > 0 {
-			_, _ = fmt.Fprintf(out, "Repointed %d configured workflow(s): %s\n",
+			fmt.Fprintf(out, "Repointed %d configured workflow(s): %s\n",
 				len(resp.Result.RepointedSlugs), strings.Join(resp.Result.RepointedSlugs, ", "))
 		}
 	default:
-		_, _ = fmt.Fprintf(out, "Imported workflow definition: %s\n", created)
+		fmt.Fprintf(out, "Imported workflow definition: %s\n", created)
 	}
 	return nil
 }
@@ -883,7 +883,7 @@ func runWorkflowDelete(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	if err := execWorkflowMutationResult(ctx, client, deleteWorkflowMutation, "deleteWorkflow", slug); err != nil {
 		return fmt.Errorf("deleting workflow: %w", err)
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow: %s (schedule torn down; past runs kept)\n", slug)
+	fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow: %s (schedule torn down; past runs kept)\n", slug)
 	return nil
 }
 
@@ -915,7 +915,7 @@ func runWorkflowDefinitionDelete(cmd *cobra.Command, ctx context.Context, client
 	if err := execWorkflowMutationResult(ctx, client, deleteWorkflowDefinitionMutation, "deleteWorkflowDefinition", slug); err != nil {
 		return fmt.Errorf("deleting definition: %w", err)
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow definition: %s\n", slug)
+	fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow definition: %s\n", slug)
 	return nil
 }
 

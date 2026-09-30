@@ -263,8 +263,8 @@ func runAgentRun(cmd *cobra.Command, ctx context.Context, client *api.Client, _ 
 	}
 
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "WorkflowRun ID:    %s\n", resp.Result.WorkflowRunID)
-	_, _ = fmt.Fprintf(out, "Temporal workflow: %s\n", resp.Result.TemporalWorkflowID)
+	fmt.Fprintf(out, "WorkflowRun ID:    %s\n", resp.Result.WorkflowRunID)
+	fmt.Fprintf(out, "Temporal workflow: %s\n", resp.Result.TemporalWorkflowID)
 
 	if !agentRunWait {
 		return nil
@@ -275,7 +275,7 @@ func runAgentRun(cmd *cobra.Command, ctx context.Context, client *api.Client, _ 
 		return fmt.Errorf("cannot --wait: server returned no temporalWorkflowId")
 	}
 
-	_, _ = fmt.Fprintln(out, "Waiting for terminal state...")
+	fmt.Fprintln(out, "Waiting for terminal state...")
 	pollCtx, pollCancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer pollCancel()
 
@@ -301,11 +301,11 @@ func runAgentRun(cmd *cobra.Command, ctx context.Context, client *api.Client, _ 
 		}
 		status := pollResp.Instance.Status
 		if status != last {
-			_, _ = fmt.Fprintf(out, "  → %s\n", status)
+			fmt.Fprintf(out, "  → %s\n", status)
 			last = status
 		}
 		if terminalWorkflowStatuses[strings.ToLower(status)] {
-			_, _ = fmt.Fprintf(out, "Final status: %s\n", status)
+			fmt.Fprintf(out, "Final status: %s\n", status)
 			if !strings.EqualFold(status, "completed") {
 				return fmt.Errorf("workflow ended in %q", status)
 			}
@@ -365,14 +365,14 @@ func runAgentList(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	}
 
 	if len(tasks) == 0 {
-		_, _ = fmt.Fprintln(out, "No tasks found.")
+		fmt.Fprintln(out, "No tasks found.")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "TASK ID\tSTATUS\tVNC\tCREATED\tSTARTED\tFINISHED")
+	fmt.Fprintln(w, "TASK ID\tSTATUS\tVNC\tCREATED\tSTARTED\tFINISHED")
 	for _, t := range tasks {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			t.ID, t.Status, yesNo(t.VNCEnabled),
 			shortTime(&t.CreatedAt), shortTime(t.StartedAt), shortTime(t.FinishedAt),
 		)
@@ -380,7 +380,7 @@ func runAgentList(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "\n%d task(s) shown.\n", len(tasks))
+	fmt.Fprintf(out, "\n%d task(s) shown.\n", len(tasks))
 	return nil
 }
 
@@ -438,7 +438,7 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 			// most is a failed task (#1712). Say that nothing came back
 			// and where to look next; the control plane logs which of
 			// the several empty cases it actually took.
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+			fmt.Fprintf(cmd.ErrOrStderr(),
 				"no log lines returned for task %s.\n"+
 					"The agent may have printed nothing, or its pod may be gone — an agent Job\n"+
 					"is garbage-collected an hour after it settles, taking the pod's logs with it.\n"+
@@ -446,7 +446,7 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 				taskID, taskID)
 		}
 		for _, line := range lines {
-			_, _ = fmt.Fprintln(out, line)
+			fmt.Fprintln(out, line)
 		}
 		return nil
 	}
@@ -465,7 +465,7 @@ func runAgentLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, t
 			return fmt.Errorf("polling logs: %w", err)
 		}
 		for _, line := range tail.append(lines) {
-			_, _ = fmt.Fprintln(out, line)
+			fmt.Fprintln(out, line)
 		}
 
 		select {
@@ -500,13 +500,13 @@ func runAgentCancel(cmd *cobra.Command, ctx context.Context, client *api.Client,
 	if !agentCancelYes {
 		noPrompt, _ := cmd.Root().PersistentFlags().GetBool("no-prompt")
 		if !noPrompt {
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Cancel task %s? [y/N] ", taskID)
+			fmt.Fprintf(cmd.OutOrStdout(), "Cancel task %s? [y/N] ", taskID)
 			var answer string
 			if _, err := fmt.Fscan(cmd.InOrStdin(), &answer); err != nil {
 				return fmt.Errorf("reading confirmation: %w", err)
 			}
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
 			}
 		}
@@ -526,7 +526,7 @@ func runAgentCancel(cmd *cobra.Command, ctx context.Context, client *api.Client,
 		return fmt.Errorf("cancel failed: %s", firstMutationError(resp.Result.Errors))
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Task %s cancelled.\n", taskID)
+	fmt.Fprintf(cmd.OutOrStdout(), "Task %s cancelled.\n", taskID)
 	return nil
 }
 
@@ -569,39 +569,39 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 		return renderJSON(cmd, t)
 	}
 
-	_, _ = fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
-	_, _ = fmt.Fprintf(out, "Status:        %s\n", t.Status)
+	fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
+	fmt.Fprintf(out, "Status:        %s\n", t.Status)
 	if diagnostic := t.StartupDiagnostic.summary(); diagnostic != "" {
-		_, _ = fmt.Fprintf(out, "Startup:       %s\n", diagnostic)
+		fmt.Fprintf(out, "Startup:       %s\n", diagnostic)
 	}
 	if t.FailureMessage != nil && strings.TrimSpace(*t.FailureMessage) != "" {
 		if _, err := fmt.Fprintf(out, "Failure:       %s\n", *t.FailureMessage); err != nil {
 			return err
 		}
 	}
-	_, _ = fmt.Fprintf(out, "VNC enabled:   %s\n", yesNo(t.VNCEnabled))
+	fmt.Fprintf(out, "VNC enabled:   %s\n", yesNo(t.VNCEnabled))
 	if t.CreatedAt != "" {
-		_, _ = fmt.Fprintf(out, "Created at:    %s\n", t.CreatedAt)
+		fmt.Fprintf(out, "Created at:    %s\n", t.CreatedAt)
 	}
 	if t.StartedAt != nil && *t.StartedAt != "" {
-		_, _ = fmt.Fprintf(out, "Started at:    %s\n", *t.StartedAt)
+		fmt.Fprintf(out, "Started at:    %s\n", *t.StartedAt)
 	}
 	if t.FinishedAt != nil && *t.FinishedAt != "" {
-		_, _ = fmt.Fprintf(out, "Finished at:   %s\n", *t.FinishedAt)
+		fmt.Fprintf(out, "Finished at:   %s\n", *t.FinishedAt)
 	}
 	if t.CallbackURL != "" {
-		_, _ = fmt.Fprintf(out, "Callback URL:  %s\n", t.CallbackURL)
+		fmt.Fprintf(out, "Callback URL:  %s\n", t.CallbackURL)
 	}
 	if t.VNCURL != "" {
-		_, _ = fmt.Fprintf(out, "VNC URL:       %s\n", t.VNCURL)
+		fmt.Fprintf(out, "VNC URL:       %s\n", t.VNCURL)
 	}
 	if t.SnapshotURL != nil && *t.SnapshotURL != "" {
-		_, _ = fmt.Fprintf(out, "Snapshot URL:  %s\n", *t.SnapshotURL)
+		fmt.Fprintf(out, "Snapshot URL:  %s\n", *t.SnapshotURL)
 	}
 	if t.Result != nil {
 		enc, err := json.MarshalIndent(t.Result, "", "  ")
 		if err == nil {
-			_, _ = fmt.Fprintf(out, "\nResult:\n%s\n", enc)
+			fmt.Fprintf(out, "\nResult:\n%s\n", enc)
 		}
 	}
 	return nil

@@ -165,8 +165,8 @@ func runAgentDispatch(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	if agentDispatchJSON && !agentDispatchWait && !agentDispatchTail {
 		return renderJSON(cmd, task)
 	}
-	_, _ = fmt.Fprintf(out, "AgentTask ID: %s\n", task.ID)
-	_, _ = fmt.Fprintf(out, "Status:       %s\n", task.Status)
+	fmt.Fprintf(out, "AgentTask ID: %s\n", task.ID)
+	fmt.Fprintf(out, "Status:       %s\n", task.Status)
 
 	if !agentDispatchWait && !agentDispatchTail {
 		return nil
@@ -182,7 +182,7 @@ func runAgentDispatch(cmd *cobra.Command, ctx context.Context, client *api.Clien
 // waitAgentTask polls agentTask(id) until the status is terminal.
 func waitAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, taskID string) error {
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(out, "Waiting for terminal state...")
+	fmt.Fprintln(out, "Waiting for terminal state...")
 
 	pollCtx, cancel := context.WithTimeout(ctx, 60*time.Minute)
 	defer cancel()
@@ -203,7 +203,7 @@ func waitAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 			continue
 		}
 		if status != last {
-			_, _ = fmt.Fprintf(out, "  → %s\n", status)
+			fmt.Fprintf(out, "  → %s\n", status)
 			last = status
 		}
 		if terminalAgentTaskStatuses[strings.ToLower(status)] {
@@ -235,7 +235,7 @@ func tailAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 			return fmt.Errorf("polling logs: %w", err)
 		}
 		for _, line := range tail.append(logResp.Lines) {
-			_, _ = fmt.Fprintln(out, line)
+			fmt.Fprintln(out, line)
 		}
 
 		// check terminal status
@@ -259,7 +259,7 @@ func tailAgentTask(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 }
 
 func finalizeAgentTask(out io.Writer, status string) error {
-	_, _ = fmt.Fprintf(out, "Final status: %s\n", status)
+	fmt.Fprintf(out, "Final status: %s\n", status)
 	if !strings.EqualFold(status, "completed") {
 		return fmt.Errorf("task ended in %q", status)
 	}

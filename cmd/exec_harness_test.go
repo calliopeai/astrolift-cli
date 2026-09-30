@@ -117,7 +117,6 @@ func newFakeRelay(t *testing.T, script func(s *relaySession)) *fakeRelay {
 			close(done)
 			return
 		}
-		// Test connection cleanup is best effort.
 		defer func() { _ = conn.Close() }()
 		in := make(chan execFrame, 64)
 		go func() {

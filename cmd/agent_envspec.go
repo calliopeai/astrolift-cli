@@ -68,6 +68,7 @@ var (
 	envSpecAllowInstall bool
 	envSpecVNC          bool
 	envSpecNonRoot      bool
+	envSpecBoxWorkspace bool
 	envSpecEnv          []string
 	envSpecSecret       []string
 )
@@ -144,6 +145,12 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 		common["configManifestPath"] = envSpecManifestPath
 	}
 	applyNonRoot(cmd, common)
+	applyBoxWorkspace(cmd, common)
+
+	org, err := resolveOrg(cmd, ctx, client, cfg)
+	if err != nil {
+		return err
+	}
 
 	// Already exists? -> update (slug-keyed, org from token).
 	var existing struct {
@@ -168,15 +175,11 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 		if err := specMutErr(resp.Result, "update"); err != nil {
 			return err
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated env-spec %s\n", slug)
+		fmt.Fprintf(cmd.OutOrStdout(), "Updated env-spec %s\n", slug)
 		return nil
 	}
 
-	// Create -> needs an org.
-	org, err := resolveOrg(cmd, ctx, client, cfg)
-	if err != nil {
-		return err
-	}
+	// Create in the same organization used for the lookup.
 	createInput := map[string]interface{}{"slug": slug}
 	for k, v := range common {
 		createInput[k] = v
@@ -191,7 +194,7 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 	if err := specMutErr(resp.Result, "create"); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Created env-spec %s in org %s\n", slug, org.Slug)
+	fmt.Fprintf(cmd.OutOrStdout(), "Created env-spec %s in org %s\n", slug, org.Slug)
 	return nil
 }
 
@@ -201,6 +204,13 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 func applyNonRoot(cmd *cobra.Command, input map[string]interface{}) {
 	if cmd.Flags().Changed("non-root") {
 		input["runAsNonRoot"] = envSpecNonRoot
+	}
+}
+
+// Omitted flags preserve existing specs and compatibility with older servers.
+func applyBoxWorkspace(cmd *cobra.Command, input map[string]interface{}) {
+	if cmd.Flags().Changed("box-workspace") {
+		input["boxWorkspace"] = envSpecBoxWorkspace
 	}
 }
 
@@ -234,13 +244,13 @@ func runEnvSpecLs(cmd *cobra.Command, args []string) error {
 		return renderJSON(cmd, resp.AgentEnvironmentSpecs)
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "SLUG\tTYPE\tIMAGE\tCONFIG")
+	fmt.Fprintln(w, "SLUG\tTYPE\tIMAGE\tCONFIG")
 	for _, s := range resp.AgentEnvironmentSpecs {
 		img := s.ImageTag
 		if img == "" {
 			img = "-"
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Slug, s.AgentType, img, s.ConfigRepo)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Slug, s.AgentType, img, s.ConfigRepo)
 	}
 	return w.Flush()
 }
@@ -261,7 +271,7 @@ func runEnvSpecRm(cmd *cobra.Command, args []string) error {
 	if err := specMutErr(resp.Result, "delete"); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted env-spec %s\n", args[0])
+	fmt.Fprintf(cmd.OutOrStdout(), "Deleted env-spec %s\n", args[0])
 	return nil
 }
 
@@ -277,6 +287,7 @@ func init() {
 	f.StringVar(&envSpecManifestPath, "manifest-path", "", "Repo-relative path to the agent's astrolift.toml (or its dir)")
 	f.BoolVar(&envSpecAllowInstall, "allow-install", false, "Allow runtime package installs")
 	f.BoolVar(&envSpecVNC, "vnc", false, "Enable VNC for this spec")
+	f.BoolVar(&envSpecBoxWorkspace, "box-workspace", false, "Prepare the configured repos, dependencies and MCP before starting a box session")
 	f.BoolVar(&envSpecNonRoot, "non-root", false, "Run pods as the non-root agent user with all capabilities dropped (excludes --allow-install)")
 	f.StringArrayVar(&envSpecEnv, "env", nil, "Non-secret env var KEY=VALUE (repeatable)")
 	f.StringArrayVar(&envSpecSecret, "secret", nil, "Secret ref ENV_VAR=secret-store-name (repeatable)")
