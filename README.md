@@ -671,3 +671,29 @@ this credential in the selected organization. `astro agent quarantine clear
 <quarantine-uuid> --yes` performs the authorized, audited recovery mutation.
 Without `--yes` it asks for confirmation; noninteractive calls must supply the
 flag. Clearing permits future dispatch and does not restart a stopped task.
+
+### Prerequisite chart source and integrity
+
+`astrolift-opscode/helm/astrolift-prereqs` is the canonical source. The CLI
+commits a release-matched snapshot plus all locked subchart archives for offline
+bootstrap. `internal/charts/source.json` records the full published source
+revision and SHA-256 inventory; `make vendor-charts-check` verifies every file,
+including missing/extra files and archives, without network access.
+
+To update the snapshot, publish/review canonical changes first, use a clean
+opscode checkout containing that revision, configure the chart repositories
+listed in `Chart.yaml`, then run:
+
+```sh
+make vendor-charts PREREQS_REPO=../astrolift-opscode PREREQS_REV=<full-published-commit>
+make vendor-charts-check
+```
+
+Refresh fetches canonical `origin/main`, requires published ancestry and reads
+Git blobs from the exact commit. A missing, dirty, older or unpublished sibling
+fails before the embedded copy changes. Dependencies build from `Chart.lock`;
+the helper never copies arbitrary sibling working files. Commit the snapshot and
+inventory together. The source repository is private: CI checks local integrity,
+not authenticated remote parity. A maintainer must independently verify the
+inventory against that published Git tree before approving a new pin. Offline
+builds do not need source-repository credentials.

@@ -50,6 +50,21 @@ jobs:
           go-version: '1.23'
           cache: true
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.2'
+
+      # The canonical source repository is private. This gate is deliberately
+      # offline; publishing a new pin also requires independent canonical review.
+      - name: Verify complete pinned prerequisite snapshot
+        run: |
+          python3 -m unittest discover -s scripts/tests -v
+          make vendor-charts-check
+
       - name: Test
         run: go test ./...
 

@@ -85,6 +85,19 @@ jobs:
           go-version: '1.23'
           cache: true
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.2'
+
+      - name: Verify complete pinned prerequisite snapshot before tagging
+        run: |
+          python3 -m unittest discover -s scripts/tests -v
+          make vendor-charts-check
+
       # Verify before tagging. build-publish.yml also runs the suite on the
       # tag, but by then the version number is already spent.
       - name: Build, vet, and test

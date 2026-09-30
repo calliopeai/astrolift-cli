@@ -1,0 +1,40 @@
+{
+  "canonicalFiles": {
+    ".helmignore": "3e684680dc269004bf29cab734205230438b712faba69facf9877e2af243a064",
+    "Chart.lock": "f331f6db43bce883b500c72a917d9633d4f6519885deac47ce454634aab632f3",
+    "Chart.yaml": "e09d8c983270edca155c6d09203467b71d993b32f3eb0e112e10418d02299d3b",
+    "README.md": "3205c0ed1b2d8df8d94776c7a33d592c54194e292282461b0d64be340c616b98",
+    "templates/NOTES.txt": "91dc132df878098cf09b02278f93949bfc14384bd0d655ffe215915f7720d1f2",
+    "templates/_helpers.tpl": "dd7acb4675b4a3cf99bc4c052259422d547b113a710ec60e038885e445e16a27",
+    "templates/cluster-issuer.yaml": "587e79b21883b008de87ba61c1779162fbc6e4b687622dd967db57cb7d60985a",
+    "templates/opensearch-node-sysctl.yaml": "dacb6af76eed0103ba877e73070e044640e1d7725ac29ec23e7e7305c6de99b3",
+    "templates/storage-classes.yaml": "fb4e74d91d41b82a7d3d6e2e3e0d1da5c9377809faf16fa02958f1d471a3e70b",
+    "values.aws.yaml": "8e541ad331af92b0c142ae0e3207b9695d22495f6e1aeff79f6ac9d5c10bdce7",
+    "values.azure.yaml": "c438462deade309ae7810a7b258f1bc24f7cd945415702ced01f10b7acd034d5",
+    "values.gcp.yaml": "ee4f6a36df6a2add55c3a039e3e925939478f8e6c63615a6db4db0e8e800fd49",
+    "values.k8s.yaml": "a9c1e0b4e78c409eb31c60e32928ee5fafbb4c5ab1cf3e209a96ad5f3b8b7b09",
+    "values.yaml": "19ae3bb1155886be7ae8aa793b2cda003f13fd209adcf1dc35a9d0736eb525e3"
+  },
+  "dependencyArchives": {
+    "charts/cert-manager-v1.16.2.tgz": "0fa89dcaf2878a18a9aabd3c43d36394cc672e13c526dbd72f65a73c36b58cef",
+    "charts/cloudnative-pg-0.22.0.tgz": "fa0fbb5aa9dc779a44dbed2f2c97aed90e8379d5b11a529d7ec76d9cdd12a9ab",
+    "charts/external-dns-1.15.0.tgz": "ad32b4331335e26fe866921c4f49b6121c3bed281cdf49bd53169ad9f74d90b3",
+    "charts/ingress-nginx-4.11.3.tgz": "a9f371489a6c18042508c0b5c2ea669deaad7ccc08f37efc4522e336edda1c20",
+    "charts/kube-prometheus-stack-65.5.0.tgz": "1301161b01b4f98611c6a9cdff7cb049474af8e7bfc9f98234ec234c8810f07f",
+    "charts/loki-6.18.0.tgz": "a8a78d5bff8dec4b84943297cd816f3ec25ed1f891d5e40e86331eca09d67d43",
+    "charts/longhorn-1.7.2.tgz": "863c011cdc37dd0ad95595ed52b5ac43ef1394fa6012e607397f86e6b682be6a",
+    "charts/metallb-0.14.9.tgz": "e808428c9047d0c218634bc0f7cc92b8545d4c207470b3b563cfcbb46ab31ae9",
+    "charts/opensearch-operator-3.0.2.tgz": "d5fe23fd7d8e1107331d2074d68b7bc42533b265096730ba9ab45eca11659d93",
+    "charts/opentelemetry-collector-0.108.0.tgz": "0ea2ea90404405fd0748f6c5c09da1ce581cb166689a4671aeb98ff2c00d782b",
+    "charts/redis-operator-0.20.0.tgz": "69a81b314c8ea6bb3970d24c965d9f345809ef5f063928351908058b100f98e0",
+    "charts/rook-ceph-v1.15.5.tgz": "fd063268275e6dc857c85cd35fcbe20b70453440031807dd74bb90141f65dc45",
+    "charts/strimzi-kafka-operator-helm-3-chart-0.43.0.tgz": "36b48f8ec692e47bf478b81b8e208012a3c981d19cb83ac04376ab2cb2120802",
+    "charts/tempo-1.10.1.tgz": "6179337f221f86c9eab7d6a4c986b1dea56360bf1b61081403f28c573c86f42f",
+    "charts/vault-0.28.1.tgz": "99efe00f5527182e76d6e7a0ccf9d4797badd248cb8fe070fbe117e0b6cb58d7",
+    "charts/velero-8.0.0.tgz": "3bf16e06e1b77bceda5453af393030d02ecf06b116e2001616bfca544d5b9ce1"
+  },
+  "path": "helm/astrolift-prereqs",
+  "repository": "calliopeai/astrolift-opscode",
+  "revision": "1fb953f44e3aa1227cb09a63fa26049f046c0a3f",
+  "schemaVersion": 1
+}

@@ -2,8 +2,9 @@
 // values files into the astro binary via go:embed.
 //
 // The vendored chart copy lives at internal/charts/astrolift-prereqs/ and
-// is refreshed by `make vendor-charts`, which copies the source of truth
-// at astrolift-opscode/helm/astrolift-prereqs/. Pinning the chart version
+// is refreshed by `make vendor-charts` from the exact published Git tree
+// at astrolift-opscode/helm/astrolift-prereqs/. A committed SHA-256 inventory
+// guards the complete snapshot in offline builds and CI. Pinning the chart version
 // to a CLI binary version means a chart bump is always a CLI release —
 // the operator never has to reason about which chart version their CLI
 // is going to install.
@@ -24,7 +25,7 @@ import (
 // CLI binary ships with. Bump in lockstep with the vendored copy under
 // internal/charts/astrolift-prereqs/. The astro cluster bootstrap command
 // surfaces this so operators can correlate failures with a known chart.
-const PinnedChartVersion = "0.1.0"
+const PinnedChartVersion = "0.1.1"
 
 // ChartName is the embedded chart's release-time name.
 const ChartName = "astrolift-prereqs"
