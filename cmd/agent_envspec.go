@@ -168,7 +168,7 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 		if err := specMutErr(resp.Result, "update"); err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Updated env-spec %s\n", slug)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated env-spec %s\n", slug)
 		return nil
 	}
 
@@ -191,7 +191,7 @@ func runEnvSpecUpsert(cmd *cobra.Command, args []string) error {
 	if err := specMutErr(resp.Result, "create"); err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Created env-spec %s in org %s\n", slug, org.Slug)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Created env-spec %s in org %s\n", slug, org.Slug)
 	return nil
 }
 
@@ -234,13 +234,13 @@ func runEnvSpecLs(cmd *cobra.Command, args []string) error {
 		return renderJSON(cmd, resp.AgentEnvironmentSpecs)
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SLUG\tTYPE\tIMAGE\tCONFIG")
+	_, _ = fmt.Fprintln(w, "SLUG\tTYPE\tIMAGE\tCONFIG")
 	for _, s := range resp.AgentEnvironmentSpecs {
 		img := s.ImageTag
 		if img == "" {
 			img = "-"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Slug, s.AgentType, img, s.ConfigRepo)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Slug, s.AgentType, img, s.ConfigRepo)
 	}
 	return w.Flush()
 }
@@ -261,7 +261,7 @@ func runEnvSpecRm(cmd *cobra.Command, args []string) error {
 	if err := specMutErr(resp.Result, "delete"); err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Deleted env-spec %s\n", args[0])
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted env-spec %s\n", args[0])
 	return nil
 }
 

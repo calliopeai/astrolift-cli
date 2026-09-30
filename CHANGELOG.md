@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Stop task cancellation and box removal when confirmation input fails, and
+  reject an update whose extracted binary cannot be closed successfully.
+
 - Show agent startup diagnostics during task inspection and box waiting, and
   preserve them in task/box JSON. Reads fall back on older servers without
   hiding permission or transport failures or retrying mutations.

@@ -352,7 +352,7 @@ func waitForBox(cmd *cobra.Command, ctx context.Context, client *api.Client, box
 		return box, nil
 	}
 	out := cmd.ErrOrStderr()
-	fmt.Fprintf(out, "Waiting for box %s to come up...\n", box.Slug)
+	_, _ = fmt.Fprintf(out, "Waiting for box %s to come up...\n", box.Slug)
 
 	deadline := time.Now().Add(boxWaitTimeout)
 	last := box.Status
@@ -375,11 +375,11 @@ func waitForBox(cmd *cobra.Command, ctx context.Context, client *api.Client, box
 		}
 		diagnostic := fetched.StartupDiagnostic.summary()
 		if diagnostic != "" && diagnostic != lastDiagnostic {
-			fmt.Fprintf(out, "  Startup: %s\n", diagnostic)
+			_, _ = fmt.Fprintf(out, "  Startup: %s\n", diagnostic)
 		}
 		lastDiagnostic = diagnostic
 		if fetched.Status != last {
-			fmt.Fprintf(out, "  → %s\n", fetched.Status)
+			_, _ = fmt.Fprintf(out, "  → %s\n", fetched.Status)
 			last = fetched.Status
 		}
 		if fetched.Status == "running" {
@@ -454,15 +454,15 @@ func runBoxList(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg
 	}
 	if len(resp.AgentBoxes) == 0 {
 		if boxListAll {
-			fmt.Fprintln(out, "No boxes found.")
+			_, _ = fmt.Fprintln(out, "No boxes found.")
 		} else {
-			fmt.Fprintln(out, "No warm boxes. Start one with `astro box ensure --env-spec <slug>`.")
+			_, _ = fmt.Fprintln(out, "No warm boxes. Start one with `astro box ensure --env-spec <slug>`.")
 		}
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SLUG\tSTATUS\tAGENT\tIDLE\tSTARTED")
+	_, _ = fmt.Fprintln(w, "SLUG\tSTATUS\tAGENT\tIDLE\tSTARTED")
 	for _, b := range resp.AgentBoxes {
 		agent := b.AgentSlug
 		if agent == "" {
@@ -471,13 +471,13 @@ func runBoxList(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg
 		if agent == "" {
 			agent = "-"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			b.Slug, b.Status, agent, formatIdleTimeout(b.IdleTimeoutSeconds), shortTime(b.StartedAt))
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "\n%d box(es) shown.\n", len(resp.AgentBoxes))
+	_, _ = fmt.Fprintf(out, "\n%d box(es) shown.\n", len(resp.AgentBoxes))
 	return nil
 }
 
@@ -520,11 +520,13 @@ func runBoxRm(cmd *cobra.Command, ctx context.Context, client *api.Client, slug 
 	if !boxRmYes {
 		noPrompt, _ := cmd.Root().PersistentFlags().GetBool("no-prompt")
 		if !noPrompt {
-			fmt.Fprintf(cmd.OutOrStdout(), "Destroy box %s and kill its session? [y/N] ", slug)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Destroy box %s and kill its session? [y/N] ", slug)
 			var answer string
-			fmt.Fscan(cmd.InOrStdin(), &answer)
+			if _, err := fmt.Fscan(cmd.InOrStdin(), &answer); err != nil {
+				return fmt.Errorf("reading confirmation: %w", err)
+			}
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
 			}
 		}
@@ -545,7 +547,7 @@ func runBoxRm(cmd *cobra.Command, ctx context.Context, client *api.Client, slug 
 	if wantJSON(cmd) {
 		return renderJSON(cmd, map[string]any{"slug": slug, "destroyed": true})
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Box %s destroyed.\n", slug)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Box %s destroyed.\n", slug)
 	return nil
 }
 
@@ -741,22 +743,22 @@ func wantJSON(cmd *cobra.Command) bool {
 
 func printBox(cmd *cobra.Command, box *agentBox) {
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "Box:     %s\n", box.Slug)
-	fmt.Fprintf(out, "Status:  %s\n", box.Status)
+	_, _ = fmt.Fprintf(out, "Box:     %s\n", box.Slug)
+	_, _ = fmt.Fprintf(out, "Status:  %s\n", box.Status)
 	if box.AgentSlug != "" {
-		fmt.Fprintf(out, "Agent:   %s\n", box.AgentSlug)
+		_, _ = fmt.Fprintf(out, "Agent:   %s\n", box.AgentSlug)
 	}
 	if box.EnvironmentSpecSlug != "" {
-		fmt.Fprintf(out, "Spec:    %s\n", box.EnvironmentSpecSlug)
+		_, _ = fmt.Fprintf(out, "Spec:    %s\n", box.EnvironmentSpecSlug)
 	}
-	fmt.Fprintf(out, "Idle:    %s\n", formatIdleTimeout(box.IdleTimeoutSeconds))
+	_, _ = fmt.Fprintf(out, "Idle:    %s\n", formatIdleTimeout(box.IdleTimeoutSeconds))
 	if box.LastError != "" {
-		fmt.Fprintf(out, "Error:   %s\n", box.LastError)
+		_, _ = fmt.Fprintf(out, "Error:   %s\n", box.LastError)
 	}
 	if !boxLiveStatuses[box.Status] {
 		return
 	}
-	fmt.Fprintf(out, "\nAttach with:\n  astro box attach %s\n", box.Slug)
+	_, _ = fmt.Fprintf(out, "\nAttach with:\n  astro box attach %s\n", box.Slug)
 }
 
 // ---- init ------------------------------------------------------------------

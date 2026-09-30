@@ -123,9 +123,9 @@ func readAuthUserPassword(cmd *cobra.Command, prompt string) (string, error) {
 	if !term.IsTerminal(fd) {
 		return "", fmt.Errorf("no password provided: pass --password-stdin or run in a terminal")
 	}
-	fmt.Fprint(cmd.OutOrStdout(), prompt)
+	_, _ = fmt.Fprint(cmd.OutOrStdout(), prompt)
 	b, err := term.ReadPassword(fd)
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	if err != nil {
 		return "", fmt.Errorf("reading password: %w", err)
 	}
@@ -176,19 +176,19 @@ var authUsersListCmd = &cobra.Command{
 		}
 		out := cmd.OutOrStdout()
 		if !resp.View.Supported {
-			fmt.Fprintf(out, "Users are not managed here: %s\n", resp.View.Reason)
+			_, _ = fmt.Fprintf(out, "Users are not managed here: %s\n", resp.View.Reason)
 			return nil
 		}
 		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "EMAIL\tUSERNAME\tENABLED\tSTATUS\tGROUPS")
+		_, _ = fmt.Fprintln(w, "EMAIL\tUSERNAME\tENABLED\tSTATUS\tGROUPS")
 		for _, u := range resp.View.Users {
-			fmt.Fprintf(w, "%s\t%s\t%t\t%s\t%s\n", dashIfEmpty(u.Email), u.Username, u.Enabled,
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%t\t%s\t%s\n", dashIfEmpty(u.Email), u.Username, u.Enabled,
 				dashIfEmpty(u.Status), dashIfEmpty(strings.Join(u.Groups, ",")))
 		}
 		if err := w.Flush(); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "\n%d user(s) in %s. Groups: %s\n%s\n", len(resp.View.Users), resp.View.Provider,
+		_, _ = fmt.Fprintf(out, "\n%d user(s) in %s. Groups: %s\n%s\n", len(resp.View.Users), resp.View.Provider,
 			dashIfEmpty(strings.Join(resp.View.Groups, ", ")), resp.View.ReachNote)
 		return nil
 	},
@@ -226,9 +226,9 @@ applies with a password you set.`,
 			return fmt.Errorf("adding %s: %w", args[1], err)
 		}
 		if _, set := input["password"]; set {
-			fmt.Fprintf(cmd.OutOrStdout(), "Added %s with the password you set.\n", args[1])
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added %s with the password you set.\n", args[1])
 		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "Added %s. The provider emailed a temporary password.\n", args[1])
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added %s. The provider emailed a temporary password.\n", args[1])
 		}
 		return nil
 	},
@@ -253,7 +253,7 @@ var authUsersSetPasswordCmd = &cobra.Command{
 		if err := runAuthUserMutation(cmd.Context(), client, "setClusterAuthUserPassword", input); err != nil {
 			return fmt.Errorf("setting the password for %s: %w", args[1], err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Password set for %s.\n", args[1])
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Password set for %s.\n", args[1])
 		return nil
 	},
 }
@@ -276,7 +276,7 @@ func authUserRefCmd(use, short, mutation, done string, extra map[string]interfac
 			if err := runAuthUserMutation(cmd.Context(), client, mutation, input); err != nil {
 				return fmt.Errorf("%s %s: %w", use, args[1], err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), done+"\n", args[1])
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), done+"\n", args[1])
 			return nil
 		},
 	}
@@ -301,11 +301,11 @@ var authUsersDeleteCmd = &cobra.Command{
 			if noPrompt {
 				return fmt.Errorf("delete needs confirmation: pass --yes (--no-prompt is set)")
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Delete %s on %s? They can no longer sign in to any app there. [y/N] ", args[1], args[0])
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Delete %s on %s? They can no longer sign in to any app there. [y/N] ", args[1], args[0])
 			var answer string
 			_, _ = fmt.Fscan(cmd.InOrStdin(), &answer)
 			if !strings.EqualFold(strings.TrimSpace(answer), "y") {
-				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
 			}
 		}
@@ -317,7 +317,7 @@ var authUsersDeleteCmd = &cobra.Command{
 		if err := runAuthUserMutation(cmd.Context(), client, "deleteClusterAuthUser", input); err != nil {
 			return fmt.Errorf("deleting %s: %w", args[1], err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Deleted %s.\n", args[1])
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted %s.\n", args[1])
 		return nil
 	},
 }
@@ -340,7 +340,7 @@ var authUsersGroupsCmd = &cobra.Command{
 		if err := runAuthUserMutation(cmd.Context(), client, "setClusterAuthUserGroups", input); err != nil {
 			return fmt.Errorf("changing the groups of %s: %w", args[1], err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Groups of %s updated.\n", args[1])
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Groups of %s updated.\n", args[1])
 		return nil
 	},
 }
@@ -358,7 +358,7 @@ var authUsersGroupCreateCmd = &cobra.Command{
 		if err := runAuthUserMutation(cmd.Context(), client, "createClusterAuthGroup", input); err != nil {
 			return fmt.Errorf("creating group %s: %w", args[1], err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Created group %s.\n", args[1])
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Created group %s.\n", args[1])
 		return nil
 	},
 }
