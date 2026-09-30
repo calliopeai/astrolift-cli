@@ -35,7 +35,7 @@ func TestPinnedHostActionsSurviveSDKTransport(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		for {
 			var request struct {
 				ID     interface{} `json:"id"`

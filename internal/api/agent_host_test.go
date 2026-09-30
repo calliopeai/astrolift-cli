@@ -30,7 +30,7 @@ func hostFixture(t *testing.T, token, org string, terminal, deny bool) (*httptes
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		var seen []string
 		defer func() { methods <- seen }()
 		channel := "ahp-session:/" + hostTaskID + "/chat"
@@ -167,7 +167,7 @@ func TestAgentHostExplicitUnavailableSupportsWatchFallback(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		var request map[string]interface{}
 		_ = conn.ReadJSON(&request)
 		_ = conn.WriteJSON(map[string]interface{}{"jsonrpc": "2.0", "id": request["id"], "error": map[string]interface{}{"code": -32003, "message": "Attach unavailable", "data": map[string]interface{}{"ahp_available": false, "reason": "agent_live_attach disabled", "fallback": "agent_task.watch"}}})
