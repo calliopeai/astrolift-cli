@@ -250,15 +250,15 @@ func runWorkflowRunCancel(cmd *cobra.Command, ctx context.Context, client *api.C
 	if workflowRunCancelTerminate {
 		verb = "Terminate"
 	}
-	fmt.Fprintf(out, "%s requested: run %s (temporal: %s)\n", verb, observed.GUID, temporalID)
+	_, _ = fmt.Fprintf(out, "%s requested: run %s (temporal: %s)\n", verb, observed.GUID, temporalID)
 	if reason != "" {
-		fmt.Fprintf(out, "Reason:            %s\n", reason)
+		_, _ = fmt.Fprintf(out, "Reason:            %s\n", reason)
 	}
-	fmt.Fprintf(out, "State:             %s\n", observed.CurrentState)
+	_, _ = fmt.Fprintf(out, "State:             %s\n", observed.CurrentState)
 	if !workflowRunTerminal(observed.configuredWorkflowRun) {
-		fmt.Fprintf(out, "\nThe run has not reached a terminal state yet; %s is delivered asynchronously.\n",
+		_, _ = fmt.Fprintf(out, "\nThe run has not reached a terminal state yet; %s is delivered asynchronously.\n",
 			strings.ToLower(verb))
-		fmt.Fprintf(out, "Watch it with `astro workflow runs %s --watch`.\n", slug)
+		_, _ = fmt.Fprintf(out, "Watch it with `astro workflow runs %s --watch`.\n", slug)
 	}
 	return nil
 }
@@ -334,29 +334,29 @@ func runWorkflowRunShow(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	}
 
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "Workflow:  %s\n", slug)
-	fmt.Fprintf(out, "Run:       %s\n", run.GUID)
-	fmt.Fprintf(out, "State:     %s\n", run.CurrentState)
-	fmt.Fprintf(out, "Started:   %s\n", shortTime(&run.StartedAt))
-	fmt.Fprintf(out, "Finished:  %s\n", shortTime(run.CompletedAt))
+	_, _ = fmt.Fprintf(out, "Workflow:  %s\n", slug)
+	_, _ = fmt.Fprintf(out, "Run:       %s\n", run.GUID)
+	_, _ = fmt.Fprintf(out, "State:     %s\n", run.CurrentState)
+	_, _ = fmt.Fprintf(out, "Started:   %s\n", shortTime(&run.StartedAt))
+	_, _ = fmt.Fprintf(out, "Finished:  %s\n", shortTime(run.CompletedAt))
 	if temporalID != "" {
-		fmt.Fprintf(out, "Temporal:  %s\n", temporalID)
+		_, _ = fmt.Fprintf(out, "Temporal:  %s\n", temporalID)
 	}
 
-	fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "")
 	if len(stages) == 0 {
 		if temporalID == "" || temporalRunID == "" {
-			fmt.Fprintln(out, "No stage detail: the run has no Temporal run id yet.")
+			_, _ = fmt.Fprintln(out, "No stage detail: the run has no Temporal run id yet.")
 			return nil
 		}
-		fmt.Fprintln(out, "No stages have started yet.")
+		_, _ = fmt.Fprintln(out, "No stages have started yet.")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "STAGE\tKIND\tROLE\tSTATUS\tATTEMPT\tGATE\tSTARTED\tFINISHED")
+	_, _ = fmt.Fprintln(w, "STAGE\tKIND\tROLE\tSTATUS\tATTEMPT\tGATE\tSTARTED\tFINISHED")
 	for _, s := range stages {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%d\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%d\t%s\t%s\t%s\n",
 			s.StageOrder, s.StageKind, dashIfEmpty(s.StageRole), s.Status, s.AttemptNumber,
 			dashIfEmpty(s.HumanGateState), shortTime(s.StartedAt), shortTime(s.EndedAt))
 	}
@@ -366,10 +366,10 @@ func runWorkflowRunShow(cmd *cobra.Command, ctx context.Context, client *api.Cli
 
 	for _, s := range stages {
 		if note := gateDetail(s); note != "" {
-			fmt.Fprintf(out, "\n  [%d] %s\n", s.StageOrder, note)
+			_, _ = fmt.Fprintf(out, "\n  [%d] %s\n", s.StageOrder, note)
 		}
 		if s.ErrorMessage != "" {
-			fmt.Fprintf(out, "\n  [%d] error: %s\n", s.StageOrder, s.ErrorMessage)
+			_, _ = fmt.Fprintf(out, "\n  [%d] error: %s\n", s.StageOrder, s.ErrorMessage)
 		}
 	}
 	return nil

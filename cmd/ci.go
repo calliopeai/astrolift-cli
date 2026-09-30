@@ -95,8 +95,8 @@ Exit codes: 0 success, 1 deploy failure, 2 config error.`,
 			return deployErr(fmt.Errorf("enqueueing deploy: %w", err))
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "Deploy enqueued: %s\n", resp.WorkflowID)
-		fmt.Fprintf(cmd.OutOrStdout(), "Polling URL:     %s\n", resp.PollingURL)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deploy enqueued: %s\n", resp.WorkflowID)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Polling URL:     %s\n", resp.PollingURL)
 
 		noWait, _ := cmd.Flags().GetBool("no-wait")
 		if noWait {
@@ -115,12 +115,12 @@ Exit codes: 0 success, 1 deploy failure, 2 config error.`,
 		pollCtx, pollCancel := context.WithTimeout(cmd.Context(), timeout)
 		defer pollCancel()
 
-		fmt.Fprintln(cmd.OutOrStdout(), "Polling for terminal state...")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Polling for terminal state...")
 		state, err := pollWorkflow(pollCtx, client, resp.PollingURL)
 		if err != nil {
 			return deployErr(err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Final state: %s\n", state)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Final state: %s\n", state)
 		if state != "succeeded" && state != "completed" {
 			return deployErr(fmt.Errorf("deploy ended in %q", state))
 		}
@@ -149,7 +149,7 @@ var ciStatusCmd = &cobra.Command{
 		if err := client.Get(ctx, fmt.Sprintf("/api/cli/v1/workflow_runs/%s", args[0]), &status); err != nil {
 			return err
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), status.State)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), status.State)
 		return nil
 	},
 }
@@ -225,7 +225,7 @@ Exit codes: 0 success, 1 render error, 2 config error.`,
 		if err != nil {
 			pretty = r.Resources
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), string(pretty))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(pretty))
 		return nil
 	},
 }

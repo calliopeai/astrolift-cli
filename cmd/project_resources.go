@@ -356,17 +356,17 @@ func runProjectResourceCatalog(cmd *cobra.Command, ctx context.Context, client *
 		return renderJSON(cmd, map[string]interface{}{"project": project, "cluster": cluster, "entries": resp.Entries})
 	}
 	if len(resp.Entries) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No resource capabilities found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No resource capabilities found.")
 		return nil
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "KIND\tVARIANT\tSTATUS\tDEFAULT\tPRODUCT\tTRACKING\n")
+	_, _ = fmt.Fprintf(w, "KIND\tVARIANT\tSTATUS\tDEFAULT\tPRODUCT\tTRACKING\n")
 	for _, entry := range resp.Entries {
 		status := entry.Status
 		if !entry.Available {
 			status += " (unavailable)"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			entry.Kind, entry.Variant, status, yesNo(entry.IsDefaultForKind), entry.DisplayName, dashIfEmpty(entry.IssueURL))
 	}
 	return w.Flush()
@@ -398,13 +398,13 @@ func runProjectResourceList(cmd *cobra.Command, ctx context.Context, client *api
 		return renderJSON(cmd, resources)
 	}
 	if len(resources) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No project resources found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No project resources found.")
 		return nil
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tKIND\tVARIANT\tSTATUS\tCLUSTER\tATTACHED\tID")
+	_, _ = fmt.Fprintln(w, "NAME\tKIND\tVARIANT\tSTATUS\tCLUSTER\tATTACHED\tID")
 	for _, resource := range resources {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
 			resource.Name, resource.Kind, dashIfEmpty(resource.Variant), resource.Status,
 			dashIfEmpty(resource.ClusterSlug), len(resource.Attachments), resource.ID)
 	}
@@ -436,29 +436,29 @@ func renderProjectResource(cmd *cobra.Command, resource *projectResource) error 
 		return renderJSON(cmd, resource)
 	}
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "Name:        %s\n", resource.Name)
-	fmt.Fprintf(out, "ID:          %s\n", resource.ID)
-	fmt.Fprintf(out, "Kind:        %s / %s\n", resource.Kind, dashIfEmpty(resource.Variant))
-	fmt.Fprintf(out, "Status:      %s\n", resource.Status)
-	fmt.Fprintf(out, "Cluster:     %s\n", dashIfEmpty(resource.ClusterSlug))
-	fmt.Fprintf(out, "Environment: %s\n", resource.EnvironmentName)
+	_, _ = fmt.Fprintf(out, "Name:        %s\n", resource.Name)
+	_, _ = fmt.Fprintf(out, "ID:          %s\n", resource.ID)
+	_, _ = fmt.Fprintf(out, "Kind:        %s / %s\n", resource.Kind, dashIfEmpty(resource.Variant))
+	_, _ = fmt.Fprintf(out, "Status:      %s\n", resource.Status)
+	_, _ = fmt.Fprintf(out, "Cluster:     %s\n", dashIfEmpty(resource.ClusterSlug))
+	_, _ = fmt.Fprintf(out, "Environment: %s\n", resource.EnvironmentName)
 	if resource.ProviderPortalURL != "" {
-		fmt.Fprintf(out, "Provider:    %s\n", resource.ProviderPortalURL)
+		_, _ = fmt.Fprintf(out, "Provider:    %s\n", resource.ProviderPortalURL)
 	}
 	if resource.StatusError != "" {
-		fmt.Fprintf(out, "Error:       %s\n", resource.StatusError)
+		_, _ = fmt.Fprintf(out, "Error:       %s\n", resource.StatusError)
 	}
 	if len(resource.EditableFields) > 0 {
-		fmt.Fprintf(out, "Editable:    %s\n", strings.Join(resource.EditableFields, ", "))
+		_, _ = fmt.Fprintf(out, "Editable:    %s\n", strings.Join(resource.EditableFields, ", "))
 	}
 	if len(resource.Attachments) > 0 {
-		fmt.Fprintln(out, "Attachments:")
+		_, _ = fmt.Fprintln(out, "Attachments:")
 		for _, attachment := range resource.Attachments {
-			fmt.Fprintf(out, "  %s  %s:%s (%s)\n", attachment.ID, attachment.ConsumerKind, attachment.ConsumerSlug, attachment.EnvironmentName)
+			_, _ = fmt.Fprintf(out, "  %s  %s:%s (%s)\n", attachment.ID, attachment.ConsumerKind, attachment.ConsumerSlug, attachment.EnvironmentName)
 		}
 	}
 	configJSON, _ := json.MarshalIndent(resource.Config, "", "  ")
-	fmt.Fprintf(out, "Config:\n%s\n", configJSON)
+	_, _ = fmt.Fprintf(out, "Config:\n%s\n", configJSON)
 	return nil
 }
 
@@ -490,19 +490,19 @@ func runProjectResourceCost(cmd *cobra.Command, ctx context.Context, client *api
 		if detail == "" {
 			detail = resp.Preview.Reason
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Cost unavailable: %s\n", detail)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Cost unavailable: %s\n", detail)
 		return nil
 	}
 	prefix := ""
 	if resp.Preview.Approximate {
 		prefix = "approximately "
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s%.2f %s/month\n", prefix, *resp.Preview.MonthlyTotal, resp.Preview.Currency)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%.2f %s/month\n", prefix, *resp.Preview.MonthlyTotal, resp.Preview.Currency)
 	if resp.Preview.PricingSourceURL != "" {
-		fmt.Fprintf(cmd.OutOrStdout(), "Pricing source: %s\n", resp.Preview.PricingSourceURL)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Pricing source: %s\n", resp.Preview.PricingSourceURL)
 	}
 	for _, note := range resp.Preview.Notes {
-		fmt.Fprintf(cmd.OutOrStdout(), "Note: %s\n", note)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Note: %s\n", note)
 	}
 	return nil
 }
@@ -647,7 +647,7 @@ func runProjectResourceAttach(cmd *cobra.Command, ctx context.Context, client *a
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Result.Data)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Attached %s to %s:%s\n", resource.Name, resp.Result.Data.ConsumerKind, resp.Result.Data.ConsumerSlug)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Attached %s to %s:%s\n", resource.Name, resp.Result.Data.ConsumerKind, resp.Result.Data.ConsumerSlug)
 	return nil
 }
 
@@ -674,7 +674,7 @@ func runProjectResourceDetach(cmd *cobra.Command, ctx context.Context, client *a
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Result.Data)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Detached %s\n", attachmentID)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Detached %s\n", attachmentID)
 	return nil
 }
 
@@ -709,7 +709,7 @@ func runProjectResourceRemove(cmd *cobra.Command, ctx context.Context, client *a
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Result.Data)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Deprovisioning %s (%s)\n", resource.Name, resource.ID)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deprovisioning %s (%s)\n", resource.Name, resource.ID)
 	return nil
 }
 

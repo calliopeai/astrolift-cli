@@ -159,8 +159,8 @@ authoritative check).`,
 			return fmt.Errorf("writing %s: %w", workflowInitOut, err)
 		}
 		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "Created %s (pattern: %s)\n", workflowInitOut, workflowInitPattern)
-		fmt.Fprintf(out, "Edit it, then run `astro workflow validate %s`.\n", workflowInitOut)
+		_, _ = fmt.Fprintf(out, "Created %s (pattern: %s)\n", workflowInitOut, workflowInitPattern)
+		_, _ = fmt.Fprintf(out, "Edit it, then run `astro workflow validate %s`.\n", workflowInitOut)
 		return nil
 	},
 }
@@ -211,14 +211,14 @@ func runWorkflowValidateLocal(cmd *cobra.Command, content, file string) error {
 		return renderJSON(cmd, &m)
 	}
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "OK (local shape check): %s\n", file)
-	fmt.Fprintf(out, "  workflow: %s (%s), pattern=%s, %d stage(s)\n",
+	_, _ = fmt.Fprintf(out, "OK (local shape check): %s\n", file)
+	_, _ = fmt.Fprintf(out, "  workflow: %s (%s), pattern=%s, %d stage(s)\n",
 		m.Workflow.Name, m.Workflow.Slug, defaultStr(m.Workflow.Pattern, "single"), len(m.Stages))
 	for i, s := range m.Stages {
-		fmt.Fprintf(out, "  [%d] %s %s\n", i, s.Kind, stageLabel(s))
+		_, _ = fmt.Fprintf(out, "  [%d] %s %s\n", i, s.Kind, stageLabel(s))
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Run with --server for authoritative validation.")
+	_, _ = fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "Run with --server for authoritative validation.")
 	return nil
 }
 
@@ -285,9 +285,9 @@ func runWorkflowValidateServer(cmd *cobra.Command, ctx context.Context, client *
 		return fmt.Errorf("server validation failed%s: %s", previewErrorLocation(p), previewErrorMessage(p))
 	}
 	out := cmd.OutOrStdout()
-	fmt.Fprintln(out, "OK (server validation):")
+	_, _ = fmt.Fprintln(out, "OK (server validation):")
 	if p.Definition != nil {
-		fmt.Fprintf(out, "  workflow: %s (%s), pattern=%s\n",
+		_, _ = fmt.Fprintf(out, "  workflow: %s (%s), pattern=%s\n",
 			p.Definition.Name, p.Definition.Slug, p.Definition.Pattern)
 	}
 	for _, s := range p.Stages {
@@ -303,7 +303,7 @@ func runWorkflowValidateServer(cmd *cobra.Command, ctx context.Context, client *
 		if s.OutputKey != nil && *s.OutputKey != "" {
 			outputKey = " output_key=" + *s.OutputKey
 		}
-		fmt.Fprintf(out, "  [%d] %s role=%s%s%s%s on_failure=%s timeout=%d fan_out=%s\n",
+		_, _ = fmt.Fprintf(out, "  [%d] %s role=%s%s%s%s on_failure=%s timeout=%d fan_out=%s\n",
 			s.Order, s.Kind, s.Role, agent, environment, outputKey, s.OnFailure, s.Timeout, s.FanOut)
 	}
 	return nil
@@ -402,14 +402,14 @@ func runWorkflowPull(cmd *cobra.Command, ctx context.Context, client *api.Client
 		if err := os.WriteFile(workflowPullOut, []byte(body), 0o644); err != nil {
 			return fmt.Errorf("writing %s: %w", workflowPullOut, err)
 		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "Wrote %s (%d bytes)\n", workflowPullOut, len(body))
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Wrote %s (%d bytes)\n", workflowPullOut, len(body))
 		return nil
 	}
 	out := cmd.OutOrStdout()
 	if !strings.HasSuffix(body, "\n") {
 		body += "\n"
 	}
-	fmt.Fprint(out, body)
+	_, _ = fmt.Fprint(out, body)
 	return nil
 }
 

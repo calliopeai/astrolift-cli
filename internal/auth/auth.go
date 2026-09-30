@@ -87,7 +87,8 @@ func StartLogin(ctx context.Context, apiURL, clientKind string) (*LoginSession, 
 	if err != nil {
 		return nil, fmt.Errorf("auth/start: %w", err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled separately; closing the reader is best effort.
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("auth/start returned %d: %s", resp.StatusCode, body)
@@ -123,7 +124,8 @@ func PollLogin(ctx context.Context, apiURL, sessionID string) (*Credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("auth/complete: %w", err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled separately; closing the reader is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -181,7 +183,8 @@ func RefreshCredentials(ctx context.Context, apiURL, refreshToken string) (*Cred
 	if err != nil {
 		return nil, fmt.Errorf("auth/refresh: %w", err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled separately; closing the reader is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusGone {
 		return nil, ErrExpired
@@ -223,7 +226,8 @@ func SignOut(ctx context.Context, apiURL, refreshToken string) error {
 	if err != nil {
 		return fmt.Errorf("auth/signout: %w", err)
 	}
-	defer resp.Body.Close()
+	// Response read errors are handled separately; closing the reader is best effort.
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)

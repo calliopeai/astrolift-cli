@@ -61,6 +61,8 @@ mode 0600. The CLI refuses to read credentials files with wider permissions.
 
 - Commands return 0 on success, 2 on usage error, 1 on operational failure.
 - Every command supports `--json` for machine-readable output.
-- Errors go to stderr; data goes to stdout.
+- Errors go to stderr; data goes to stdout. Human-facing formatted output is
+  best effort: explicitly discard its write result. Keep confirmation input,
+  machine-readable output, and file writes error-checked.
 - No AI co-authorship messages in commits or code.
 - No rebases. New commits only.

@@ -17,6 +17,7 @@ const (
 )
 
 // Writer handles formatted output to stdout/stderr.
+// Human-facing void methods are best effort; JSON returns serialization/write errors.
 type Writer struct {
 	out    io.Writer
 	errOut io.Writer
@@ -48,23 +49,23 @@ func (w *Writer) Table(headers []string, rows [][]string) {
 
 	for i, h := range headers {
 		if i > 0 {
-			fmt.Fprint(tw, "\t")
+			_, _ = fmt.Fprint(tw, "\t")
 		}
-		fmt.Fprint(tw, h)
+		_, _ = fmt.Fprint(tw, h)
 	}
-	fmt.Fprintln(tw)
+	_, _ = fmt.Fprintln(tw)
 
 	for _, row := range rows {
 		for i, col := range row {
 			if i > 0 {
-				fmt.Fprint(tw, "\t")
+				_, _ = fmt.Fprint(tw, "\t")
 			}
-			fmt.Fprint(tw, col)
+			_, _ = fmt.Fprint(tw, col)
 		}
-		fmt.Fprintln(tw)
+		_, _ = fmt.Fprintln(tw)
 	}
 
-	tw.Flush()
+	_ = tw.Flush()
 }
 
 // Error prints a formatted error message to stderr in the style:
@@ -72,13 +73,13 @@ func (w *Writer) Table(headers []string, rows [][]string) {
 //	error: <summary>
 //	       <hint>
 func (w *Writer) Error(summary string, hint string) {
-	fmt.Fprintf(w.errOut, "error: %s\n", summary)
+	_, _ = fmt.Fprintf(w.errOut, "error: %s\n", summary)
 	if hint != "" {
-		fmt.Fprintf(w.errOut, "       %s\n", hint)
+		_, _ = fmt.Fprintf(w.errOut, "       %s\n", hint)
 	}
 }
 
 // Print writes a line to stdout.
 func (w *Writer) Print(msg string) {
-	fmt.Fprintln(w.out, msg)
+	_, _ = fmt.Fprintln(w.out, msg)
 }

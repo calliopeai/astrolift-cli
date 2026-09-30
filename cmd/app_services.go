@@ -170,23 +170,23 @@ func runAppServicesList(cmd *cobra.Command, ctx context.Context, client *api.Cli
 
 	out := cmd.OutOrStdout()
 	if len(rows) == 0 {
-		fmt.Fprintf(out, "No managed services bound to app %q.\n", appSlug)
+		_, _ = fmt.Fprintf(out, "No managed services bound to app %q.\n", appSlug)
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tKIND\tVARIANT\tENVIRONMENT\tSTATUS\tBINDING READY\tCREATED")
+	_, _ = fmt.Fprintln(w, "NAME\tKIND\tVARIANT\tENVIRONMENT\tSTATUS\tBINDING READY\tCREATED")
 	for _, s := range rows {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			s.Name, s.Kind, dashIfEmpty(s.Variant), dashIfEmpty(s.EnvironmentName),
 			appManagedServiceStatusLabel(s), yesNo(s.BindingReady), shortTime(&s.CreatedAt))
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "\n%d managed service(s) shown.\n", len(rows))
+	_, _ = fmt.Fprintf(out, "\n%d managed service(s) shown.\n", len(rows))
 	if truncated {
-		fmt.Fprintf(cmd.ErrOrStderr(),
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 			"note: only the %d most recently created managed services were scanned\n", appServicesPageSize*appServicesMaxPages)
 	}
 	return nil
