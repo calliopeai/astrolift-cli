@@ -515,7 +515,9 @@ func runBoxRm(cmd *cobra.Command, ctx context.Context, client *api.Client, slug 
 		if !noPrompt {
 			fmt.Fprintf(cmd.OutOrStdout(), "Destroy box %s and kill its session? [y/N] ", slug)
 			var answer string
-			fmt.Fscan(cmd.InOrStdin(), &answer)
+			if _, err := fmt.Fscan(cmd.InOrStdin(), &answer); err != nil {
+				return fmt.Errorf("read confirmation: %w", err)
+			}
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil

@@ -89,7 +89,6 @@ func TestRunProjectResourceAddSendsResolvedVariantAndAttachments(t *testing.T) {
 }
 
 func TestRunProjectResourceAttachRequiresExactlyOneConsumer(t *testing.T) {
-	client := api.NewClient("http://unused", "tok", false)
 	cmd, _ := groupsTestCmd()
 	// Resolution happens first, so exercise the invariant at the command level
 	// with the smallest mock response that supplies the resource.
@@ -97,7 +96,7 @@ func TestRunProjectResourceAttachRequiresExactlyOneConsumer(t *testing.T) {
 		"astroliftProjectManagedServices": []map[string]interface{}{{"id": "r-1", "name": "db", "attachments": []interface{}{}}},
 	}, nil)
 	defer srv.Close()
-	client = api.NewClient(srv.URL, "tok", false)
+	client := api.NewClient(srv.URL, "tok", false)
 	err := runProjectResourceAttach(cmd, context.Background(), client, projectRef{ID: "p-1"}, "db", projectResourceOptions{})
 	if err == nil || !strings.Contains(err.Error(), "exactly one") {
 		t.Fatalf("expected consumer validation, got %v", err)
