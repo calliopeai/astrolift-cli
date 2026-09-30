@@ -386,7 +386,7 @@ func waitForBox(cmd *cobra.Command, ctx context.Context, client *api.Client, box
 		}
 		if time.Now().After(deadline) {
 			return nil, fmt.Errorf(
-				"timed out waiting for box %s (last status: %s) — check `astro box ls` and the pod's events",
+				"timed out waiting for box %s (last status: %s) — the box may still be setting up its workspace; check `astro box ls` and the pod's events",
 				fetched.Slug, fetched.Status)
 		}
 	}

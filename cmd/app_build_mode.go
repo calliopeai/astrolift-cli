@@ -88,8 +88,12 @@ Examples:
 			return err
 		}
 
-		client, _, _, err := loadActiveClient(cmd.Context(), false)
+		client, cfg, _, err := loadActiveClient(cmd.Context(), false)
 		if err != nil {
+			return err
+		}
+
+		if _, err := resolveOrg(cmd, cmd.Context(), client, cfg); err != nil {
 			return err
 		}
 

@@ -184,6 +184,14 @@ the mode would leave an app that reports `ci_pushed` and still runs a platform
 build on every deploy. A Dockerfile path or build context saved at registration
 is left untouched, so switching back and forth loses nothing.
 
+### Preparing a box workspace
+
+Use `astro agent env-spec upsert <slug> --agent-type codex --box-workspace`
+to prepare the spec's configured repositories, dependencies and MCP before its
+box session starts. Use `--box-workspace=false` to turn setup off. Omitting the
+flag preserves the existing setting and compatibility with older servers. Box
+readiness waits for setup; a slow workspace can exceed the attach timeout.
+
 ### Deploying a platform-built app
 
 A platform-built app can deploy without an image tag. The platform resolves its

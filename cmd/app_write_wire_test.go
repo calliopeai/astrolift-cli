@@ -31,6 +31,9 @@ func TestSetBuildModeSendsResolvedIDAndPreservesOtherBuildInputs(t *testing.T) {
 			var requests []gqlRequest
 			srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
 				requests = append(requests, req)
+				if strings.Contains(req.Query, "astroliftOrganizations") {
+					return map[string]interface{}{"astroliftOrganizations": []map[string]string{{"id": "org-guid", "slug": "org", "name": "Org"}}}
+				}
 				if strings.Contains(req.Query, "astroliftApp(") {
 					return map[string]interface{}{"astroliftApp": map[string]interface{}{
 						"id": "resolved-guid", "slug": "web", "buildMode": "platform_build",
@@ -49,10 +52,13 @@ func TestSetBuildModeSendsResolvedIDAndPreservesOtherBuildInputs(t *testing.T) {
 			if err := appSetBuildModeCmd.RunE(cmd, []string{"web", mode}); err != nil {
 				t.Fatal(err)
 			}
-			if len(requests) != 2 || requests[0].Variables["slug"] != "web" {
+			if len(requests) != 3 || requests[1].Variables["slug"] != "web" {
 				t.Fatalf("unexpected request sequence: %#v", requests)
 			}
-			input := requests[1].Variables["input"].(map[string]interface{})
+			if requests[1].Organization != "org-guid" || requests[2].Organization != "org-guid" {
+				t.Fatalf("app lookup/write did not bind the resolved organization: %#v", requests)
+			}
+			input := requests[2].Variables["input"].(map[string]interface{})
 			strategy := "off"
 			if mode == "platform_build" {
 				strategy = "dockerfile"
@@ -87,6 +93,9 @@ func TestSetBuildModeRefusesMissingAppAndMalformedSuccess(t *testing.T) {
 			requestCount := 0
 			srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
 				requestCount++
+				if strings.Contains(req.Query, "astroliftOrganizations") {
+					return map[string]interface{}{"astroliftOrganizations": []map[string]string{{"id": "org-guid", "slug": "org", "name": "Org"}}}
+				}
 				if strings.Contains(req.Query, "astroliftApp(") {
 					if scenario == "missing" {
 						return map[string]interface{}{"astroliftApp": nil}
@@ -110,7 +119,7 @@ func TestSetBuildModeRefusesMissingAppAndMalformedSuccess(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected refusal")
 			}
-			if scenario == "missing" && requestCount != 1 {
+			if scenario == "missing" && requestCount != 2 {
 				t.Fatal("a missing app must not trigger an update")
 			}
 			if scenario == "denied" && !strings.Contains(err.Error(), "not permitted") {
