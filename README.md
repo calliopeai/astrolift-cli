@@ -452,3 +452,38 @@ unknown organization fails before any task operation is sent.
 `astro agent inspect <task-id>` also reports the control plane's recorded failure
 reason in text and JSON output. This remains available for failures before a
 pod starts, when there are no pod logs to inspect.
+
+### Agent session attachment
+
+`astro agent session attach <task-uuid>` joins an existing task, prints its
+history, and follows turns, tool calls, and approval requests. `--snapshot`
+prints history and detaches; `--json` emits snapshots and authoritative actions
+as newline-delimited JSON. Ctrl-C detaches and leaves the task running.
+
+```sh
+astro agent session attach <task-uuid> --org <organization>
+astro agent session attach <task-uuid> --steer "Also check the migration"
+astro agent session attach <task-uuid> --approve <displayed-tool-id>
+astro agent session attach <task-uuid> --deny <displayed-tool-id> --reason "Outside the brief"
+astro agent session attach <task-uuid> --action-file answer.json
+astro agent session attach <box-uuid> --box --interactive
+```
+
+Controller actions require the caller's current permissions and wait for the
+host's acceptance or rejection. An acknowledgment timeout leaves delivery
+uncertain; inspect the session before resending. Use `--client-id` to reuse an
+attachment identity; the host supplies the next sequence for that identity.
+The selected server credentials and organization apply to every request.
+
+For boxes, `--interactive` connects keyboard input to the existing tmux session;
+Ctrl-] detaches. Missing live gVisor, network fence, or gateway controls refuse
+attachment and name the missing prerequisite. Keyboard mode requires a local
+terminal and text output. `--action-file` can send a terminal input or resize
+without keyboard mode. Independent clients have separate PTY output histories.
+
+If the task host explicitly reports that live attachment is disabled, observer
+mode follows the durable task event stream instead. It preserves question and
+tool identities, drains all pages, and prints the recorded terminal result.
+Controller actions require live attachment. This adapter negotiates AHP 1.0.0
+and tests its attachment messages with the official Go SDK transport, whose
+published module is pinned at v0.9.0.
