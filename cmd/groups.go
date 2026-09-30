@@ -219,13 +219,13 @@ func runTeamList(cmd *cobra.Command, ctx context.Context, client *api.Client) er
 		return renderJSON(cmd, teams)
 	}
 	if len(teams) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No teams found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No teams found.")
 		return nil
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SLUG\tNAME\tID")
+	_, _ = fmt.Fprintln(w, "SLUG\tNAME\tID")
 	for _, t := range teams {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", t.Slug, t.Name, t.ID)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", t.Slug, t.Name, t.ID)
 	}
 	return w.Flush()
 }
@@ -277,7 +277,7 @@ func runTeamCreate(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 		return renderJSON(cmd, resp.Result.Data)
 	}
 	t := resp.Result.Data
-	fmt.Fprintf(cmd.OutOrStdout(), "Team created: %s (%s) in org %s\n", t.Slug, t.Name, org.Slug)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Team created: %s (%s) in org %s\n", t.Slug, t.Name, org.Slug)
 	return nil
 }
 
@@ -305,13 +305,13 @@ func runProjectList(cmd *cobra.Command, ctx context.Context, client *api.Client)
 		return renderJSON(cmd, resp.Projects)
 	}
 	if len(resp.Projects) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No projects found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No projects found.")
 		return nil
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SLUG\tNAME\tTEAM\tID")
+	_, _ = fmt.Fprintln(w, "SLUG\tNAME\tTEAM\tID")
 	for _, p := range resp.Projects {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Slug, p.Name, dashIfEmpty(p.Team.Slug), p.ID)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Slug, p.Name, dashIfEmpty(p.Team.Slug), p.ID)
 	}
 	return w.Flush()
 }
@@ -379,7 +379,7 @@ func runProjectCreate(cmd *cobra.Command, ctx context.Context, client *api.Clien
 		return renderJSON(cmd, resp.Result.Data)
 	}
 	p := resp.Result.Data
-	fmt.Fprintf(cmd.OutOrStdout(), "Project created: %s (%s) in team %s\n", p.Slug, p.Name, teamSlug)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Project created: %s (%s) in team %s\n", p.Slug, p.Name, teamSlug)
 	return nil
 }
 
@@ -406,11 +406,11 @@ func runScmList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 		return renderJSON(cmd, resp.Connections)
 	}
 	if len(resp.Connections) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No SCM connections configured.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No SCM connections configured.")
 		return nil
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "KIND\tACCOUNT\tNAME\tSCOPE\tACTIVE\tID")
+	_, _ = fmt.Fprintln(w, "KIND\tACCOUNT\tNAME\tSCOPE\tACTIVE\tID")
 	for _, c := range resp.Connections {
 		scope := "org"
 		if c.IsPersonal {
@@ -420,7 +420,7 @@ func runScmList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 		if name == "" {
 			name = c.Name
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			c.Kind, dashIfEmpty(c.AccountLogin), dashIfEmpty(name), scope, yesNo(c.IsActive), c.ID)
 	}
 	return w.Flush()
@@ -454,7 +454,7 @@ func runScmDisconnect(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Result.Data)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Disconnected SCM connection %s\n", id)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Disconnected SCM connection %s\n", id)
 	return nil
 }
 
@@ -488,11 +488,11 @@ func runAlertList(cmd *cobra.Command, ctx context.Context, client *api.Client) e
 		return renderJSON(cmd, resp.Rules)
 	}
 	if len(resp.Rules) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No alert rules found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No alert rules found.")
 		return nil
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tSEVERITY\tTARGET\tSTATE\tID")
+	_, _ = fmt.Fprintln(w, "NAME\tSEVERITY\tTARGET\tSTATE\tID")
 	for _, r := range resp.Rules {
 		state := "active"
 		if !r.IsActive {
@@ -505,7 +505,7 @@ func runAlertList(cmd *cobra.Command, ctx context.Context, client *api.Client) e
 		if r.TargetID != "" {
 			target = fmt.Sprintf("%s:%s", r.Target, r.TargetID)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Name, r.Severity, target, state, r.ID)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Name, r.Severity, target, state, r.ID)
 	}
 	return w.Flush()
 }
@@ -548,19 +548,19 @@ func runStatus(cmd *cobra.Command, ctx context.Context, client *api.Client, apiU
 		label = fmt.Sprintf("%s (%s)", *info.InstallLabel, info.InstallSlug)
 	}
 	if apiURL != "" {
-		fmt.Fprintf(out, "API:          %s\n", apiURL)
+		_, _ = fmt.Fprintf(out, "API:          %s\n", apiURL)
 	}
-	fmt.Fprintf(out, "Install:      %s\n", label)
+	_, _ = fmt.Fprintf(out, "Install:      %s\n", label)
 	if info.Region != nil && *info.Region != "" {
-		fmt.Fprintf(out, "Region:       %s\n", *info.Region)
+		_, _ = fmt.Fprintf(out, "Region:       %s\n", *info.Region)
 	}
-	fmt.Fprintf(out, "Version:      %s (api %s)\n", info.Version, info.APIVersion)
-	fmt.Fprintf(out, "Server time:  %s\n", info.ServerTime)
+	_, _ = fmt.Fprintf(out, "Version:      %s (api %s)\n", info.Version, info.APIVersion)
+	_, _ = fmt.Fprintf(out, "Server time:  %s\n", info.ServerTime)
 	if len(info.AuthMethods) > 0 {
-		fmt.Fprintf(out, "Auth:         %s\n", strings.Join(info.AuthMethods, ", "))
+		_, _ = fmt.Fprintf(out, "Auth:         %s\n", strings.Join(info.AuthMethods, ", "))
 	}
 	if len(info.Capabilities) > 0 {
-		fmt.Fprintf(out, "Capabilities: %s\n", strings.Join(info.Capabilities, ", "))
+		_, _ = fmt.Fprintf(out, "Capabilities: %s\n", strings.Join(info.Capabilities, ", "))
 	}
 	return nil
 }

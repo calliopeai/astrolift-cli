@@ -55,7 +55,7 @@ var docsListCmd = &cobra.Command{
 			return renderJSON(cmd, topics)
 		}
 		for _, topic := range topics {
-			fmt.Fprintf(cmd.OutOrStdout(), "%-12s %s\n", topic.Slug, topic.Title)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-12s %s\n", topic.Slug, topic.Title)
 		}
 		return nil
 	},
@@ -93,7 +93,7 @@ Existing files are never overwritten unless --force is supplied.`,
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Exported %d files to %s\n", count, destination)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Exported %d files to %s\n", count, destination)
 		return nil
 	},
 }
@@ -114,7 +114,7 @@ overwritten unless --force is supplied.`,
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Generated %d man pages in %s\n", count, destination)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Generated %d man pages in %s\n", count, destination)
 		return nil
 	},
 }
@@ -124,7 +124,8 @@ func exportPortableDocs(destination string, force bool) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("creating temporary docs tree: %w", err)
 	}
-	defer os.RemoveAll(temporary)
+	// Temporary staging cleanup is best effort.
+	defer func() { _ = os.RemoveAll(temporary) }()
 
 	guideDir := filepath.Join(temporary, "guides")
 	if err := os.MkdirAll(guideDir, 0o755); err != nil {
@@ -171,7 +172,8 @@ func exportManPages(destination string, force bool) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("creating temporary man tree: %w", err)
 	}
-	defer os.RemoveAll(temporary)
+	// Temporary staging cleanup is best effort.
+	defer func() { _ = os.RemoveAll(temporary) }()
 	if err := generateManTree(temporary); err != nil {
 		return 0, err
 	}
@@ -235,9 +237,10 @@ func normalizeManTree(destination string, generatedAt time.Time) error {
 				continue
 			}
 			normalized = appendWrappedRoff(normalized, line, noFill)
-			if line == ".nf" {
+			switch line {
+			case ".nf":
 				noFill = true
-			} else if line == ".fi" {
+			case ".fi":
 				noFill = false
 			}
 		}

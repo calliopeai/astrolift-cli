@@ -103,7 +103,8 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 
 	actionConfig := new(action.Configuration)
 	debugLog := func(format string, v ...any) {
-		fmt.Fprintf(log, "[helm] "+format+"\n", v...)
+		// Helm debug output is best effort; the action reports operational errors.
+		_, _ = fmt.Fprintf(log, "[helm] "+format+"\n", v...)
 	}
 	if err := actionConfig.Init(cf, opts.Namespace, "secret", debugLog); err != nil {
 		return nil, fmt.Errorf("init helm action config: %w", err)
@@ -114,7 +115,7 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Fprint(log, rendered)
+		_, _ = fmt.Fprint(log, rendered)
 		return &InstallResult{
 			Release: ReleaseSummary{
 				Name:    opts.ReleaseName,

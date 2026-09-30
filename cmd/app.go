@@ -235,16 +235,16 @@ mutation RegisterApp($input: RegisterAppInput!) {
 		}
 
 		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "Registered app:   %s (%s)\n", app.Name, app.Slug)
-		fmt.Fprintf(out, "ID:               %s\n", app.ID)
-		fmt.Fprintf(out, "Org:              %s\n", app.OrganizationSlug)
-		fmt.Fprintf(out, "Project:          %s\n", app.ProjectSlug)
-		fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
+		_, _ = fmt.Fprintf(out, "Registered app:   %s (%s)\n", app.Name, app.Slug)
+		_, _ = fmt.Fprintf(out, "ID:               %s\n", app.ID)
+		_, _ = fmt.Fprintf(out, "Org:              %s\n", app.OrganizationSlug)
+		_, _ = fmt.Fprintf(out, "Project:          %s\n", app.ProjectSlug)
+		_, _ = fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
 		if app.Subdomain != "" {
-			fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
+			_, _ = fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
 		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Next step: run `astro app deploy` to trigger the first deployment.")
+		_, _ = fmt.Fprintln(out, "")
+		_, _ = fmt.Fprintln(out, "Next step: run `astro app deploy` to trigger the first deployment.")
 		return nil
 	},
 }

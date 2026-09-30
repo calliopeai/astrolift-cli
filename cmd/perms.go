@@ -102,46 +102,46 @@ the operation that failed.`,
 		}
 
 		// Human-readable output
-		fmt.Fprintf(cmd.OutOrStdout(), "User:   %s\n", result.Username)
-		fmt.Fprintf(cmd.OutOrStdout(), "Email:  %s\n", result.Email)
-		fmt.Fprintf(cmd.OutOrStdout(), "Org:    %s\n", result.OrgSlug)
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "User:   %s\n", result.Username)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Email:  %s\n", result.Email)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Org:    %s\n", result.OrgSlug)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 		if len(result.Roles) > 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "Roles:")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Roles:")
 			for _, r := range result.Roles {
-				fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", r)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", r)
 			}
-			fmt.Fprintln(cmd.OutOrStdout())
+			_, _ = fmt.Fprintln(cmd.OutOrStdout())
 		}
 
 		if len(result.Permissions) > 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "Effective permissions:")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Effective permissions:")
 			for _, p := range result.Permissions {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s\n", p)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s\n", p)
 			}
-			fmt.Fprintln(cmd.OutOrStdout())
+			_, _ = fmt.Fprintln(cmd.OutOrStdout())
 		}
 
 		if appSlug != "" && result.AppContext != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "App-scoped (%s):\n", appSlug)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "App-scoped (%s):\n", appSlug)
 			if len(result.AppContext.Permissions) > 0 {
 				for _, p := range result.AppContext.Permissions {
-					fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s\n", p)
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s\n", p)
 				}
 			} else {
-				fmt.Fprintln(cmd.OutOrStdout(), "  (no app-scoped permissions — are you a member?)")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  (no app-scoped permissions — are you a member?)")
 			}
-			fmt.Fprintln(cmd.OutOrStdout())
+			_, _ = fmt.Fprintln(cmd.OutOrStdout())
 		}
 
 		if len(result.Missing) > 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "Common permissions you do NOT hold:")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Common permissions you do NOT hold:")
 			for _, m := range result.Missing {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✗ %s\n", m)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  ✗ %s\n", m)
 			}
-			fmt.Fprintln(cmd.OutOrStdout())
-			fmt.Fprintf(cmd.OutOrStdout(),
+			_, _ = fmt.Fprintln(cmd.OutOrStdout())
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(),
 				"Hint: ask an org admin to grant you the missing permissions.\n"+
 					"Run `astro perms diagnose --json` for the full machine-readable report.\n")
 		}
@@ -186,13 +186,13 @@ Useful when writing custom roles or debugging access control.`,
 			return renderJSON(cmd, map[string]any{"permissions": permissions})
 		}
 
-		fmt.Fprintln(cmd.OutOrStdout(), "Platform permissions:")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Platform permissions:")
 		for _, p := range permissions {
 			parts := strings.SplitN(p, ".", 2)
 			if len(parts) == 2 {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %-40s  (%s scope)\n", p, parts[0])
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %-40s  (%s scope)\n", p, parts[0])
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", p)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", p)
 			}
 		}
 		return nil

@@ -146,19 +146,19 @@ func runAppPods(cmd *cobra.Command, ctx context.Context, client *api.Client, app
 	}
 
 	if len(pods) == 0 {
-		fmt.Fprintf(out, "No pods found for app %q", appSlug)
+		_, _ = fmt.Fprintf(out, "No pods found for app %q", appSlug)
 		if appPodsWorkload != "" {
-			fmt.Fprintf(out, " in workload %q", appPodsWorkload)
+			_, _ = fmt.Fprintf(out, " in workload %q", appPodsWorkload)
 		}
 		if appPodsReady {
-			fmt.Fprint(out, " (--ready)")
+			_, _ = fmt.Fprint(out, " (--ready)")
 		}
-		fmt.Fprintln(out, ".")
+		_, _ = fmt.Fprintln(out, ".")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "POD\tWORKLOAD\tSTATUS\tREADY\tRESTARTS\tNODE\tCONTAINERS")
+	_, _ = fmt.Fprintln(w, "POD\tWORKLOAD\tSTATUS\tREADY\tRESTARTS\tNODE\tCONTAINERS")
 	for _, p := range pods {
 		containers := strings.Join(p.containerNames(), ",")
 		if containers == "" {
@@ -168,14 +168,14 @@ func runAppPods(cmd *cobra.Command, ctx context.Context, client *api.Client, app
 		if node == "" {
 			node = "-"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
 			p.Name, p.Workload, podStatusLabel(p), yesNo(p.Ready), p.Restarts, node, containers,
 		)
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "\n%d pod(s) shown.\n", len(pods))
+	_, _ = fmt.Fprintf(out, "\n%d pod(s) shown.\n", len(pods))
 	return nil
 }
 
