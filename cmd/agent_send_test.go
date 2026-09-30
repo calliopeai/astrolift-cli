@@ -14,6 +14,7 @@ import (
 func resetAgentSendFlags() {
 	agentSendJSON = false
 	agentSendStdin = false
+	agentSendRequestID = ""
 }
 
 // queuedMessage builds a sendAgentTaskInput data row, defaulting to the

@@ -9,8 +9,8 @@
 // message is persisted against the task and the agent picks it up at its
 // next turn boundary — the point one harness invocation finishes. So a
 // successful send means "queued", not "the agent has read it"; the
-// deliveredAt timestamp in the result is what answers that, and it is null
-// until the runner takes the message. Not every runtime can accept a
+// deliveredAt timestamp records a control-plane delivery claim, not harness
+// execution. It is null until the message is claimed for the runner. Not every runtime can accept a
 // follow-up prompt (see the astrolift-agents support matrix); one that
 // cannot leaves the message queued rather than dropping it, so a message
 // that never gets a deliveredAt is a real signal, not a lost write.
@@ -33,14 +33,16 @@ import (
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/calliopeai/astrolift-cli/internal/config"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
 // ---- flags -----------------------------------------------------------------
 
 var (
-	agentSendJSON  bool
-	agentSendStdin bool
+	agentSendJSON      bool
+	agentSendStdin     bool
+	agentSendRequestID string
 )
 
 // ---- GraphQL operation -----------------------------------------------------
@@ -53,14 +55,23 @@ const sendAgentTaskInputMutation = `mutation($taskId: ID!, $message: String!) {
   }
 }`
 
+const sendKeyedAgentTaskInputMutation = `mutation($taskId: ID!, $message: String!, $requestId: String!) {
+  sendAgentTaskInput(taskId: $taskId, message: $message, clientRequestId: $requestId) {
+    ok
+    errors { code message field }
+    data { id clientRequestId message author createdAt deliveredAt }
+  }
+}`
+
 // agentTaskInputMessage mirrors the AstroliftAgentTaskInputMessage type.
 // `deliveredAt` is null while the message is still queued.
 type agentTaskInputMessage struct {
-	ID          string  `json:"id"`
-	Message     string  `json:"message"`
-	Author      string  `json:"author"`
-	CreatedAt   string  `json:"createdAt"`
-	DeliveredAt *string `json:"deliveredAt"`
+	ID              string  `json:"id"`
+	ClientRequestID *string `json:"clientRequestId,omitempty"`
+	Message         string  `json:"message"`
+	Author          string  `json:"author"`
+	CreatedAt       string  `json:"createdAt"`
+	DeliveredAt     *string `json:"deliveredAt"`
 }
 
 // agentSendResult is the AstroliftAgentTaskInputMessageMutationResult
@@ -93,8 +104,21 @@ would otherwise mangle).
 
 The task must be running: a queued or finished task has no turn boundary
 left to apply the message at, and the send is refused rather than
-silently stranded.`,
-	Args: cobra.RangeArgs(1, 2),
+silently stranded. A retry with the original --request-id can recover an
+already accepted message after the task finishes. Persist that UUID and the
+original input before sending; never replace it merely because a reply is lost.
+Use 'astro agent input-receipt' to look up its receipt without sending again.`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.RangeArgs(1, 2)(cmd, args); err != nil {
+			return err
+		}
+		if cmd.Flags().Changed("request-id") {
+			if _, err := uuid.Parse(agentSendRequestID); err != nil {
+				return fmt.Errorf("--request-id must be a UUID")
+			}
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		message, err := agentSendMessage(cmd, args, agentSendStdin)
 		if err != nil {
@@ -142,12 +166,32 @@ func runAgentSend(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	var resp struct {
 		Result agentSendResult `json:"sendAgentTaskInput"`
 	}
-	if err := client.GraphQL(sendCtx, sendAgentTaskInputMutation,
-		map[string]interface{}{"taskId": taskID, "message": message}, &resp); err != nil {
+	query := sendAgentTaskInputMutation
+	variables := map[string]interface{}{"taskId": taskID, "message": message}
+	requestID := ""
+	if agentSendRequestID != "" {
+		parsed, err := uuid.Parse(agentSendRequestID)
+		if err != nil {
+			return fmt.Errorf("--request-id must be a UUID")
+		}
+		requestID = parsed.String()
+		query = sendKeyedAgentTaskInputMutation
+		variables["requestId"] = requestID
+	}
+	if err := client.GraphQL(sendCtx, query, variables, &resp); err != nil {
+		if requestID != "" {
+			return fmt.Errorf("sending input: %w; recover with agent input-receipt --request-id %s, or retry with that same ID and original input", err, requestID)
+		}
 		return fmt.Errorf("sending input: %w", err)
 	}
 	if !resp.Result.Ok {
 		return fmt.Errorf("send failed: %s", firstMutationError(resp.Result.Errors))
+	}
+	if resp.Result.Data == nil || resp.Result.Data.ID == "" {
+		return fmt.Errorf("send returned no receipt; acceptance is unconfirmed")
+	}
+	if requestID != "" && (resp.Result.Data.ClientRequestID == nil || *resp.Result.Data.ClientRequestID != requestID || resp.Result.Data.Message != strings.TrimSpace(message)) {
+		return fmt.Errorf("send returned a mismatched receipt; acceptance is unconfirmed")
 	}
 
 	if agentSendJSON {
@@ -155,8 +199,13 @@ func runAgentSend(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	}
 
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "Queued for task %s.\n", taskID)
-	fmt.Fprintln(out, "The agent applies it at its next turn boundary; it is not delivered yet.")
+	if resp.Result.Data.DeliveredAt == nil {
+		fmt.Fprintf(out, "Queued for task %s.\n", taskID)
+		fmt.Fprintln(out, "The agent applies it at its next turn boundary; it is not delivered yet.")
+	} else {
+		fmt.Fprintf(out, "Recovered input receipt for task %s.\n", taskID)
+		fmt.Fprintln(out, "Previously claimed for runner delivery; this does not confirm execution.")
+	}
 	return nil
 }
 
@@ -165,6 +214,7 @@ func runAgentSend(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 func init() {
 	agentSendCmd.Flags().BoolVar(&agentSendJSON, "json", false, "Output the queued message as JSON")
 	agentSendCmd.Flags().BoolVar(&agentSendStdin, "stdin", false, "Read the input from standard input")
+	agentSendCmd.Flags().StringVar(&agentSendRequestID, "request-id", "", "Persisted request UUID to reuse when recovering an uncertain send")
 
 	agentCmd.AddCommand(agentSendCmd)
 }
