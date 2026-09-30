@@ -14,7 +14,7 @@ their cluster needs.
   `astrolift-rwx`. Provisioner defaults to Longhorn; switch via values.
 - ClusterIssuer for cert-manager (ACME / Let's Encrypt by default).
 
-**Subcharts** (toggleable; added in follow-up commits):
+**Subcharts** (toggleable):
 
 | Component | Subchart | Default |
 |---|---|---|
@@ -26,7 +26,8 @@ their cluster needs.
 | Rook Ceph (block + filesystem) | `rook-release/rook-ceph` | off |
 | CloudNativePG (Postgres operator) | `cnpg/cloudnative-pg` | off |
 | Strimzi Kafka | `strimzi/strimzi-kafka-operator` | off |
-| Bitnami Redis Operator | `bitnami/redis-operator` | off |
+| OT-Container-Kit Redis Operator | `ot-container-kit/redis-operator` | off |
+| OpenSearch Operator | `opensearch-project/opensearch-operator` | off |
 | HashiCorp Vault | `hashicorp/vault` | off |
 | Velero (cluster backup) | `vmware-tanzu/velero` | off |
 | OpenTelemetry collector | `open-telemetry/opentelemetry-collector` | off |
@@ -37,9 +38,8 @@ their cluster needs.
 ## Usage
 
 ```bash
-# Update vendored chart deps (subcharts) — no-op until deps are added in
-# follow-up commits.
-helm dependency update ./helm/astrolift-prereqs
+# Build the versions recorded in Chart.lock (configure the listed repositories first).
+helm dependency build ./helm/astrolift-prereqs
 
 # Install with the operator's per-cluster values.
 helm install astrolift-prereqs ./helm/astrolift-prereqs -f my-values.yaml
@@ -52,6 +52,28 @@ helm install astrolift ./helm/astrolift -f ./helm/astrolift/values.k8s.yaml
 
 See `values.yaml` for the full toggle matrix and per-prereq config sections.
 
+Enabling `opensearch-operator` also enables the chart's
+`opensearchNodeSysctl` DaemonSet by default. It runs privileged to set
+`vm.max_map_count=262144` on eligible nodes; disable it only when node
+bootstrap or the host OS already owns that setting. The OpenSearch operator
+controller itself runs as UID/GID 65532 with its init-container injection
+disabled so tenant clusters can stay inside restricted workload policy.
+
 For local kind / dev, prefer `kubernetes/base/install.sh` (script-driven path
 optimised for sub-5-minute spin-up). The Helm chart is for production +
 customer-operator installs where reproducibility and GitOps matter.
+
+## Source and CLI vendoring
+
+This directory is the canonical prerequisite chart. The CLI embeds a committed
+copy for offline bootstrap; changes must reconcile both trees before refreshing
+that copy. Version 0.1.1 includes the CLI's cert-manager CRD values and post-install
+ClusterIssuer hook fixes while preserving this source's OpenSearch operator and
+node sysctl resources. `certManager.enabled` gates the dependency; actual
+subchart settings belong under `cert-manager`. Hooks create the issuer after
+cert-manager is installed and retain its ACME account key on uninstall.
+
+Validate the source with `helm dependency build`, `helm lint`, and rendered
+base/cloud overlays. Refresh and verify the CLI against the published source
+revision; an unrelated old sibling checkout must never silently overwrite the
+embedded chart.

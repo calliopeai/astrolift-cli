@@ -5,7 +5,7 @@ description: |
   ingress, storage, managed-service operators, observability, backup. Each
   component is an optional subchart toggled by .Values.<component>.enabled.
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "0.1.0"
 keywords:
   - astrolift
@@ -68,6 +68,10 @@ dependencies:
     repository: "https://ot-container-kit.github.io/helm-charts/"
     condition: redisOperator.enabled
     alias: redis-operator
+  - name: opensearch-operator
+    version: "3.0.2"
+    repository: "https://opensearch-project.github.io/opensearch-k8s-operator/"
+    condition: opensearch-operator.enabled
   - name: vault
     version: "0.28.1"
     repository: "https://helm.releases.hashicorp.com"

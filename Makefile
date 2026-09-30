@@ -5,12 +5,10 @@ COMMIT   ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE     ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS  := -ldflags "-X $(MODULE)/cmd.Version=$(VERSION) -X $(MODULE)/cmd.Commit=$(COMMIT) -X $(MODULE)/cmd.Date=$(DATE)"
 
-# Vendored chart source — refreshed by `make vendor-charts` before build.
-# The metarepo path is used in dev; CI checks the committed copy and skips
-# vendor-charts via SKIP_VENDOR_CHARTS=1 (the chart lives in-repo so the
-# binary can be built without the metarepo sibling on disk).
-PREREQS_SRC ?= ../astrolift-opscode/helm/astrolift-prereqs
-PREREQS_DST := internal/charts/astrolift-prereqs
+# Canonical source is opscode. Refresh requires its full published revision;
+# builds/checks use the committed offline inventory, never sibling contents.
+PREREQS_REPO ?= ../astrolift-opscode
+PREREQS_REV ?=
 SKILLS_SRC ?= ../astrolift-skills
 SKILLS_DST := internal/skills/catalogue
 
@@ -22,7 +20,7 @@ DOCS_DST := internal/portabledocs/content
 
 .PHONY: build test fmt lint clean docs manpages vendor-docs vendor-docs-check vendor-charts vendor-charts-check vendor-skills vendor-skills-check
 
-build:
+build: vendor-charts-check
 	go build $(LDFLAGS) -o $(BINARY) .
 
 test:
@@ -83,18 +81,11 @@ vendor-docs-check:
 		done; \
 	fi
 
-# Refresh the vendored astrolift-prereqs chart from the metarepo. Run this
-# whenever the source chart bumps; commit the result. Skips silently when
-# the source dir isn't present (CI / clones without the metarepo sibling).
+# Refresh from the exact published Git tree, then build Chart.lock dependencies.
+# Refuses dirty, older or unpublished source checkouts before any overwrite.
 vendor-charts:
-	@if [ -d "$(PREREQS_SRC)" ]; then \
-		echo "vendoring $(PREREQS_SRC) -> $(PREREQS_DST)"; \
-		rm -rf $(PREREQS_DST); \
-		mkdir -p $(PREREQS_DST); \
-		cp -R $(PREREQS_SRC)/. $(PREREQS_DST)/; \
-	else \
-		echo "skip vendor-charts: $(PREREQS_SRC) not present (using committed copy)"; \
-	fi
+	@test -n "$(PREREQS_REV)" || { echo "set PREREQS_REV to the full published opscode commit"; exit 1; }
+	python3 scripts/vendor-charts.py refresh --source "$(PREREQS_REPO)" --revision "$(PREREQS_REV)"
 
 # Refresh the vendored agent skills from the metarepo sibling. Bundled into
 # the binary so `astro onboard` can install them with no network and no
@@ -119,6 +110,7 @@ vendor-skills-check:
 			echo "stale $(SKILLS_DST)/skills — run \`make vendor-skills\`"; exit 1; }; \
 	fi
 
-# CI sanity check — the committed copy must exist and contain Chart.yaml.
+# Offline CI proves complete file-set/content integrity of the pinned snapshot.
+# Canonical remote parity is reviewed separately before publishing this pin.
 vendor-charts-check:
-	@test -f $(PREREQS_DST)/Chart.yaml || (echo "missing $(PREREQS_DST)/Chart.yaml — run \`make vendor-charts\`" && exit 1)
+	python3 scripts/vendor-charts.py check

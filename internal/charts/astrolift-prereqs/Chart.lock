@@ -26,6 +26,9 @@ dependencies:
 - name: redis-operator
   repository: https://ot-container-kit.github.io/helm-charts/
   version: 0.20.0
+- name: opensearch-operator
+  repository: https://opensearch-project.github.io/opensearch-k8s-operator/
+  version: 3.0.2
 - name: vault
   repository: https://helm.releases.hashicorp.com
   version: 0.28.1
@@ -44,5 +47,5 @@ dependencies:
 - name: tempo
   repository: https://grafana.github.io/helm-charts
   version: 1.10.1
-digest: sha256:20096ce8a8bd6f1c15b0af728d893d2da6c04eff553f45a5ebe8c6db6503463c
-generated: "2026-05-09T19:43:54.205667-06:00"
+digest: sha256:cf462187bfab2c669d4df43b3c811a52cad5b8907d5ee7c808c607c123b246c8
+generated: "2026-08-14T23:14:33.197102-06:00"
