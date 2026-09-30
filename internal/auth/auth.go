@@ -52,10 +52,31 @@ var ErrPending = errors.New("auth: login pending")
 // before the user completed it.
 var ErrExpired = errors.New("auth: session expired; run `astro auth login` again")
 
-// StartLogin initiates the browser device flow.
-func StartLogin(ctx context.Context, apiURL string) (*LoginSession, error) {
+// ClientKindForScope maps `astro auth login --scope` to the device-flow
+// client kind the server keys its scope ceiling on. The approval page lists
+// the scopes, so the approver sees what the login asks for.
+func ClientKindForScope(scope string) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(scope)) {
+	case "", "default":
+		return "", nil
+	case "clusters":
+		// The CLI's scopes plus write:clusters and manage:clusters (#2120),
+		// for an operator who would otherwise mint an admin token.
+		return "cli-operator", nil
+	default:
+		return "", fmt.Errorf("unknown --scope %q (want: clusters)", scope)
+	}
+}
+
+// StartLogin initiates the browser device flow. An empty clientKind sends no
+// kind, which the server treats as the plain CLI.
+func StartLogin(ctx context.Context, apiURL, clientKind string) (*LoginSession, error) {
 	url := strings.TrimSuffix(apiURL, "/") + "/api/cli/v1/auth/start"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte("{}")))
+	body := []byte("{}")
+	if clientKind != "" {
+		body, _ = json.Marshal(map[string]string{"client_kind": clientKind})
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +87,7 @@ func StartLogin(ctx context.Context, apiURL string) (*LoginSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("auth/start: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("auth/start returned %d: %s", resp.StatusCode, body)
@@ -102,7 +123,7 @@ func PollLogin(ctx context.Context, apiURL, sessionID string) (*Credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("auth/complete: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -160,7 +181,7 @@ func RefreshCredentials(ctx context.Context, apiURL, refreshToken string) (*Cred
 	if err != nil {
 		return nil, fmt.Errorf("auth/refresh: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusGone {
 		return nil, ErrExpired
@@ -175,4 +196,38 @@ func RefreshCredentials(ctx context.Context, apiURL, refreshToken string) (*Cred
 		return nil, fmt.Errorf("decoding refreshed credentials: %w", err)
 	}
 	return &creds, nil
+}
+
+// SignOut ends the device-flow session that owns refreshToken at the
+// server: the access token stops authenticating and the refresh
+// chain dies, the same way it would on its own after the access
+// token's TTL and then the refresh chain's TTL both elapsed. Proof of
+// possession of the refresh secret is the only credential this needs,
+// same as RefreshCredentials.
+//
+// The server always answers 200 whether or not the token was still
+// live, so the only error this returns is a transport/HTTP failure --
+// callers that are about to delete the same local credentials anyway
+// (`astro auth logout`) should treat that as non-fatal.
+func SignOut(ctx context.Context, apiURL, refreshToken string) error {
+	url := strings.TrimSuffix(apiURL, "/") + "/api/cli/v1/auth/signout"
+	body, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth/signout: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("auth/signout returned %d: %s", resp.StatusCode, respBody)
+	}
+	return nil
 }

@@ -329,16 +329,67 @@ func TestAppShowJSON(t *testing.T) {
 func resetDeployFlags() {
 	appDeployEnv = "production"
 	appDeployImageTag = ""
+	appDeployRef = ""
 	appDeployWait = false
 }
 
-func TestAppDeployRequiresImageTag(t *testing.T) {
+func TestAppDeployDefersImageRequirementToServer(t *testing.T) {
 	resetDeployFlags()
-	client := api.NewClient("http://127.0.0.1:0", "tok", false)
+	defer resetDeployFlags()
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"startDeployment": map[string]interface{}{
+			"ok":     false,
+			"errors": []interface{}{map[string]interface{}{"code": "VALIDATION", "message": "image_tag is required for ci_pushed apps", "field": "imageTag"}},
+		},
+	}, &captured)
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "tok", false)
 	cmd, _ := appTestCmd()
 	err := runAppDeploy(cmd, context.Background(), client, "web")
-	if err == nil || !strings.Contains(err.Error(), "--image-tag is required") {
-		t.Fatalf("expected --image-tag required error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "image_tag is required for ci_pushed") {
+		t.Fatalf("expected server image-tag requirement, got %v", err)
+	}
+	input := captured.Variables["input"].(map[string]interface{})
+	if _, exists := input["imageTag"]; exists {
+		t.Fatalf("must not invent a tag: %+v", input)
+	}
+}
+
+func TestAppDeployWithoutImageTag(t *testing.T) {
+	for _, ref := range []string{"", "release/v2", "v2.0.0", strings.Repeat("a", 40)} {
+		t.Run(ref, func(t *testing.T) {
+			resetDeployFlags()
+			defer resetDeployFlags()
+			appDeployRef = ref
+			var captured gqlRequest
+			sha := strings.Repeat("a", 40)
+			srv := gqlServer(t, map[string]interface{}{
+				"startDeployment": map[string]interface{}{
+					"ok": true, "errors": []interface{}{},
+					"data": map[string]interface{}{"id": "dep-built", "status": "pending", "environmentName": "production", "imageTag": sha, "commitSha": sha},
+				},
+			}, &captured)
+			defer srv.Close()
+			cmd, out := appTestCmd()
+			if err := runAppDeploy(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web"); err != nil {
+				t.Fatal(err)
+			}
+			input := captured.Variables["input"].(map[string]interface{})
+			if _, exists := input["imageTag"]; exists {
+				t.Fatalf("omitted image tag sent as an override: %+v", input)
+			}
+			if ref == "" {
+				if _, exists := input["sourceRef"]; exists {
+					t.Fatal("default ref must be resolved by the server")
+				}
+			} else if input["sourceRef"] != ref {
+				t.Fatalf("source ref missing: %+v", input)
+			}
+			if !strings.Contains(out.String(), "Source commit:      "+sha) {
+				t.Fatalf("resolved source missing: %s", out.String())
+			}
+		})
 	}
 }
 
@@ -378,6 +429,67 @@ func TestAppDeploySendsMutation(t *testing.T) {
 	got := out.String()
 	if !strings.Contains(got, "Deployment started: dep-99") || !strings.Contains(got, "staging") {
 		t.Errorf("deploy output wrong:\n%s", got)
+	}
+}
+
+func TestAppDeployExplicitTagAndRef(t *testing.T) {
+	resetDeployFlags()
+	defer resetDeployFlags()
+	if err := appDeployCmd.Flags().Set("ref", " release/v2 "); err != nil {
+		t.Fatal(err)
+	}
+	appDeployImageTag = " custom-tag "
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"startDeployment": map[string]interface{}{
+			"ok": true, "errors": []interface{}{},
+			"data": map[string]interface{}{"id": "dep-1", "status": "pending", "imageTag": "custom-tag", "commitSha": strings.Repeat("a", 40), "branch": "release/v2"},
+		},
+	}, &captured)
+	defer srv.Close()
+	cmd, out := appTestCmd()
+	_ = cmd.Flags().Set("json", "true")
+	if err := runAppDeploy(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web"); err != nil {
+		t.Fatal(err)
+	}
+	input := captured.Variables["input"].(map[string]interface{})
+	if input["imageTag"] != "custom-tag" || input["sourceRef"] != "release/v2" {
+		t.Fatalf("explicit inputs lost: %+v", input)
+	}
+	var result deploymentSummary
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.CommitSHA != strings.Repeat("a", 40) || result.Branch != "release/v2" {
+		t.Fatalf("resolved revision lost in JSON: %+v", result)
+	}
+}
+
+func TestAppDeployManifestImagesWithoutTag(t *testing.T) {
+	resetDeployFlags()
+	defer resetDeployFlags()
+	appDeployImageTag = "  "
+	appDeployRef = "  "
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"startDeployment": map[string]interface{}{
+			"ok": true, "errors": []interface{}{},
+			"data": map[string]interface{}{"id": "dep-1", "status": "pending", "imageTag": "", "commitSha": ""},
+		},
+	}, &captured)
+	defer srv.Close()
+	cmd, out := appTestCmd()
+	if err := runAppDeploy(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web"); err != nil {
+		t.Fatal(err)
+	}
+	input := captured.Variables["input"].(map[string]interface{})
+	for _, key := range []string{"imageTag", "sourceRef"} {
+		if _, exists := input[key]; exists {
+			t.Fatalf("empty override sent: %+v", input)
+		}
+	}
+	if strings.Contains(out.String(), "Source commit:") || !strings.Contains(out.String(), "Image:              -") {
+		t.Fatalf("unexpected manifest image output: %s", out.String())
 	}
 }
 
