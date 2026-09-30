@@ -45,9 +45,9 @@ longhorn:
 # Cluster essentials
 # -----------------------------------------------------------------------------
 
-# cert-manager: enabled with CRDs. `certManager.enabled` is condition-only.
-# Real subchart values go under the hyphenated `cert-manager:` key below,
-# because the dependency has no `alias` (see values.yaml, #1695 defect 3).
+# cert-manager: enabled with CRDs.
+# The camelCase block gates the dependency; Helm forwards settings under
+# the dependency name because cert-manager has no alias.
 certManager:
   enabled: true
 
@@ -97,8 +97,8 @@ metallb:
 
 # -----------------------------------------------------------------------------
 # Managed-service operators — vanilla clusters have no cloud-managed
-# equivalents, so CNPG (Postgres) is on by default. Strimzi / redis-operator
-# / vault remain opt-in (heavy + not needed by most installs out of the gate).
+# equivalents, so CNPG (Postgres) is on by default. Strimzi, Redis,
+# OpenSearch, and Vault remain opt-in (heavy + not needed by most installs).
 # -----------------------------------------------------------------------------
 
 cnpg:
@@ -111,6 +111,8 @@ strimzi:
 redis-operator:
   enabled: false
 redisOperator:
+  enabled: false
+opensearch-operator:
   enabled: false
 vault:
   enabled: false

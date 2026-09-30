@@ -29,3 +29,7 @@ Thumbs.db
 
 # Navegador graph DB
 .navegador/
+
+# Chart provenance helper test artifacts
+__pycache__/
+*.pyc

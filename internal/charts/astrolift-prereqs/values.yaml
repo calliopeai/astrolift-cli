@@ -70,15 +70,10 @@ clusterIssuer:
 # which only controls Chart.yaml condition gating).
 # -----------------------------------------------------------------------------
 
-# cert-manager: ACME / private-CA TLS issuance. The dependency in Chart.yaml
-# has no `alias`, so Helm only forwards subchart values nested under the
-# literal, hyphenated `cert-manager:` key below. `certManager.enabled` here
-# is condition-only (Chart.yaml: condition: certManager.enabled), and
-# anything else set under `certManager:` never reaches the subchart. This
-# was defect 3 of #1695: `installCRDs` silently no-opped, cert-manager's own
-# CRDs never installed, and the startupapicheck hook spun to
-# BackoffLimitExceeded on "the cert-manager CRDs are not yet installed".
+# cert-manager: ACME / private-CA TLS issuance.
 # Upstream values: https://github.com/cert-manager/cert-manager/tree/master/deploy/charts/cert-manager
+# The camelCase block gates the dependency; Helm forwards settings under
+# the dependency name because cert-manager has no alias.
 certManager:
   enabled: false
 
@@ -195,6 +190,53 @@ redis-operator:
 
 redisOperator:
   enabled: false
+
+# OpenSearch Kubernetes Operator 3.x: search and vector-index clusters.
+# The image digest is the multi-architecture 3.0.0-alpha controller shipped by
+# chart release 3.0.2. The chart's appVersion still carries the alpha suffix;
+# the chart itself contains the 3.0.2 CRD/RBAC and secure bootstrap fixes.
+opensearch-operator:
+  enabled: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  manager:
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65532
+      runAsGroup: 65532
+    extraEnv:
+      - name: SKIP_INIT_CONTAINER
+        value: "true"
+    image:
+      repository: opensearchproject/opensearch-operator
+      tag: "3.0.0-alpha@sha256:f78bbdd1a3860839d3022ee9c55abb503d5547967aec938d66805846bae37604"
+      pullPolicy: IfNotPresent
+  installCRDs: true
+  webhook:
+    enabled: true
+    failurePolicy: Fail
+    certManager:
+      enabled: true
+
+# OpenSearch needs vm.max_map_count on every data node. The operator's root
+# init helpers are disabled above so tenant pods can satisfy restricted
+# workload policy; this opt-out-able node DaemonSet owns the host setting.
+opensearchNodeSysctl:
+  enabled: true
+  value: 262144
+  image: "busybox:1.37.0@sha256:9db7b59979c38555a39def84a31fb98b5296952f9e3afd4f6f11f05b07adfab0"
+  nodeSelector:
+    kubernetes.io/os: linux
+  tolerations:
+    - operator: Exists
 
 # HashiCorp Vault: secrets, dynamic credentials, transit encryption.
 # HA + Raft + auto-unseal are recommended for prod; operators wire
