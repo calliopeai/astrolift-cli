@@ -56,10 +56,16 @@ vendor-docs:
 	cp "$(DOCS_SRC)/reference/astrolift-toml.md" "$(DOCS_DST)/manifest.md"
 	cp "$(DOCS_SRC)/reference/agent-packages.md" "$(DOCS_DST)/agents.md"
 	cp "$(DOCS_SRC)/reference/workflow-toml.md" "$(DOCS_DST)/workflows.md"
+	cp "$(DOCS_SRC)/guides/capabilities.md" "$(DOCS_DST)/capabilities.md"
+	cp "$(DOCS_SRC)/guides/app-setup.md" "$(DOCS_DST)/app-setup.md"
+	cp "$(DOCS_SRC)/guides/agent-setup.md" "$(DOCS_DST)/agent-setup.md"
+	cp "$(DOCS_SRC)/guides/workflow-setup.md" "$(DOCS_DST)/workflow-setup.md"
+	cp "$(DOCS_SRC)/guides/shared-services.md" "$(DOCS_DST)/shared-services.md"
+	cp "$(DOCS_SRC)/guides/agent-completion-callbacks.md" "$(DOCS_DST)/callbacks.md"
 	cp "$(DOCS_SRC)/llms.txt" "$(DOCS_DST)/llms.txt"
 
 vendor-docs-check:
-	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md llms.txt; do \
+	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md capabilities.md app-setup.md agent-setup.md workflow-setup.md shared-services.md callbacks.md llms.txt; do \
 		test -s "$(DOCS_DST)/$$file" || { echo "missing $(DOCS_DST)/$$file — run \`make vendor-docs\`"; exit 1; }; \
 	done
 	@if [ -d "$(DOCS_SRC)" ]; then \
@@ -72,6 +78,12 @@ vendor-docs-check:
 			"reference/astrolift-toml.md:manifest.md" \
 			"reference/agent-packages.md:agents.md" \
 			"reference/workflow-toml.md:workflows.md" \
+			"guides/capabilities.md:capabilities.md" \
+			"guides/app-setup.md:app-setup.md" \
+			"guides/agent-setup.md:agent-setup.md" \
+			"guides/workflow-setup.md:workflow-setup.md" \
+			"guides/shared-services.md:shared-services.md" \
+			"guides/agent-completion-callbacks.md:callbacks.md" \
 			"llms.txt:llms.txt"; do \
 			source="$${pair%%:*}"; destination="$${pair#*:}"; \
 			cmp -s "$(DOCS_SRC)/$$source" "$(DOCS_DST)/$$destination" || { \

@@ -4,12 +4,10 @@ This guide walks you through installing the Astrolift CLI and deploying your fir
 
 ## Install the CLI
 
-The CLI release repository is private. Authenticate GitHub CLI with an account
-that can read `calliopeai/astrolift-cli`, then download the release archive and
+The CLI and platform source repositories are public. Download the release archive and
 checksum file for your platform:
 
 ```bash
-gh auth login
 tag="$(gh release view --repo calliopeai/astrolift-cli \
   --json tagName --jq .tagName)"
 gh release download "$tag" --repo calliopeai/astrolift-cli \
@@ -24,9 +22,8 @@ astro version
 
 That example is for Apple silicon. The [CLI install
 reference](reference/cli.md#install) lists every release asset and the Linux
-checksum command. Homebrew, Scoop, anonymous `curl`, and `go install` cannot
-fetch this private repository; use the authenticated release path until a
-public distribution channel is available.
+checksum command. GitHub authentication is optional for public downloads; it
+can increase API rate limits. Pin a release tag in automation.
 
 ## Authenticate
 

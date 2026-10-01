@@ -141,6 +141,7 @@ func installAgentDocs(dir string, dryRun, force bool) ([]writtenFn, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading embedded topic %q: %w", topic.Slug, err)
 		}
+		body = portabledocs.PortableMarkdown(topic, body)
 		name := topic.Slug + ".md"
 		written, err := writeFileReport(filepath.Join(base, name), []byte(body), dryRun, force)
 		if err != nil {

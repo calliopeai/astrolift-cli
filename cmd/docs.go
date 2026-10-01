@@ -25,7 +25,8 @@ var docsCmd = &cobra.Command{
 	Use:   "docs [topic]",
 	Short: "Open the platform docs or access the embedded offline reference",
 	Long: `Open the public Astrolift documentation in a browser. A topic may be
-client, cli, api, mcp, manifest, agents, or workflows.
+start, client, cli, api, mcp, manifest, agents, workflows, capabilities,
+app-setup, agent-setup, workflow-setup, shared-services, or callbacks.
 
 Use "astro docs show" for release-matched Markdown without a browser,
 "astro docs export" for a portable documentation tree, or "astro docs man"
@@ -135,6 +136,9 @@ func exportPortableDocs(destination string, force bool) (int, error) {
 		return 0, err
 	}
 	for filename, body := range files {
+		if topic, err := portabledocs.Resolve(strings.TrimSuffix(filename, ".md")); err == nil {
+			body = []byte(portabledocs.PortableMarkdown(topic, string(body)))
+		}
 		path := filepath.Join(guideDir, filename)
 		if filename == "llms.txt" {
 			path = filepath.Join(temporary, filename)
