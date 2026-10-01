@@ -5,14 +5,9 @@ the non-interactive client used in CI.
 
 ## Install
 
-The canonical CLI releases currently live in the private
-`calliopeai/astrolift-cli` repository. Authenticate GitHub CLI with an account
-that can read that repository:
-
-```bash
-gh auth login
-gh auth status
-```
+The [CLI releases](https://github.com/calliopeai/astrolift-cli/releases) and
+[source](https://github.com/calliopeai/astrolift-cli) are public. GitHub CLI can
+download public releases without an account; authentication is optional.
 
 Find the current immutable tag and download both the archive and its checksum.
 For example, on Apple silicon:
@@ -47,12 +42,9 @@ Add `~/.local/bin` to `PATH` when it is not already there. Use `sha256sum
 | Windows, ARM64 | `astro-windows-arm64.zip` |
 | Windows, x86-64 | `astro-windows-amd64.zip` |
 
-The public Homebrew tap and Scoop bucket cannot authenticate downloads from a
-private GitHub release. Likewise, anonymous `curl` and `go install` cannot read
-the private source repository. Do not advertise those as install paths until
-the release assets are mirrored publicly or the repository visibility changes.
-Repository collaborators can build from source after `gh repo clone
-calliopeai/astrolift-cli` by running `make build`.
+Build from source with `git clone https://github.com/calliopeai/astrolift-cli.git`
+followed by `make build`. Prefer the checksum-verified release archives for
+repeatable installations.
 
 ## Configure and authenticate
 
@@ -85,8 +77,8 @@ astro workflow --help
 ```
 
 Use `--json` for stable machine-readable data. Normal data is written to
-stdout and diagnostics to stderr. Exit `0` means success, `2` means invalid
-usage/configuration where documented, and `1` means an operational failure.
+stdout and diagnostics to stderr. Exit `0` means success. The current CLI
+returns `1` when a command fails, including usage or configuration errors.
 
 ## Common app flow
 
@@ -213,3 +205,24 @@ man -M "$HOME/.local/share/man" astro
 
 Release archives include generated man pages. Packagers can also run `astro
 docs export` during packaging without network access.
+
+## Completion callbacks and setup guides
+
+```bash
+astro agent callbacks configure --allow-host hooks.internal.example.org
+astro agent callbacks secret-set completion-key --file /secure/path/completion-key
+astro agent dispatch report --callback-url https://hooks.internal.example.org/tasks \
+  --callback-secret-ref completion-key --correlation-id request-42 --callback-mode NOTIFY
+astro agent inspect <task-guid> --json
+astro agent callbacks redeliver <task-guid> --json
+astro docs show callbacks
+astro docs show capabilities
+astro docs show app-setup
+astro docs show agent-setup
+astro docs show workflow-setup
+astro docs show shared-services
+```
+
+Callback commands require a compatible server and CLI release. See the
+[callback guide](../guides/agent-completion-callbacks.md) for authorization,
+signing-key setup, durable backoff, and receiver verification.

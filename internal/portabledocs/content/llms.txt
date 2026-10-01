@@ -22,6 +22,15 @@ Use these plain-Markdown references as the current public contract. The target i
 - [Agent packages](https://astrolift.dev/reference/agent-packages/): briefs, skills, tools, payload slices, imports, and federation
 - [Workflow TOML](https://astrolift.dev/reference/workflow-toml/): ordered stages, agent binding, outputs, and repo reconciliation
 
+## Setup and final notifications
+
+- [Capabilities](https://astrolift.dev/guides/capabilities/): discover server version, API surface, provider support, and permissions
+- [App setup](https://astrolift.dev/guides/app-setup/): source registration, image deployment, health, and shared bindings
+- [Agent setup](https://astrolift.dev/guides/agent-setup/): packages, environments, secret references, dispatch, and observation
+- [Workflow setup](https://astrolift.dev/guides/workflow-setup/): author, validate, bind, configure, and run ordered stages
+- [Shared services](https://astrolift.dev/guides/shared-services/): catalogue discovery, provision once, attach apps and agents, and inspect readiness
+- [Agent completion callbacks](https://astrolift.dev/guides/agent-completion-callbacks/): signed final events, retries for 24 hours, replay, key rotation, and Python verification
+
 ## Operational guides
 
 - [Working with apps](https://astrolift.dev/working-with-apps/)

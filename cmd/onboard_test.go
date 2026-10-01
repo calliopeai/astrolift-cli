@@ -186,7 +186,7 @@ func TestInstallAgentDocsIncludesTheAuthTopicAndAnIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"start.md", "mcp.md", "manifest.md"} {
+	for _, want := range []string{"start.md", "mcp.md", "manifest.md", "callbacks.md", "capabilities.md", "app-setup.md", "agent-setup.md", "workflow-setup.md", "shared-services.md"} {
 		if !strings.Contains(string(index), want) {
 			t.Errorf("index does not mention %s", want)
 		}

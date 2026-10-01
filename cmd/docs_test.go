@@ -21,6 +21,12 @@ func TestExportPortableDocs(t *testing.T) {
 		"llms.txt",
 		"guides/manifest.md",
 		"guides/mcp.md",
+		"guides/capabilities.md",
+		"guides/app-setup.md",
+		"guides/agent-setup.md",
+		"guides/workflow-setup.md",
+		"guides/shared-services.md",
+		"guides/callbacks.md",
 		"commands/astro.md",
 		"man/man1/astro.1",
 	} {

@@ -451,14 +451,42 @@ astro auth wait --session-id <id>    # blocks until they finish, then stores
 The MCP config references `${ASTROLIFT_TOKEN}` rather than a resolved bearer,
 so the file is safe to commit and works for every agent on the machine.
 
+### Signed task completion callbacks
+
+With a compatible server, configure organization callback destinations and a
+signing secret, then attach a callback to an agent dispatch:
+
+```bash
+astro agent callbacks configure --allow-host hooks.internal.example.org
+astro agent callbacks secret-set completion-key --file /secure/path/completion-key
+astro agent dispatch report --callback-url https://hooks.internal.example.org/tasks \
+  --callback-secret-ref completion-key --correlation-id request-42 --callback-mode NOTIFY
+astro agent callbacks show --json
+astro agent inspect <task-guid> --json
+astro agent callbacks redeliver <task-guid> --json
+```
+
+`secret-set` accepts `--stdin` or `--file` and never a literal key argument.
+`configure` replaces the allow-list; repeat `--allow-host`, or use `--clear`.
+Delivery retries for at least 24 hours with backoff and jitter when a receiver
+is unavailable. `inspect` shows delivery state, attempt count, and sanitized
+last error; replay sends the final event without rerunning the agent. See
+`astro docs show callbacks` for permissions, receiver signatures, deduplication,
+key rotation, and retention. `--wait` waits for task execution, not webhook
+acknowledgement.
+
 ### Documentation for humans and agents
 
 The binary includes a release-matched, network-free reference for the CLI,
-control API, MCP, `astrolift.toml`, agent packages, and workflow TOML:
+control API, MCP, `astrolift.toml`, agent packages, workflow TOML, capability
+discovery, app/agent/workflow setup, shared services, and signed completion callbacks:
 
 ```bash
 astro docs list
 astro docs show manifest
+astro docs show callbacks
+astro docs show capabilities
+astro docs show shared-services
 astro docs export ./astrolift-docs
 astro docs man ./man/man1
 ```
