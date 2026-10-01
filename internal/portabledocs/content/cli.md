@@ -97,6 +97,10 @@ resolved from `--app` and then the local `astrolift.toml` for later commands.
 ## Common agent flow
 
 ```bash
+astro org list --json
+astro org use <organization-slug>
+ASTROLIFT_ORG_ID="$(astro org current --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
+
 astro agent register-repo owner/agents --project-id <guid> --ref main
 
 astro agent env-spec upsert triage-prod \
@@ -104,7 +108,7 @@ astro agent env-spec upsert triage-prod \
   --runtime claude-code-vnc \
   --config-repo owner/agents \
   --manifest-path agents/triage/astrolift.toml \
-  --secret ANTHROPIC_API_KEY=secret://agents/anthropic
+  --secret "ANTHROPIC_API_KEY=secret://agents/${ASTROLIFT_ORG_ID}/anthropic"
 
 printf '%s' "$ANTHROPIC_API_KEY" | \
   astro agent secret set triage-prod ANTHROPIC_API_KEY --stdin
@@ -112,6 +116,11 @@ printf '%s' "$ANTHROPIC_API_KEY" | \
 astro agent dispatch triage --env-spec triage-prod \
   --input @input.json --tail
 ```
+
+The organization `id` returned by `astro org current --json` is its GUID.
+Agent secret references must use `secret://agents/<organization-guid>/<name>`
+for the same organization selected by the command; a slug or an unscoped
+`secret://agents/anthropic` is rejected. The GUID is non-secret metadata.
 
 Secret declarations are references. `secret set` writes the value to the
 installation's secret backend and never prints it. `astro agent cancel <task>`
@@ -127,7 +136,11 @@ astro workflow import workflows/triage.toml --preview
 astro workflow import workflows/triage.toml
 ```
 
-Agent-repo registration also reconciles every `workflows/**/*.toml` file.
+Import creates a disabled definition. Review it and run
+`astro workflow definition-enable <definition-slug>` before executing a
+configured workflow that uses it. For binding and a complete first-run flow,
+see [workflow setup](../guides/workflow-setup.md). Agent-repo registration also
+reconciles every `workflows/**/*.toml` file.
 
 ## Project shared resources
 

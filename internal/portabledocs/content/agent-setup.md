@@ -25,13 +25,22 @@ manifest, or unavailable package store is an actionable failure.
 ## Select a runtime and provide credentials
 
 ```bash
+astro org list --json
+astro org use <organization-slug>
+ASTROLIFT_ORG_ID="$(astro org current --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
+
 astro agent env-spec upsert report-prod \
   --agent-type claude --runtime claude-code-vnc \
   --config-repo owner/agents --manifest-path agents/report/astrolift.toml \
-  --secret ANTHROPIC_API_KEY=secret://agents/anthropic
+  --secret "ANTHROPIC_API_KEY=secret://agents/${ASTROLIFT_ORG_ID}/anthropic"
 printf '%s' "$ANTHROPIC_API_KEY" | \
   astro agent secret set report-prod ANTHROPIC_API_KEY --stdin
 ```
+
+The organization `id` returned by `astro org current --json` is its GUID.
+Agent secret references must use `secret://agents/<organization-guid>/<name>`
+for the same organization selected by the command; a slug or an unscoped
+`secret://agents/anthropic` is rejected. The GUID is non-secret metadata.
 
 Environment specs select image and secret references. The secret command writes
 the value through the configured secret backend. Do not commit its value or
