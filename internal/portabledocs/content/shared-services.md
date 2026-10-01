@@ -46,6 +46,14 @@ slugs; app targets are environment GUIDs. The binding can provide secret
 references, identity grants, environment values, or mounts. Inspect attachment
 and grant state rather than assuming credentials are automatically readable.
 
+Consumers must belong to the service's owning project and resolve to its tenant
+cluster. In this example, `my-app` must belong to `platform`, its production
+app environment must use the selected `production` cluster, and both
+`report-prod` and `reviewer-prod` must resolve to that same cluster. An agent
+must also be associated with `platform` through a project workload or workflow
+stage. A matching environment name alone does not establish these bindings;
+attachments across projects or clusters are rejected.
+
 Writes require project RBAC and token scope `project:write`. A newly added scope
 can require `astro auth refresh` or a new login. Read-only discovery does not
 prove write authorization.

@@ -51,6 +51,23 @@ binding readiness. Attachments expose references, identities, configuration,
 or mounts according to the provider; they do not require copying credentials
 into a manifest.
 
-Literal app-secret editing currently uses the dashboard or GraphQL API; the
-app secret CLI group has no CRUD subcommands. Use the [app operations guide](../working-with-apps.md)
+Manage literal app secrets with the CLI:
+
+```bash
+astro app secrets list my-app --environment production --json
+astro app secrets create DATABASE_URL my-app --stdin --scope production < /secure/path/database-url
+astro app secrets create DATABASE_URL my-app
+astro app secrets delete UNUSED_KEY my-app --yes
+```
+
+`create` sets a new value or updates an existing key. Use `--stdin` with shell
+file redirection, or omit it for a hidden terminal prompt. There is no `--file`
+flag for this command; avoid `--value`, which puts a literal secret in process
+arguments and shell history. Listing returns metadata, never values.
+
+`--scope` accepts `all`, an environment name, or `preview:<branch>`. Omitting it
+preserves an existing key's scope; a new key defaults to `all`. An installation
+with secret-change approval can queue a proposal instead of applying the write.
+Check that proposal before assuming a new value is live. Deletion prompts for
+confirmation unless `--yes` is supplied. See the [app operations guide](../working-with-apps.md)
 for environment, domain, secret, and removal workflows.

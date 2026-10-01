@@ -34,9 +34,27 @@ astro workflow runs <configured-workflow-slug> --watch
 ```
 
 `run-manifest` imports the definition, resolves bindings, creates a configured
-workflow, and starts it. Add `--no-run` to configure without executing. Use
-repeatable `--bind <stageOrder>=<agentWorkloadGuid>` when a stage needs an
+workflow, enables the newly imported definition, and starts it. This requires
+workflow update permission; existing definitions are not automatically enabled
+by a later `workflow run`. Use repeatable `--bind <stageOrder>=<agentWorkloadGuid>` when a stage needs an
 explicit workload binding. Review the dry-run plan first.
+
+To review a persisted configuration before its first execution, use `--no-run`.
+The imported definition remains disabled. Copy the two slugs printed by the
+command: the definition slug identifies what to enable, while the configured
+workflow slug identifies what to run.
+
+```bash
+astro workflow run-manifest workflows/report.toml --no-run
+astro workflow definition <imported-definition-slug> --json
+astro workflow definition-enable <imported-definition-slug>
+astro workflow run <configured-workflow-slug> --input request_id=example-42
+astro workflow runs <configured-workflow-slug> --watch
+```
+
+Enabling the definition does not start a run. A plain `workflow import` also
+creates a disabled definition; enable it after review before running a
+configuration that uses it.
 
 A human gate pauses for the declared approvers; grant them access before the
 run reaches that stage. Unique `output_key` values let later stages consume
