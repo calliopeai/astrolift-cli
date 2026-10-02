@@ -50,6 +50,12 @@ astro docs export ./platform-reference
 astro onboard --help
 ```
 
+With a CLI release containing offline search, run
+`astro docs search 'workflow recovery' --json` or
+`astro docs search '"request file"'`. Search reads only the embedded public
+guides and requires neither authentication nor network access. The executing
+binary's `docs --help` lists its actual topics and commands.
+
 Offline guides travel with the executing CLI release. The website follows the
 current public documentation release. Compare `astro version` and `astro
 status --json` before using newly added API fields against an older server.
