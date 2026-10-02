@@ -22,7 +22,7 @@ var agentDefinitionPollInterval = 5 * time.Second
 // when a legacy input flag is present or its old file no longer exists.
 func runReviewedAgentDefinition(cmd *cobra.Command, ctx context.Context, client *api.Client, id string) error {
 	if !definitionGUIDValid(id) {
-		return errors.New("agent run requires an exact definition GUID; use workflow definitions --json and workflow definition-review, or agent task run for an AgentTask")
+		return errors.New("agent run requires an exact definition GUID; use workflow definitions --json and workflow definition-review, or agent dispatch for a registered agent task")
 	}
 	filename, _ := cmd.Flags().GetString("request-file")
 	if filename == "" {
