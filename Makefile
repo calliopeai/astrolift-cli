@@ -64,10 +64,12 @@ vendor-docs:
 	cp "$(DOCS_SRC)/guides/agent-completion-callbacks.md" "$(DOCS_DST)/callbacks.md"
 	cp "$(DOCS_SRC)/guides/environment-actions.md" "$(DOCS_DST)/environment-actions.md"
 	cp "$(DOCS_SRC)/guides/reviewed-starts.md" "$(DOCS_DST)/reviewed-starts.md"
+	cp "$(DOCS_SRC)/guides/preview-targets.md" "$(DOCS_DST)/preview-targets.md"
+	cp "$(DOCS_SRC)/guides/workload-signals.md" "$(DOCS_DST)/workload-signals.md"
 	cp "$(DOCS_SRC)/llms.txt" "$(DOCS_DST)/llms.txt"
 
 vendor-docs-check:
-	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md capabilities.md app-setup.md agent-setup.md workflow-setup.md shared-services.md callbacks.md environment-actions.md reviewed-starts.md llms.txt; do \
+	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md capabilities.md app-setup.md agent-setup.md workflow-setup.md shared-services.md callbacks.md environment-actions.md reviewed-starts.md preview-targets.md workload-signals.md llms.txt; do \
 		test -s "$(DOCS_DST)/$$file" || { echo "missing $(DOCS_DST)/$$file — run \`make vendor-docs\`"; exit 1; }; \
 	done
 	@if [ -d "$(DOCS_SRC)" ]; then \
@@ -88,6 +90,8 @@ vendor-docs-check:
 			"guides/agent-completion-callbacks.md:callbacks.md" \
 			"guides/environment-actions.md:environment-actions.md" \
 			"guides/reviewed-starts.md:reviewed-starts.md" \
+			"guides/preview-targets.md:preview-targets.md" \
+			"guides/workload-signals.md:workload-signals.md" \
 			"llms.txt:llms.txt"; do \
 			source="$${pair%%:*}"; destination="$${pair#*:}"; \
 			cmp -s "$(DOCS_SRC)/$$source" "$(DOCS_DST)/$$destination" || { \

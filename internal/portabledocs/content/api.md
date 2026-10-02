@@ -148,3 +148,14 @@ the same exact durable-start and current-authority gates; new clients should
 use `startWorkflowDefinition` rather than relying on slug selection or the
 legacy mirror-ID field. `runAstroliftAgent` and configured-workflow APIs retain
 their separate contracts.
+
+## Exact resource, preview and metric context
+
+Use [shared services](../guides/shared-services.md) for bounded project resource
+pages, exact managed-service GUID metadata and separately paged visible consumers.
+Reviewed writes carry `expectedContextRevision`; an enqueue acknowledgement is
+separate from provider completion. [Exact preview targets](../guides/preview-targets.md)
+explains persisted environment ownership and versions required on logs/deployments.
+[Workload signals](../guides/workload-signals.md) documents each signal's scope,
+identity basis, physical container membership and instrumentation prerequisites.
+Check the selected installation's SDL before requesting additive fields.

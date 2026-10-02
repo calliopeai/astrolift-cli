@@ -41,6 +41,8 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |
 | Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |
+| Review a preview environment by GUID | `preview-targets` | [Exact preview targets](preview-targets.md) |
+| Interpret workload measurements | `workload-signals` | [Workload signals](workload-signals.md) |
 | Receive a final task event | `callbacks` | [Agent completion callbacks](agent-completion-callbacks.md) |
 
 ```bash
@@ -50,7 +52,7 @@ astro docs export ./platform-reference
 astro onboard --help
 ```
 
-With a CLI release containing offline search, run
+CLI v0.8.0 includes offline search. Run
 `astro docs search 'workflow recovery' --json` or
 `astro docs search '"request file"'`. Search reads only the embedded public
 guides and requires neither authentication nor network access. The executing

@@ -1,7 +1,7 @@
 ---
 name: astrolift-platform
 description: The capability map of the Astrolift platform an app runs on — workload kinds, delivery, scheduling, secrets, managed services, observability, agents/workflows, tokens, and RBAC. Read before designing anything that touches deployment, infrastructure, scheduling, or integrations, so you build WITH the platform instead of around it.
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Astrolift platform capabilities
@@ -51,9 +51,13 @@ The platform provisions databases, caches, and object-storage buckets bound to a
 
 Hostnames come from the manifest; DNS + TLS are automatic under the install's managed domain. Custom domains are a Settings-level feature.
 
-## Observability (no instrumentation required)
+## Observability and measurement scope
 
-The app page's **Observability tab** ships automatically: traffic, error rate, latency percentiles, CPU/memory saturation, status-code breakdown, endpoint stats, and logs — golden signals are sourced at the platform's edge, so an uninstrumented app gets full panels. Every chart has a **Show PromQL** disclosure with the exact query. Uptime probes, app-down alerts, and alert rules with notification delivery live under Alerts. Apps MAY additionally expose their own `/metrics` for custom metrics — never required for the standard panels.
+Inspect the API's per-signal scope, source, identity basis and availability before using a panel as evidence. Namespace ingress/ALB traffic and resource aggregates describe an app environment; they can include other namespace resources and do not establish one workload's usage. A workload request never borrows environment totals. Missing samples, source access, collectors or limits are unavailable, not healthy zero.
+
+Exact workload request/error/latency metrics need application instrumentation carrying canonical app/environment/workload GUID labels and verified runtime membership. Physical CPU/memory measurements need current pod/controller GUID labels, verified container identities, cAdvisor usage series and matching UID-bound limits from kube-state-metrics. Existing unstamped pods need a normal redeploy; a Prometheus endpoint alone does not provide every panel. A valid CPU signal does not prove request instrumentation or application health.
+
+For setup and scope limits, use `astro docs show workload-signals` in a CLI release containing that topic, or https://astrolift.dev/guides/workload-signals/. Check the selected server's schema and actual deployment/collector configuration. Legacy service exporter/resource-gauge APIs are separate contracts; do not describe them as verified physical workload measurements. Uptime probes, alerts and logs remain separate evidence.
 
 ## Agents & workflows
 
