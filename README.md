@@ -837,3 +837,36 @@ output; JSON includes `matches`, `totalMatches` and `truncated`. Queries are
 bounded to 512 UTF-8 bytes and 32 terms/phrases. Use `docs show` for a complete
 guide and command `--help` for the actual executing command tree. These new
 commands require a release containing them; the published v0.7.2 predates them.
+
+### Scoped managed resource reads
+
+`astro project resources list` preserves its JSON array output and now walks
+permission-checked server cursors. `--page --json` returns one bounded
+`{items,totalCount,nextCursor}` page; use `--after` only with `--page`.
+`--limit` accepts 1–200. Search and kind/status/environment/cluster-GUID filters
+are sent to the server. A refused continuation or a walk exceeding the safety
+bound returns an error without emitting a partial JSON array. App-owned
+`astro app services list` has the same additive `--page` mode.
+
+```sh
+astro project resources list --project platform --page --limit 50 --json
+astro project resources show <resource-guid> --project platform --json
+astro project resources attachments <resource-guid> --project platform --limit 50 --json
+astro project resources cost <resource-guid> --project platform --expected-context-revision <revision> --json
+astro app services show <resource-guid> --app example-api --json
+```
+
+Project and app-owned resources remain separate. Basic reads contain metadata,
+not configuration values, connection material, provider failure bodies or nested
+grants. Names on project show/cost/actions use at most two discovery rows, then
+reread the selected exact GUID; deleted GUIDs never follow a same-name replacement.
+Cost is explicit and permission checked; missing amount, currency, timestamp or
+HTTPS source produces unavailable pricing rather than zero.
+
+Existing project-resource update/reprovision/attach/remove commands always carry
+the fresh reviewed `contextRevision` through the write. Supply
+`--expected-context-revision` to pin an earlier explicit review. Detach now needs
+`--resource <GUID>` as well as the attachment GUID, so its ownership is explicit.
+Attachments must share the owning project and cluster. An asynchronous operation
+receipt proves acceptance/enqueue only; read its operation identity and status
+separately. A lost response is unconfirmed and is never automatically retried.

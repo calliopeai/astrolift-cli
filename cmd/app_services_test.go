@@ -102,7 +102,7 @@ func TestAppServicesListRendersTable(t *testing.T) {
 	got := out.String()
 	for _, want := range []string{
 		"web-db", "postgres", "rds", "production", "active", "yes",
-		"web-cache", "redis", "failed (quota exceeded)", "2 managed service(s) shown.",
+		"web-cache", "redis", "failed", "2 managed service(s) shown.",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q:\n%s", want, got)
@@ -143,28 +143,20 @@ func TestAppServicesListWalksCursorPages(t *testing.T) {
 	}
 }
 
-func TestAppServicesListNotesTruncationAtPageCap(t *testing.T) {
+func TestAppServicesListRefusesCursorCycleWithoutPartialOutput(t *testing.T) {
 	resetAppServicesFlags()
 	defer resetAppServicesFlags()
-
 	page := 0
 	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
 		page++
 		return managedServicesPageData([]appManagedService{{Name: "svc"}}, "more")
 	})
 	defer srv.Close()
-
-	cmd, _ := appTestCmd()
-	errBuf := &strings.Builder{}
-	cmd.SetErr(errBuf)
-	if err := runAppServicesList(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web"); err != nil {
-		t.Fatalf("runAppServicesList: %v", err)
-	}
-	if page != appServicesMaxPages {
-		t.Errorf("walked %d pages, want the bounded max of %d", page, appServicesMaxPages)
-	}
-	if !strings.Contains(errBuf.String(), "note:") {
-		t.Errorf("expected a truncation note, got: %s", errBuf.String())
+	cmd, out := appTestCmd()
+	_ = cmd.Flags().Set("json", "true")
+	err := runAppServicesList(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
+	if err == nil || !strings.Contains(err.Error(), "incomplete") || out.Len() != 0 || page != 2 {
+		t.Fatalf("expected explicit incomplete walk, requests=%d out=%s err=%v", page, out, err)
 	}
 }
 
@@ -204,7 +196,7 @@ func TestAppServicesListJSONShape(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
 		t.Fatalf("decoding json output: %v", err)
 	}
-	if len(decoded) != 1 || decoded[0].ID != "svc-1" || len(decoded[0].Attachments) != 1 {
+	if len(decoded) != 1 || decoded[0].ID != "svc-1" || len(decoded[0].Attachments) != 0 {
 		t.Errorf("decoded = %+v", decoded)
 	}
 }
@@ -218,7 +210,7 @@ func TestAppServicesListSurfacesGraphQLError(t *testing.T) {
 
 	cmd, _ := appTestCmd()
 	err := runAppServicesList(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
-	if err == nil || !strings.Contains(err.Error(), "permission denied") {
-		t.Fatalf("err = %v, want the server's message surfaced", err)
+	if err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("err = %v, want a static refusal without server diagnostics", err)
 	}
 }

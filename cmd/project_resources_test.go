@@ -105,11 +105,10 @@ func TestRunProjectResourceAttachRequiresExactlyOneConsumer(t *testing.T) {
 
 func TestRunProjectResourceCostPrintsLiveEstimateAndSource(t *testing.T) {
 	srv := gqlServer(t, map[string]interface{}{
-		"astroliftProjectManagedServices": []map[string]interface{}{
-			{"id": "r-1", "name": "db", "attachments": []interface{}{}},
-		},
+		"astroliftProjectManagedServicesPage": map[string]interface{}{"items": []interface{}{resourceReadFixture()}, "totalCount": 1, "nextCursor": nil},
+		"astroliftProjectManagedService":      resourceReadFixture(),
 		"astroliftManagedServiceCostPreview": map[string]interface{}{
-			"managedServiceId": "r-1",
+			"managedServiceId": resourceTestID,
 			"available":        true,
 			"monthlyTotal":     42.5,
 			"currency":         "USD",
