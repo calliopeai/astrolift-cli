@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -82,7 +83,7 @@ func runReviewedAgentDefinition(cmd *cobra.Command, ctx context.Context, client 
 	return err
 }
 
-const agentDefinitionExecutionQuery = `query ReviewedAgentDefinitionExecution($id: ID!) { workflowExecution(executionId: $id) { guid recordId organizationGuid status temporalWorkflowId temporalRunId isTerminal observationError taskCleanup { status remaining retryable } } }`
+const agentDefinitionExecutionQuery = `query ReviewedAgentDefinitionExecution($id: ID!) { workflowExecution(executionId: $id) { guid recordId organizationGuid status temporalWorkflowId temporalRunId isTerminal observationError taskCleanup } }`
 
 func waitAgentDefinition(cmd *cobra.Command, ctx context.Context, client *api.Client, start *reviewedDefinitionStart, filename string) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
@@ -96,6 +97,9 @@ func waitAgentDefinition(cmd *cobra.Command, ctx context.Context, client *api.Cl
 		readCtx, stopRead := context.WithTimeout(ctx, 30*time.Second)
 		err := client.GraphQL(readCtx, agentDefinitionExecutionQuery, map[string]interface{}{"id": start.ExecutionID}, &resp)
 		stopRead()
+		if permanentAgentObservationError(err) {
+			return errors.New("the server refused observation of the original execution; keep its saved request and restore access or API compatibility before reconciling")
+		}
 		if err == nil && resp.Execution != nil {
 			row := resp.Execution
 			if err := validateWorkflowExecution(row, start.ExecutionID, client.Org(), opts); err != nil {
@@ -126,6 +130,32 @@ func waitAgentDefinition(cmd *cobra.Command, ctx context.Context, client *api.Cl
 		case <-time.After(agentDefinitionPollInterval):
 		}
 	}
+}
+
+func permanentAgentObservationError(err error) bool {
+	if errors.Is(err, api.ErrUnauthorized) || errors.Is(err, api.ErrSchemaMismatch) {
+		return true
+	}
+	permanentStatus := func(status int) bool {
+		return status >= 400 && status < 500 && status != http.StatusRequestTimeout && status != http.StatusTooManyRequests
+	}
+	var transport *api.HTTPError
+	if errors.As(err, &transport) && permanentStatus(transport.Status) {
+		return true
+	}
+	var response *api.GraphQLResponseError
+	if errors.As(err, &response) {
+		if permanentStatus(response.Status) {
+			return true
+		}
+		for _, item := range response.Errors {
+			switch item.Code {
+			case "PERMISSION_DENIED", "UNAUTHENTICATED", "FORBIDDEN", "GRAPHQL_VALIDATION_FAILED", "PRECONDITION", "PRECONDITION_FAILED":
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func init() {
