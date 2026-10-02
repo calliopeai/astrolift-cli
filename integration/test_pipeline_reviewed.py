@@ -23,7 +23,9 @@ from uuid import uuid4
 import pytest
 
 if not os.environ.get("ASTROLIFT_CLI_TEST_BINARY"):
-    pytest.skip("requires the opt-in compiled CLI and app backend", allow_module_level=True)
+    pytest.skip(
+        "requires the opt-in compiled CLI and app backend", allow_module_level=True
+    )
 
 from asgiref.sync import sync_to_async
 from astrolift_identity.api_tokens import mint_token
@@ -37,6 +39,17 @@ from django.contrib.auth import get_user_model
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
+@pytest.fixture(autouse=True)
+def expire_disposable_engine_connection():
+    # Each scenario sets a fresh real Temporal server address. Expire only the
+    # process connection cache between scenarios; keep the real SDK connector.
+    from astrolift_workflows import client
+
+    client._client = None
+    yield
+    client._client = None
+
+
 @contextmanager
 def running_api():
     import uvicorn
@@ -45,8 +58,12 @@ def running_api():
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
     sock.listen(128)
-    server = uvicorn.Server(uvicorn.Config(application, lifespan="off", log_level="critical"))
-    thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
+    server = uvicorn.Server(
+        uvicorn.Config(application, lifespan="off", log_level="critical")
+    )
+    thread = threading.Thread(
+        target=server.run, kwargs={"sockets": [sock]}, daemon=True
+    )
     thread.start()
     deadline = time.monotonic() + 5
     while not server.started:
@@ -62,7 +79,9 @@ def running_api():
 
 
 @contextmanager
-def forwarding_proxy(api_port, *, start_operation="StartPipelineRun", start_field="startPipelineRun"):
+def forwarding_proxy(
+    api_port, *, start_operation="StartPipelineRun", start_field="startPipelineRun"
+):
     """Fault real transport only; all GraphQL results come from config.asgi."""
     state = SimpleNamespace(requests=[], drop_start=False, reject_schema=False)
 
@@ -119,7 +138,9 @@ def forwarding_proxy(api_port, *, start_operation="StartPipelineRun", start_fiel
 
 def create_world():
     suffix = uuid4().hex[:12]
-    org = Organization.objects.create(name="Disposable CLI pipeline", slug=f"cli-pipeline-{suffix}")
+    org = Organization.objects.create(
+        name="Disposable CLI pipeline", slug=f"cli-pipeline-{suffix}"
+    )
     user = get_user_model().objects.create_user(username=f"cli-pipeline-{suffix}")
     Member.objects.create(user=user, scope_kind="ORG", scope_id=org.pk)
     bind_role(
@@ -143,7 +164,9 @@ def create_world():
         token_hash=issued.token_hash,
         scopes=["read:apps", "write:apps"],
     )
-    return SimpleNamespace(org=org, user=user, pipeline=pipeline, token=issued.plaintext)
+    return SimpleNamespace(
+        org=org, user=user, pipeline=pipeline, token=issued.plaintext
+    )
 
 
 def other_actor_token(world):
@@ -179,14 +202,20 @@ def invoke(world, proxy, tmp_path, args, *, token=None, org=None):
             "--no-prompt",
             *args,
         ],
-        env={**os.environ, "XDG_CONFIG_HOME": str(tmp_path), "ASTROLIFT_TOKEN": token or world.token},
+        env={
+            **os.environ,
+            "XDG_CONFIG_HOME": str(tmp_path),
+            "ASTROLIFT_TOKEN": token or world.token,
+        },
         capture_output=True,
         text=True,
         timeout=30,
     )
 
 
-async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(settings, tmp_path):
+async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(
+    settings, tmp_path
+):
     # This is an actual SDK-managed disposable server, not a substituted client.
     async with temporal_test_env() as engine:
         settings.ASTROLIFT_TEMPORAL_ENABLED = True
@@ -216,25 +245,45 @@ async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(setting
             assert saved["targetId"] == str(world.pipeline.guid)
             assert saved["version"] == world.pipeline.version and saved["ref"] == "main"
             assert world.token not in path.read_text()
-            run = await sync_to_async(PipelineRun._unscoped.get)(request_id=saved["requestId"])
-            assert run.organization_id == world.org.pk and run.pipeline_id == world.pipeline.pk
-            assert run.pipeline_version == saved["version"] and run.actor_key == f"user:{world.user.pk}"
+            run = await sync_to_async(PipelineRun._unscoped.get)(
+                request_id=saved["requestId"]
+            )
+            assert (
+                run.organization_id == world.org.pk
+                and run.pipeline_id == world.pipeline.pk
+            )
+            assert (
+                run.pipeline_version == saved["version"]
+                and run.actor_key == f"user:{world.user.pk}"
+            )
             assert run.temporal_run_id and run.dispatch_status == "submitted"
-            handle = engine.client.get_workflow_handle(run.temporal_workflow_id, run_id=run.temporal_run_id)
+            handle = engine.client.get_workflow_handle(
+                run.temporal_workflow_id, run_id=run.temporal_run_id
+            )
             try:
                 description = await handle.describe()
-                assert description.run_id == run.temporal_run_id and description.status.name == "RUNNING"
-                # Definitions can change after dispatch; exact request recovery comes first.
-                await sync_to_async(Pipeline.objects.filter(pk=world.pipeline.pk).update)(
-                    version=world.pipeline.version + 1
+                assert (
+                    description.run_id == run.temporal_run_id
+                    and description.status.name == "RUNNING"
                 )
+                # Definitions can change after dispatch; exact request recovery comes first.
+                await sync_to_async(
+                    Pipeline.objects.filter(pk=world.pipeline.pk).update
+                )(version=world.pipeline.version + 1)
                 before = len(proxy.requests)
-                recovered = await asyncio.to_thread(invoke, world, proxy, tmp_path, run_args)
+                recovered = await asyncio.to_thread(
+                    invoke, world, proxy, tmp_path, run_args
+                )
                 assert recovered.returncode == 0, recovered.stderr
                 receipt = json.loads(recovered.stdout)["run"]
-                assert receipt["id"] == str(run.guid) and receipt["requestId"] == saved["requestId"]
+                assert (
+                    receipt["id"] == str(run.guid)
+                    and receipt["requestId"] == saved["requestId"]
+                )
                 assert receipt["temporalRunId"] == run.temporal_run_id
-                assert not any("mutation" in q["query"] for q, _ in proxy.requests[before:])
+                assert not any(
+                    "mutation" in q["query"] for q, _ in proxy.requests[before:]
+                )
                 assert path.read_bytes() == original
                 reconciled = await asyncio.to_thread(
                     invoke,
@@ -246,19 +295,37 @@ async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(setting
                 assert reconciled.returncode == 0, reconciled.stderr
                 assert json.loads(reconciled.stdout)["run"]["id"] == str(run.guid)
                 shown = await asyncio.to_thread(
-                    invoke, world, proxy, tmp_path, ["pipeline", "show", str(run.guid), "--json"]
+                    invoke,
+                    world,
+                    proxy,
+                    tmp_path,
+                    ["pipeline", "show", str(run.guid), "--json"],
                 )
                 assert shown.returncode == 0, shown.stderr
                 cancelled = await asyncio.to_thread(
-                    invoke, world, proxy, tmp_path, ["pipeline", "cancel", str(run.guid), "--yes", "--json"]
+                    invoke,
+                    world,
+                    proxy,
+                    tmp_path,
+                    ["pipeline", "cancel", str(run.guid), "--yes", "--json"],
                 )
                 assert cancelled.returncode == 0, cancelled.stderr
                 ack = json.loads(cancelled.stdout)["run"]
                 assert ack["cancellationStatus"] == "acknowledged"
-                assert ack["cancellationObservedAt"] is None and ack["cleanupStatus"] == "pending"
-                assert ack["status"] == "pending" and (await handle.describe()).status.name == "RUNNING"
+                assert (
+                    ack["cancellationObservedAt"] is None
+                    and ack["cleanupStatus"] == "pending"
+                )
+                assert (
+                    ack["status"] == "pending"
+                    and (await handle.describe()).status.name == "RUNNING"
+                )
                 assert await sync_to_async(PipelineRun._unscoped.count)() == 1
-                starts = [q for q, _ in proxy.requests if "mutation StartPipelineRun" in q["query"]]
+                starts = [
+                    q
+                    for q, _ in proxy.requests
+                    if "mutation StartPipelineRun" in q["query"]
+                ]
                 assert len(starts) == 1
                 assert starts[0]["variables"]["input"] == {
                     "pipelineId": str(world.pipeline.guid),
@@ -269,9 +336,13 @@ async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(setting
                 }
                 # Org discovery precedes SetOrg; every pipeline request is scoped.
                 assert all(
-                    org == str(world.org.guid) for q, org in proxy.requests if "Pipeline" in q["query"]
+                    org == str(world.org.guid)
+                    for q, org in proxy.requests
+                    if "Pipeline" in q["query"]
                 )
-                assert not any("triggerPipelineRun" in q["query"] for q, _ in proxy.requests)
+                assert not any(
+                    "triggerPipelineRun" in q["query"] for q, _ in proxy.requests
+                )
 
                 # A real schema validation failure cannot cause a legacy dispatch.
                 proxy.reject_schema = True
@@ -292,17 +363,34 @@ async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(setting
                     ],
                 )
                 assert failed.returncode != 0, failed.stdout
-                assert failed_path.exists() and await sync_to_async(PipelineRun._unscoped.count)() == 1
-                assert sum("mutation" in q["query"] for q, _ in proxy.requests[before:]) == 1
-                assert not any("triggerPipelineRun" in q["query"] for q, _ in proxy.requests[before:])
+                assert (
+                    failed_path.exists()
+                    and await sync_to_async(PipelineRun._unscoped.count)() == 1
+                )
+                assert (
+                    sum("mutation" in q["query"] for q, _ in proxy.requests[before:])
+                    == 1
+                )
+                assert not any(
+                    "triggerPipelineRun" in q["query"]
+                    for q, _ in proxy.requests[before:]
+                )
 
                 # A real authorized second actor cannot adopt the original key.
                 another_token = await sync_to_async(other_actor_token)(world)
-                for options in ({"token": "invalid-bearer"}, {"token": another_token}, {"org": uuid4()}):
+                for options in (
+                    {"token": "invalid-bearer"},
+                    {"token": another_token},
+                    {"org": uuid4()},
+                ):
                     before = len(proxy.requests)
-                    refused = await asyncio.to_thread(invoke, world, proxy, tmp_path, run_args, **options)
+                    refused = await asyncio.to_thread(
+                        invoke, world, proxy, tmp_path, run_args, **options
+                    )
                     assert refused.returncode != 0
-                    assert not any("mutation" in q["query"] for q, _ in proxy.requests[before:])
+                    assert not any(
+                        "mutation" in q["query"] for q, _ in proxy.requests[before:]
+                    )
                     assert path.read_bytes() == original
 
                 # New dispatch requires review metadata and explicit confirmation.
@@ -318,15 +406,19 @@ async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(setting
                     ["pipeline", "cancel", str(run.guid)],
                 ):
                     before = len(proxy.requests)
-                    refused = await asyncio.to_thread(invoke, world, proxy, tmp_path, args)
+                    refused = await asyncio.to_thread(
+                        invoke, world, proxy, tmp_path, args
+                    )
                     assert refused.returncode != 0
-                    assert not any("mutation" in q["query"] for q, _ in proxy.requests[before:])
+                    assert not any(
+                        "mutation" in q["query"] for q, _ in proxy.requests[before:]
+                    )
                 assert not (tmp_path / "unconfirmed.json").exists()
 
                 # A never-submitted saved request cannot silently refresh its version.
-                await sync_to_async(Pipeline.objects.filter(pk=world.pipeline.pk).update)(
-                    version=world.pipeline.version + 2
-                )
+                await sync_to_async(
+                    Pipeline.objects.filter(pk=world.pipeline.pk).update
+                )(version=world.pipeline.version + 2)
                 before = len(proxy.requests)
                 stale = await asyncio.to_thread(
                     invoke,
@@ -343,7 +435,9 @@ async def test_real_pipeline_dispatch_recovery_and_cancel_acknowledgment(setting
                     ],
                 )
                 assert stale.returncode != 0 and "changed" in stale.stderr
-                assert not any("mutation" in q["query"] for q, _ in proxy.requests[before:])
+                assert not any(
+                    "mutation" in q["query"] for q, _ in proxy.requests[before:]
+                )
                 assert await sync_to_async(PipelineRun._unscoped.count)() == 1
             finally:
                 await handle.terminate(reason="Disposable CLI receipt cleanup")
