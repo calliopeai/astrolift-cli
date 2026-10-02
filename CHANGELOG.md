@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.9.0 — 2026-10-02
+
 - Read preview GUIDs and their persisted environment identity directly, with
   explicitly requested pricing and reviewed log routes that never infer a
   replacement from a hostname or environment name (#2206).
