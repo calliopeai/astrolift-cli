@@ -17,14 +17,10 @@ register clusters and configure providers against an Astrolift control plane.
 
 ## Install
 
-> **The binary is behind a token.** `calliopeai/astrolift-cli` is a private
-> repository, so release archives cannot be downloaded anonymously — GitHub
-> answers anonymous requests for a private repo with **404**, not 401, so an
-> unauthenticated attempt looks like a missing file rather than an auth error.
-> Homebrew, Scoop, anonymous `curl`, and `go install` cannot work until a
-> public binary channel exists. **The container image is public and needs no
-> credentials.** There is no `curl | sh` one-liner; any URL you may have seen
-> for one does not resolve.
+Source and [release archives](https://github.com/calliopeai/astrolift-cli/releases)
+are public. Manual `curl` downloads need no GitHub account. Homebrew and Scoop
+publication remain unconfigured; the legacy installer still requires GitHub
+credentials unless a mirror is supplied. The container images are public.
 
 ### Docker (no credentials required)
 
@@ -82,11 +78,13 @@ the destination.
 ### Manual release download
 
 ```bash
-gh auth login
-tag="$(gh release view --repo calliopeai/astrolift-cli --json tagName --jq .tagName)"
-gh release download "$tag" --repo calliopeai/astrolift-cli \
-  --pattern 'astro-darwin-arm64.tar.gz' \
-  --pattern 'astro-checksums.txt'
+release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+  https://github.com/calliopeai/astrolift-cli/releases/latest)"
+tag="${release_url##*/}"
+release_base="https://github.com/calliopeai/astrolift-cli/releases/download/${tag}"
+curl -fL "$release_base/astro-darwin-arm64.tar.gz" -o astro-darwin-arm64.tar.gz
+curl -fL "$release_base/astro-checksums.txt" -o astro-checksums.txt
+shasum -a 256 -c <(grep '  astro-darwin-arm64.tar.gz$' astro-checksums.txt)
 ```
 
 Archives are named `astro-<os>-<arch>.tar.gz` (`.zip` on Windows) for
@@ -99,16 +97,15 @@ full matrix.
 
 `astro version` prints the release, commit, and build date it was built from;
 an unstamped source build reports `astro dev`. `astro update` replaces the
-running binary with the latest release (it needs the same token as above).
+running binary with the latest public release; GitHub credentials are optional.
 Once a day `astro` will note on stderr if a newer release exists; set
 `ASTROLIFT_NO_UPDATE_CHECK=1` to silence it. The hint never appears with
 `--json`, in CI, or on `dev` builds.
 
-### From source (repository collaborators)
+### From source
 
 ```bash
-gh auth login
-gh repo clone calliopeai/astrolift-cli
+git clone https://github.com/calliopeai/astrolift-cli.git
 cd astrolift-cli
 make build              # produces ./astro
 ./astro version
@@ -451,14 +448,42 @@ astro auth wait --session-id <id>    # blocks until they finish, then stores
 The MCP config references `${ASTROLIFT_TOKEN}` rather than a resolved bearer,
 so the file is safe to commit and works for every agent on the machine.
 
+### Signed task completion callbacks
+
+With a compatible server, configure organization callback destinations and a
+signing secret, then attach a callback to an agent dispatch:
+
+```bash
+astro agent callbacks configure --allow-host hooks.internal.example.org
+astro agent callbacks secret-set completion-key --file /secure/path/completion-key
+astro agent dispatch report --callback-url https://hooks.internal.example.org/tasks \
+  --callback-secret-ref completion-key --correlation-id request-42 --callback-mode NOTIFY
+astro agent callbacks show --json
+astro agent inspect <task-guid> --json
+astro agent callbacks redeliver <task-guid> --json
+```
+
+`secret-set` accepts `--stdin` or `--file` and never a literal key argument.
+`configure` replaces the allow-list; repeat `--allow-host`, or use `--clear`.
+Delivery retries for at least 24 hours with backoff and jitter when a receiver
+is unavailable. `inspect` shows delivery state, attempt count, and sanitized
+last error; replay sends the final event without rerunning the agent. See
+`astro docs show callbacks` for permissions, receiver signatures, deduplication,
+key rotation, and retention. `--wait` waits for task execution, not webhook
+acknowledgement.
+
 ### Documentation for humans and agents
 
 The binary includes a release-matched, network-free reference for the CLI,
-control API, MCP, `astrolift.toml`, agent packages, and workflow TOML:
+control API, MCP, `astrolift.toml`, agent packages, workflow TOML, capability
+discovery, app/agent/workflow setup, shared services, and signed completion callbacks:
 
 ```bash
 astro docs list
 astro docs show manifest
+astro docs show callbacks
+astro docs show capabilities
+astro docs show shared-services
 astro docs export ./astrolift-docs
 astro docs man ./man/man1
 ```

@@ -23,9 +23,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/spf13/cobra"
@@ -34,12 +36,16 @@ import (
 // ---- flags -----------------------------------------------------------------
 
 var (
-	agentDispatchInput   string
-	agentDispatchEnvSpec string
-	agentDispatchTimeout int
-	agentDispatchWait    bool
-	agentDispatchTail    bool
-	agentDispatchJSON    bool
+	agentDispatchInput             string
+	agentDispatchEnvSpec           string
+	agentDispatchTimeout           int
+	agentDispatchWait              bool
+	agentDispatchTail              bool
+	agentDispatchJSON              bool
+	agentDispatchCallbackURL       string
+	agentDispatchCallbackSecretRef string
+	agentDispatchCorrelationID     string
+	agentDispatchCallbackMode      string
 )
 
 // ---- GraphQL ---------------------------------------------------------------
@@ -48,7 +54,7 @@ const runAstroliftAgentMutation = `mutation($input: RunAstroliftAgentInput!) {
   runAstroliftAgent(input: $input) {
     ok
     errors { message }
-    data { id status }
+    data { id status callbackStatus callbackAttempts callbackLastError }
   }
 }`
 
@@ -64,8 +70,11 @@ type runAgentResult struct {
 		Message string `json:"message"`
 	} `json:"errors"`
 	Data *struct {
-		ID     string `json:"id"`
-		Status string `json:"status"`
+		ID                string  `json:"id"`
+		Status            string  `json:"status"`
+		CallbackStatus    *string `json:"callbackStatus"`
+		CallbackAttempts  *int    `json:"callbackAttempts"`
+		CallbackLastError *string `json:"callbackLastError"`
 	} `json:"data"`
 }
 
@@ -106,6 +115,11 @@ than empty.
 --env-spec pins an AgentEnvironmentSpec (by slug) to launch into — its
 image + secret packet. Omit to use the workload's own image/runtime.
 
+Register a signed completion notification with --callback-url and
+--callback-secret-ref (an organization secret name, never the key). Optional
+--correlation-id is returned unchanged; --callback-mode selects FULL or NOTIFY.
+The server validates the organization host allow-list and permissions.
+
 With --wait, blocks until the task reaches a terminal state, polling
 agentTask. --tail additionally streams the task's logs while waiting.
 
@@ -122,6 +136,9 @@ Exit codes: 0 success, 1 dispatch/run failure.`,
 
 func runAgentDispatch(cmd *cobra.Command, ctx context.Context, client *api.Client, agentSlug string) error {
 	input := map[string]interface{}{"agentSlug": agentSlug}
+	if err := addAgentCallbackInput(input); err != nil {
+		return err
+	}
 
 	if agentDispatchInput != "" {
 		payload, err := parseJSONInput(agentDispatchInput)
@@ -149,7 +166,12 @@ func runAgentDispatch(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	var resp struct {
 		Result runAgentResult `json:"runAstroliftAgent"`
 	}
-	if err := client.GraphQL(dispatchCtx, runAstroliftAgentMutation,
+	query := runAstroliftAgentMutation
+	if agentDispatchCallbackURL == "" {
+		// Keep ordinary dispatch compatible with servers predating callbacks.
+		query = strings.Replace(query, " callbackStatus callbackAttempts callbackLastError", "", 1)
+	}
+	if err := client.GraphQL(dispatchCtx, query,
 		map[string]interface{}{"input": input}, &resp); err != nil {
 		return fmt.Errorf("dispatching agent: %w", err)
 	}
@@ -274,7 +296,7 @@ func fetchAgentTaskStatus(ctx context.Context, client *api.Client, taskID string
 	var resp struct {
 		AgentTask *agentTask `json:"agentTask"`
 	}
-	if err := client.GraphQL(fetchCtx, agentTaskQuery,
+	if err := client.GraphQL(fetchCtx, `query($id: ID!) { agentTask(id: $id) { id status } }`,
 		map[string]interface{}{"id": taskID}, &resp); err != nil {
 		return "", fmt.Errorf("polling task: %w", err)
 	}
@@ -334,7 +356,43 @@ func firstMessageError(errs []struct {
 
 // ---- init ------------------------------------------------------------------
 
+// addAgentCallbackInput validates CLI shape; the server owns policy and authorization.
+func addAgentCallbackInput(input map[string]interface{}) error {
+	if agentDispatchCallbackURL == "" {
+		if agentDispatchCallbackSecretRef != "" || agentDispatchCorrelationID != "" || agentDispatchCallbackMode != "" {
+			return fmt.Errorf("callback options require --callback-url")
+		}
+		return nil
+	}
+	u, err := url.Parse(agentDispatchCallbackURL)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" {
+		return fmt.Errorf("--callback-url must be HTTPS without credentials or a fragment")
+	}
+	if agentDispatchCallbackSecretRef == "" {
+		return fmt.Errorf("--callback-url requires --callback-secret-ref")
+	}
+	if utf8.RuneCountInString(agentDispatchCorrelationID) > 128 {
+		return fmt.Errorf("--correlation-id must be at most 128 characters")
+	}
+	mode := strings.ToUpper(agentDispatchCallbackMode)
+	if mode == "" {
+		mode = "FULL"
+	}
+	if mode != "FULL" && mode != "NOTIFY" {
+		return fmt.Errorf("--callback-mode must be FULL or NOTIFY")
+	}
+	input["callbackUrl"] = agentDispatchCallbackURL
+	input["callbackSecretRef"] = agentDispatchCallbackSecretRef
+	input["correlationId"] = agentDispatchCorrelationID
+	input["callbackMode"] = mode
+	return nil
+}
+
 func init() {
+	agentDispatchCmd.Flags().StringVar(&agentDispatchCallbackURL, "callback-url", "", "HTTPS destination for a signed final task notification")
+	agentDispatchCmd.Flags().StringVar(&agentDispatchCallbackSecretRef, "callback-secret-ref", "", "Organization signing secret name (never its value)")
+	agentDispatchCmd.Flags().StringVar(&agentDispatchCorrelationID, "correlation-id", "", "Opaque caller ID, at most 128 characters")
+	agentDispatchCmd.Flags().StringVar(&agentDispatchCallbackMode, "callback-mode", "", "Completion body: FULL (default) or NOTIFY")
 	agentDispatchCmd.Flags().StringVar(&agentDispatchInput, "input", "", "Trigger payload as a JSON string or @file.json")
 	agentDispatchCmd.Flags().StringVar(&agentDispatchEnvSpec, "env-spec", "", "Env-spec slug to pin (image + secret packet)")
 	agentDispatchCmd.Flags().IntVar(&agentDispatchTimeout, "timeout", 0, "Run timeout in seconds (0 = server default)")

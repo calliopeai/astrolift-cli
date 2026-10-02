@@ -5,27 +5,21 @@ the non-interactive client used in CI.
 
 ## Install
 
-The canonical CLI releases currently live in the private
-`calliopeai/astrolift-cli` repository. Authenticate GitHub CLI with an account
-that can read that repository:
-
-```bash
-gh auth login
-gh auth status
-```
+The [CLI releases](https://github.com/calliopeai/astrolift-cli/releases) and
+[source](https://github.com/calliopeai/astrolift-cli) are public. The following `curl` path needs no GitHub account.
 
 Find the current immutable tag and download both the archive and its checksum.
 For example, on Apple silicon:
 
 ```bash
-tag="$(gh release view --repo calliopeai/astrolift-cli \
-  --json tagName --jq .tagName)"
+release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+  https://github.com/calliopeai/astrolift-cli/releases/latest)"
+tag="${release_url##*/}"
+release_base="https://github.com/calliopeai/astrolift-cli/releases/download/${tag}"
 asset=astro-darwin-arm64.tar.gz
 download_dir="$(mktemp -d)"
-gh release download "$tag" --repo calliopeai/astrolift-cli \
-  --pattern "$asset" \
-  --pattern 'astro-checksums.txt' \
-  --dir "$download_dir"
+curl -fL "$release_base/$asset" -o "$download_dir/$asset"
+curl -fL "$release_base/astro-checksums.txt" -o "$download_dir/astro-checksums.txt"
 
 (cd "$download_dir" && \
   shasum -a 256 -c <(grep "  ${asset}$" astro-checksums.txt))
@@ -47,12 +41,12 @@ Add `~/.local/bin` to `PATH` when it is not already there. Use `sha256sum
 | Windows, ARM64 | `astro-windows-arm64.zip` |
 | Windows, x86-64 | `astro-windows-amd64.zip` |
 
-The public Homebrew tap and Scoop bucket cannot authenticate downloads from a
-private GitHub release. Likewise, anonymous `curl` and `go install` cannot read
-the private source repository. Do not advertise those as install paths until
-the release assets are mirrored publicly or the repository visibility changes.
-Repository collaborators can build from source after `gh repo clone
-calliopeai/astrolift-cli` by running `make build`.
+Build from source with `git clone https://github.com/calliopeai/astrolift-cli.git`
+followed by `make build`. Prefer the checksum-verified release archives for
+repeatable installations. Pin `tag=vX.Y.Z` instead of resolving latest in CI.
+The legacy `scripts/install.sh` still requires an authenticated GitHub CLI or
+token unless `ASTRO_INSTALL_BASE_URL` supplies a mirror; it has no anonymous
+GitHub fallback. The archive path above avoids that requirement.
 
 ## Configure and authenticate
 
@@ -85,8 +79,8 @@ astro workflow --help
 ```
 
 Use `--json` for stable machine-readable data. Normal data is written to
-stdout and diagnostics to stderr. Exit `0` means success, `2` means invalid
-usage/configuration where documented, and `1` means an operational failure.
+stdout and diagnostics to stderr. Exit `0` means success. The current CLI
+returns `1` when a command fails, including usage or configuration errors.
 
 ## Common app flow
 
@@ -105,6 +99,10 @@ resolved from `--app` and then the local `astrolift.toml` for later commands.
 ## Common agent flow
 
 ```bash
+astro org list --json
+astro org use <organization-slug>
+ASTROLIFT_ORG_ID="$(astro org current --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
+
 astro agent register-repo owner/agents --project-id <guid> --ref main
 
 astro agent env-spec upsert triage-prod \
@@ -112,7 +110,7 @@ astro agent env-spec upsert triage-prod \
   --runtime claude-code-vnc \
   --config-repo owner/agents \
   --manifest-path agents/triage/astrolift.toml \
-  --secret ANTHROPIC_API_KEY=secret://agents/anthropic
+  --secret "ANTHROPIC_API_KEY=secret://agents/${ASTROLIFT_ORG_ID}/anthropic"
 
 printf '%s' "$ANTHROPIC_API_KEY" | \
   astro agent secret set triage-prod ANTHROPIC_API_KEY --stdin
@@ -120,6 +118,11 @@ printf '%s' "$ANTHROPIC_API_KEY" | \
 astro agent dispatch triage --env-spec triage-prod \
   --input @input.json --tail
 ```
+
+The organization `id` returned by `astro org current --json` is its GUID.
+Agent secret references must use `secret://agents/<organization-guid>/<name>`
+for the same organization selected by the command; a slug or an unscoped
+`secret://agents/anthropic` is rejected. The GUID is non-secret metadata.
 
 Secret declarations are references. `secret set` writes the value to the
 installation's secret backend and never prints it. `astro agent cancel <task>`
@@ -135,7 +138,11 @@ astro workflow import workflows/triage.toml --preview
 astro workflow import workflows/triage.toml
 ```
 
-Agent-repo registration also reconciles every `workflows/**/*.toml` file.
+Import creates a disabled definition. Review it and run
+`astro workflow definition-enable <definition-slug>` before executing a
+configured workflow that uses it. For binding and a complete first-run flow,
+see [workflow setup](../guides/workflow-setup.md). Agent-repo registration also
+reconciles every `workflows/**/*.toml` file.
 
 ## Project shared resources
 
@@ -213,3 +220,24 @@ man -M "$HOME/.local/share/man" astro
 
 Release archives include generated man pages. Packagers can also run `astro
 docs export` during packaging without network access.
+
+## Completion callbacks and setup guides
+
+```bash
+astro agent callbacks configure --allow-host hooks.internal.example.org
+astro agent callbacks secret-set completion-key --file /secure/path/completion-key
+astro agent dispatch report --callback-url https://hooks.internal.example.org/tasks \
+  --callback-secret-ref completion-key --correlation-id request-42 --callback-mode NOTIFY
+astro agent inspect <task-guid> --json
+astro agent callbacks redeliver <task-guid> --json
+astro docs show callbacks
+astro docs show capabilities
+astro docs show app-setup
+astro docs show agent-setup
+astro docs show workflow-setup
+astro docs show shared-services
+```
+
+Callback commands require a compatible server and CLI release. See the
+[callback guide](../guides/agent-completion-callbacks.md) for authorization,
+signing-key setup, durable backoff, and receiver verification.

@@ -105,3 +105,18 @@ Secret-list operations return names, references, and presence metadata. A
 caller needs `secret:read` plus `secret.read` RBAC to reveal a value on the few
 surfaces that support reveal. `secret:write` permits write-through operations,
 not readback. MCP intentionally never exposes secret values.
+
+## Agent completion callbacks
+
+`runAstroliftAgent` accepts optional `callbackUrl`, `callbackSecretRef`,
+`correlationId` (at most 128 characters), and `callbackMode` (`FULL` or `NOTIFY`).
+The organization configures HTTPS destinations with
+`configureAgentTaskCallbacks(allowedHosts)` and writes a signing secret with
+`setAgentTaskCallbackSecret(name, value)`. Query `agentTaskCallbackPolicy` for
+the configured host allow-list. Never send the signing key in dispatch input.
+
+`agentTask` returns `callbackStatus`, `callbackAttempts`, and
+`callbackLastError`. `redeliverAgentTaskCallback(taskId)` replays the final event
+without rerunning the agent. Read the [completion callback guide](../guides/agent-completion-callbacks.md)
+for the exact signed wire contract, durable 24-hour backoff, authorization,
+retention, rotation, and Python verification snippet.

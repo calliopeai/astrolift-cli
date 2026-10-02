@@ -19,6 +19,10 @@ func resetDispatchFlags() {
 	agentDispatchWait = false
 	agentDispatchTail = false
 	agentDispatchJSON = false
+	agentDispatchCallbackURL = ""
+	agentDispatchCallbackSecretRef = ""
+	agentDispatchCorrelationID = ""
+	agentDispatchCallbackMode = ""
 }
 
 func TestAgentDispatchSendsMutationAndParsesTask(t *testing.T) {
@@ -81,6 +85,9 @@ func TestAgentDispatchNoPayloadOmitsTriggerPayload(t *testing.T) {
 		t.Fatalf("runAgentDispatch: %v", err)
 	}
 	input := captured.Variables["input"].(map[string]interface{})
+	if strings.Contains(captured.Query, "callbackStatus") {
+		t.Fatal("ordinary dispatch requires new callback server fields")
+	}
 	if _, present := input["triggerPayload"]; present {
 		t.Errorf("triggerPayload should be omitted when --input is empty, got %v", input["triggerPayload"])
 	}
