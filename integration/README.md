@@ -33,3 +33,21 @@ credentials are read.
 The Go suite also checks review-file parsing, unsupported target authority,
 legacy exec behavior and portable docs exports. Run `go fmt ./...`,
 `go vet ./...`, `make lint` with a v2 golangci-lint, and `make test` before commit.
+
+## Exact workflow Definition starts
+
+`test_definition_reviewed.py` uses the same real bearer ASGI helpers plus an
+actual SDK-managed disposable Temporal server and an independent PostgreSQL
+test database. Build the CLI and run this module from the reviewed-start app
+checkout with its `pytest.ini` and backend `conftest` loaded. External test
+paths must retain `asyncio_mode=auto` and the backend's real-schema truncation
+fixtures. Use a dedicated database, for example `astrolift_cli_definition_2236`.
+
+The suite dispatches nested JSON and a sensitive secret reference, drops the
+actual accepted reply at a local forwarding proxy, and recovers the original
+execution after deleting the input file and disabling the definition. It checks
+schema revision changes, literal-sensitive-input refusal, private metadata-file
+contents and unknown absent recovery. The task queue intentionally has no worker:
+these tests prove native CLI engine submission and read-only recovery, without
+claiming stage execution, completion or Kubernetes job cleanup. Temporary token
+and configuration fixtures never read saved production credentials.

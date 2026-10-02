@@ -776,3 +776,32 @@ distinguish patch acceptance from rollout completion. Exec disconnect requires a
 explicit new attach and does not replay input; a lost exit receipt leaves the
 last input's outcome unknown. Pod UID checking is preflight only, and this client
 does not claim mobile-audience, atomic binding or action-admission proof support.
+
+### Exact workflow definition review and recovery
+
+Review the exact definition GUID and its JSON Schema before dispatch:
+
+```sh
+astro workflow definitions --json
+astro workflow definition-review <definition-guid> --json
+astro workflow definition-start <definition-guid> --expected-revision <revision> --expected-input-schema-digest <digest> --inputs-file ./inputs.json --request-file ./definition-request.json --yes --json
+astro workflow definition-reconcile --request-file ./definition-request.json --json
+astro docs show reviewed-starts
+```
+
+The expected revision and schema digest flags are optional as a pair; without
+them, the CLI binds the current exact review immediately before dispatch. Use
+one bounded JSON object file (at most 64 KiB) for typed or complex inputs, and
+omit it for a no-input definition. Sensitive schema fields accept opaque secret
+references, never literal credentials. Schema validation and defaults remain
+server-authoritative. Disabled or unsupported definitions cannot start.
+
+Before dispatch, the CLI synchronizes an exclusively created mode-0600 recovery
+file containing only the original UUID and actor/server/org/definition/revision/
+schema metadata. Existing files always perform read-only recovery: input files
+are never opened or resubmitted, including after an empty lookup. An absent
+record leaves the original outcome unknown; retain the file rather than making
+a replacement key. Scope changes refuse recovery. Known unconfirmed engine
+submission prints its exact identities and returns an error; reconciliation
+can display that uncertainty without writing. Engine acceptance is separate
+from execution completion. Existing app-bound `workflow run` is unchanged.

@@ -241,3 +241,28 @@ astro docs show shared-services
 Callback commands require a compatible server and CLI release. See the
 [callback guide](../guides/agent-completion-callbacks.md) for authorization,
 signing-key setup, durable backoff, and receiver verification.
+
+## Reviewed starts and exact environments
+
+```sh
+astro workflow definition-review <definition-guid> --json
+astro workflow definition-start <definition-guid> --inputs-file ./inputs.json \
+  --request-file ./definition-request.json --yes --json
+astro workflow definition-reconcile --request-file ./definition-request.json --json
+astro pipeline run <pipeline-guid> --request-file ./pipeline-request.json --yes --json
+astro pipeline reconcile --request-file ./pipeline-request.json --json
+astro pipeline show <run-guid> --json
+astro pipeline cancel <run-guid> --yes --json
+astro docs show reviewed-starts
+astro docs show environment-actions
+```
+
+These commands require a CLI release containing them and compatible server
+contracts. They are not present in every older published release. Review the
+[start and recovery guide](../guides/reviewed-starts.md) before dispatch: an
+existing Definition request file never reads/resubmits inputs, whereas a pipeline
+file can resubmit its original metadata key after a successful null recovery,
+unchanged version review and confirmation. Both preserve uncertain identities.
+Omit `--inputs-file` for a no-input definition. Exact environment controls and
+shell admission are documented in the
+[environment guide](../guides/environment-actions.md).
