@@ -44,9 +44,29 @@ Add `~/.local/bin` to `PATH` when it is not already there. Use `sha256sum
 Build from source with `git clone https://github.com/calliopeai/astrolift-cli.git`
 followed by `make build`. Prefer the checksum-verified release archives for
 repeatable installations. Pin `tag=vX.Y.Z` instead of resolving latest in CI.
-The legacy `scripts/install.sh` still requires an authenticated GitHub CLI or
-token unless `ASTRO_INSTALL_BASE_URL` supplies a mirror; it has no anonymous
-GitHub fallback. The archive path above avoids that requirement.
+The current source installer also supports anonymous downloads:
+
+```bash
+git clone https://github.com/calliopeai/astrolift-cli.git
+cd astrolift-cli
+./scripts/install.sh
+```
+
+Set `ASTRO_INSTALL_TAG=vX.Y.Z` to an existing immutable release tag to pin the
+install. Otherwise the latest release is selected. The installer detects Linux
+or macOS and ARM64 or x86-64, verifies `astro-checksums.txt` before installing
+the binary, and installs the archive's man page. It requires `curl`, `tar`,
+`install`, and either `sha256sum` or `shasum`.
+
+`ASTRO_INSTALL_BASE_URL` selects a mirror. Otherwise an authenticated `gh` or
+an explicit `ASTRO_GITHUB_TOKEN`, `GITHUB_TOKEN`, or `GH_TOKEN` can raise the
+GitHub API rate limit; requests are anonymous when none is configured. Do not
+paste tokens into command transcripts. Set `ASTRO_INSTALL_DIR` and
+`ASTRO_MAN_DIR` to choose installation destinations. Missing release/assets,
+rejected credentials and rate limits produce errors before installation;
+a checksum failure refuses the archive. Source tags predating the anonymous
+installer may still require authentication, so use the archive path above
+when using such a checkout.
 
 ## Configure and authenticate
 

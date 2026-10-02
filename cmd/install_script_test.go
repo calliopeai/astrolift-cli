@@ -128,17 +128,20 @@ esac
 	}
 }
 
-// stubReleaseAPI serves a realistic private-release view of the GitHub REST
-// API: metadata at /releases/latest and bytes at /releases/assets/<id>, both
-// requiring a bearer token. Field order matches GitHub's real response so the
-// installer's dependency-free JSON extraction is genuinely exercised.
+// stubReleaseAPI serves public or token-protected release metadata and assets.
+// Empty token means anonymous requests must omit Authorization altogether.
+// Field order matches GitHub's real response for the dependency-free parser.
 func stubReleaseAPI(t *testing.T, token, archiveName, archivePath, checksumsPath string) *httptest.Server {
 	t.Helper()
 	const archiveID, checksumsID = 4242, 4243
 	mux := http.NewServeMux()
+	wantAuth := ""
+	if token != "" {
+		wantAuth = "Bearer " + token
+	}
 
-	mux.HandleFunc("/repos/calliopeai/astrolift-cli/releases/latest", func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer "+token {
+	serveRelease := func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != wantAuth {
 			// GitHub hides private repositories behind 404.
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -173,11 +176,13 @@ func stubReleaseAPI(t *testing.T, token, archiveName, archivePath, checksumsPath
     }
   ]
 }`, archiveID, archiveID, archiveName, checksumsID, checksumsID)
-	})
+	}
+	mux.HandleFunc("/repos/calliopeai/astrolift-cli/releases/latest", serveRelease)
+	mux.HandleFunc("/repos/calliopeai/astrolift-cli/releases/tags/v9.9.9", serveRelease)
 
 	serveAsset := func(path string) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get("Authorization") != "Bearer "+token {
+			if r.Header.Get("Authorization") != wantAuth {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -316,22 +321,103 @@ func TestInstallScriptRejectsCorruptedArchive(t *testing.T) {
 	}
 }
 
-// TestInstallScriptWithoutCredentialsExplainsOptions is the actionable-error
-// requirement: no credentials must not look like a missing asset.
-func TestInstallScriptWithoutCredentialsExplainsOptions(t *testing.T) {
+func TestInstallScriptDownloadsPublicReleaseWithoutCredentials(t *testing.T) {
 	skipUnlessInstallerPlatform(t)
-	command := exec.Command("sh", filepath.Join("..", "scripts", "install.sh"))
-	command.Env = installerEnv(t, unauthenticatedGH(t),
-		"ASTRO_INSTALL_DIR="+filepath.Join(t.TempDir(), "bin"),
-	)
-	output, err := command.CombinedOutput()
-	if err == nil {
-		t.Fatalf("installer should fail without credentials:\n%s", output)
+	for _, tag := range []string{"", "v9.9.9"} {
+		t.Run("tag="+tag, func(t *testing.T) {
+			_, archiveName, archivePath, checksumsPath := writeReleaseFixture(t)
+			server := stubReleaseAPI(t, "", archiveName, archivePath, checksumsPath)
+			installDir := filepath.Join(t.TempDir(), "bin")
+			command := exec.Command("sh", filepath.Join("..", "scripts", "install.sh"))
+			command.Env = installerEnv(t, unauthenticatedGH(t),
+				"ASTRO_GITHUB_API_URL="+server.URL,
+				"ASTRO_INSTALL_TAG="+tag,
+				"ASTRO_INSTALL_DIR="+installDir,
+			)
+			output, err := command.CombinedOutput()
+			if err != nil {
+				t.Fatalf("anonymous installer failed: %v\n%s", err, output)
+			}
+			if !strings.Contains(string(output), "astro test-version") {
+				t.Fatalf("installer did not execute the checksum-verified binary:\n%s", output)
+			}
+			endpoint := "/releases/latest"
+			if tag != "" {
+				endpoint = "/releases/tags/" + tag
+			}
+			if !strings.Contains(string(output), endpoint) {
+				t.Fatalf("installer did not use the selected release endpoint:\n%s", output)
+			}
+			if _, err := os.Stat(filepath.Join(filepath.Dir(installDir), "share", "man", "man1", "astro.1")); err != nil {
+				t.Fatalf("installer omitted the man page: %v", err)
+			}
+		})
 	}
-	for _, want := range []string{"private repository", "gh auth login", "GITHUB_TOKEN", "docker run"} {
-		if !strings.Contains(string(output), want) {
-			t.Errorf("credential error should mention %q:\n%s", want, output)
+}
+
+func TestInstallScriptRefusesPublicReleaseFailures(t *testing.T) {
+	skipUnlessInstallerPlatform(t)
+	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
+		t.Run(fmt.Sprint(code), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "" {
+					t.Error("anonymous request included Authorization")
+				}
+				w.WriteHeader(code)
+			}))
+			defer server.Close()
+			installDir := filepath.Join(t.TempDir(), "bin")
+			command := exec.Command("sh", filepath.Join("..", "scripts", "install.sh"))
+			command.Env = installerEnv(t, unauthenticatedGH(t), "ASTRO_GITHUB_API_URL="+server.URL, "ASTRO_INSTALL_DIR="+installDir)
+			output, err := command.CombinedOutput()
+			if err == nil || !strings.Contains(string(output), fmt.Sprint(code)) {
+				t.Fatalf("expected clear refusal for %d: %v\n%s", code, err, output)
+			}
+			if _, err := os.Stat(filepath.Join(installDir, "astro")); !os.IsNotExist(err) {
+				t.Fatal("failed release left an executable behind")
+			}
+		})
+	}
+}
+
+func TestInstallScriptRefusesMissingPublicAsset(t *testing.T) {
+	skipUnlessInstallerPlatform(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Error("anonymous request included Authorization")
 		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"tag_name":"v9.9.9","assets":[]}`)
+	}))
+	defer server.Close()
+	installDir := filepath.Join(t.TempDir(), "bin")
+	command := exec.Command("sh", filepath.Join("..", "scripts", "install.sh"))
+	command.Env = installerEnv(t, unauthenticatedGH(t), "ASTRO_GITHUB_API_URL="+server.URL, "ASTRO_INSTALL_DIR="+installDir)
+	output, err := command.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "release has no asset named astro-") {
+		t.Fatalf("missing asset did not clearly refuse installation: %v\n%s", err, output)
+	}
+	if _, err := os.Stat(filepath.Join(installDir, "astro")); !os.IsNotExist(err) {
+		t.Fatal("missing asset left an executable behind")
+	}
+}
+
+func TestInstallScriptRefusesCorruptPublicArchive(t *testing.T) {
+	skipUnlessInstallerPlatform(t)
+	_, archiveName, archivePath, checksumsPath := writeReleaseFixture(t)
+	if err := os.WriteFile(archivePath, []byte("corrupt public archive"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	server := stubReleaseAPI(t, "", archiveName, archivePath, checksumsPath)
+	installDir := filepath.Join(t.TempDir(), "bin")
+	command := exec.Command("sh", filepath.Join("..", "scripts", "install.sh"))
+	command.Env = installerEnv(t, unauthenticatedGH(t), "ASTRO_GITHUB_API_URL="+server.URL, "ASTRO_INSTALL_DIR="+installDir)
+	output, err := command.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "checksum mismatch for "+archiveName) {
+		t.Fatalf("corrupt public archive did not clearly refuse installation: %v\n%s", err, output)
+	}
+	if _, err := os.Stat(filepath.Join(installDir, "astro")); !os.IsNotExist(err) {
+		t.Fatal("corrupt archive left an executable behind")
 	}
 }
 
