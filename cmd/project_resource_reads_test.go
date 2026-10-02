@@ -188,3 +188,84 @@ func TestProjectResourceCostRejectsMissingOrUnsafeEvidence(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectResourceDetachLegacyInvocationResolvesExactOwnerThenPinsRevision(t *testing.T) {
+	requests := []gqlRequest{}
+	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+		requests = append(requests, req)
+		switch {
+		case strings.Contains(req.Query, "astroliftProjectManagedServiceAttachmentOwner("):
+			if req.Variables["attachmentId"] != resourceTestID {
+				t.Fatal("lost attachment GUID")
+			}
+			return map[string]interface{}{"astroliftProjectManagedServiceAttachmentOwner": resourceReadFixture()}
+		case strings.Contains(req.Query, "astroliftProjectManagedService("):
+			if req.Variables["id"] != resourceTestID || req.Variables["expectedContextRevision"] != "review-1" {
+				t.Fatal("unreviewed owner reread")
+			}
+			return map[string]interface{}{"astroliftProjectManagedService": resourceReadFixture()}
+		default:
+			input := req.Variables["input"].(map[string]interface{})
+			if input["attachmentId"] != resourceTestID || input["managedServiceId"] != resourceTestID || input["expectedContextRevision"] != "review-1" {
+				t.Fatal("unreviewed detach")
+			}
+			return map[string]interface{}{"detachProjectManagedService": map[string]interface{}{"ok": true, "data": map[string]interface{}{"id": resourceTestID}}}
+		}
+	})
+	defer srv.Close()
+	cmd, out := resourceReadCmd()
+	_ = cmd.Flags().Set("json", "true")
+	if err := runProjectResourceDetach(cmd, context.Background(), api.NewClient(srv.URL, "token", false), projectRef{ID: "p-1"}, resourceTestID); err != nil {
+		t.Fatal(err)
+	}
+	if len(requests) != 3 || !strings.Contains(out.String(), resourceTestID) {
+		t.Fatalf("requests=%+v output=%s", requests, out)
+	}
+	for _, req := range requests {
+		if strings.Contains(req.Query, "ManagedServicesPage") {
+			t.Fatal("owner lookup scanned catalog")
+		}
+	}
+}
+
+func TestProjectResourceDetachLegacyRefusesUnavailableOrChangedOwnerBeforeWrite(t *testing.T) {
+	for _, change := range []string{"missing", "foreign", "bad_guid", "empty_revision", "review_changed", "owner_reread_missing", "owner_reread_changed"} {
+		t.Run(change, func(t *testing.T) {
+			requests := 0
+			srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+				requests++
+				owner := resourceReadFixture()
+				if strings.Contains(req.Query, "astroliftProjectManagedServiceAttachmentOwner(") {
+					switch change {
+					case "missing":
+						return map[string]interface{}{"astroliftProjectManagedServiceAttachmentOwner": nil}
+					case "foreign":
+						owner["projectId"] = "other"
+					case "bad_guid":
+						owner["id"] = "invalid"
+					case "empty_revision":
+						owner["contextRevision"] = ""
+					}
+					return map[string]interface{}{"astroliftProjectManagedServiceAttachmentOwner": owner}
+				}
+				if !strings.Contains(req.Query, "astroliftProjectManagedService(") {
+					t.Fatal("refused owner performed mutation")
+				}
+				if change == "owner_reread_changed" {
+					owner["contextRevision"] = "review-2"
+					return map[string]interface{}{"astroliftProjectManagedService": owner}
+				}
+				return map[string]interface{}{"astroliftProjectManagedService": nil}
+			})
+			defer srv.Close()
+			cmd, out := resourceReadCmd()
+			if change == "review_changed" {
+				_ = cmd.Flags().Set("expected-context-revision", "old-review")
+			}
+			err := runProjectResourceDetach(cmd, context.Background(), api.NewClient(srv.URL, "token", false), projectRef{ID: "p-1"}, resourceTestID)
+			if err == nil || out.Len() != 0 || requests > 2 {
+				t.Fatalf("err=%v requests=%d out=%s", err, requests, out)
+			}
+		})
+	}
+}

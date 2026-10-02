@@ -255,6 +255,12 @@ def test_native_resource_pages_exact_context_and_reviewed_attachment(tmp_path):
             if "attachProjectManagedService(input:" in request[0]["query"]
         ][-1]
         assert proof["expectedContextRevision"] == revision
+        detached = call(world, proxy, tmp_path, ["project", "resources", "detach", attachment["id"]])
+        assert detached.returncode == 0, detached.stderr
+        assert not ManagedServiceAttachment.objects.filter(guid=attachment["id"]).exists()
+        assert any("astroliftProjectManagedServiceAttachmentOwner(" in request[0]["query"] for request in proxy.requests)
+        missing_detach = call(world, proxy, tmp_path, ["project", "resources", "detach", attachment["id"]])
+        assert missing_detach.returncode != 0 and missing_detach.stdout == ""
         world.cluster.region = "changed-region"
         world.cluster.save()
         before = ManagedServiceAttachment.objects.filter(

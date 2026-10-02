@@ -191,6 +191,30 @@ func resolveProjectResourceRevision(ctx context.Context, client *api.Client, pro
 	}
 	return row, nil
 }
+
+// Resolve the exact, currently visible attachment owner without scanning a catalog.
+// Then reread that resource with the returned revision before the reviewed write.
+func resolveProjectAttachmentResource(ctx context.Context, client *api.Client, projectID, attachmentID, revision string) (*projectResource, error) {
+	if _, err := uuid.Parse(attachmentID); err != nil {
+		return nil, fmt.Errorf("attachment requires an exact GUID")
+	}
+	var response struct {
+		Row *projectResource `json:"astroliftProjectManagedServiceAttachmentOwner"`
+	}
+	query := `query($projectId:GUID!, $attachmentId:GUID!) { astroliftProjectManagedServiceAttachmentOwner(projectId:$projectId,attachmentId:$attachmentId) { ` + resourceContextFields + ` } }`
+	if err := client.GraphQL(ctx, query, map[string]interface{}{"projectId": projectID, "attachmentId": attachmentID}, &response); err != nil {
+		return nil, fmt.Errorf("attachment owner unavailable; review the exact attachment and current permissions")
+	}
+	row := response.Row
+	if row == nil || row.OwnerScope != "project" || row.ProjectID != projectID || row.ContextRevision == "" || (revision != "" && revision != row.ContextRevision) {
+		return nil, fmt.Errorf("attachment owner unavailable or changed; review the exact attachment again")
+	}
+	if _, err := uuid.Parse(row.ID); err != nil {
+		return nil, fmt.Errorf("attachment owner unavailable")
+	}
+	return resolveProjectResourceRevision(ctx, client, projectID, row.ID, row.ContextRevision)
+}
+
 func renderProjectResource(cmd *cobra.Command, row *projectResource) error {
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, row)
@@ -308,6 +332,6 @@ func init() {
 	for _, command := range []*cobra.Command{projectResourceShowCmd, projectResourceCostCmd, projectResourceUpdateCmd, projectResourceReprovisionCmd, projectResourceAttachCmd, projectResourceDetachCmd, projectResourceRemoveCmd, projectResourceAttachmentsCmd} {
 		command.Flags().String("expected-context-revision", "", "Refuse a context changed since this reviewed revision")
 	}
-	projectResourceDetachCmd.Flags().String("resource", "", "Exact resource GUID owning this attachment (required)")
+	projectResourceDetachCmd.Flags().String("resource", "", "Exact resource GUID owning this attachment (optional; otherwise resolve exact attachment owner)")
 	projectResourcesCmd.AddCommand(projectResourceAttachmentsCmd)
 }
