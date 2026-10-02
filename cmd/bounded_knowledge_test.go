@@ -46,7 +46,7 @@ func TestBoundedWorkflowKnowledgeIsSearchableExportedAndInstalledOffline(t *test
 		t.Fatal(err)
 	}
 	skill, ok := skills.Lookup("astrolift-workflows")
-	if !ok || skill.Version != "0.1.0" {
+	if !ok || skill.Version != "0.1.1" {
 		t.Fatal("versioned workflow skill missing from embedded catalogue")
 	}
 	files, err := skills.Files(skill)

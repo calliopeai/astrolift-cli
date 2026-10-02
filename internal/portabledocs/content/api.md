@@ -130,6 +130,13 @@ combined finite execution budget before dispatch; a capability is not an
 authorization grant. See [bounded workflows](../guides/bounded-workflows.md)
 for the native object contracts and supported source-import subset.
 
+Stage agent and nested-workflow string references also accept
+`guid:<canonical-lowercase-UUID>`. Authoring round-trips preserve explicit GUIDs;
+unavailable or inaccessible targets are refused without substituting a slug.
+Literal slugs keep their existing resolution behavior. See the
+[exact-reference rules](../guides/bounded-workflows.md#preserve-an-explicitly-selected-target)
+for binding overrides and visibility checks.
+
 `workflowExecutionStages(executionId, limit, after)` reads pages belonging to
 one exact execution GUID or mirror ID. Preserve the returned execution GUID,
 organization and recorded Temporal workflow/run IDs across pages. Its stage

@@ -1,7 +1,7 @@
 ---
 name: astrolift-workflows
 description: Author and operate Astrolift workflows with finite stage attempts, human-review return edges, serial record collections and exact reviewed starts. Use for Astrolift workflow setup or migration; generic standalone framework execution is outside this skill.
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Astrolift workflow authoring and operation
@@ -29,6 +29,17 @@ Author TOML with `astro workflow init`, validate locally, then use
 agent-workload GUID bindings with `run-manifest --dry-run --bind <order>=<guid>`.
 Resolve nested definitions through their actual reviewed identity. Labels and
 same-slug targets in another app or organization are insufficient proof.
+
+Use `agent = "guid:<workload-guid>"` or
+`workflow = "guid:<definition-guid>"` for an explicitly selected target. Require
+canonical lowercase, hyphenated UUID spelling. Export/re-import and source sync
+preserve these references. Refuse unavailable, deleted or foreign GUID targets
+without replacing them with a same-slug target. Literal slugs retain their
+existing compatibility resolution, including late agent registration; review
+the resolved identity before dispatch. GUID selection preserves child visibility
+and current trigger/dispatch checks. Configured overrides are explicit reviewed
+choices; a conflicting default agent mapping is refused. An exact GUID does not
+prove source-framework model/tool equivalence.
 
 ## Keep every loop finite
 

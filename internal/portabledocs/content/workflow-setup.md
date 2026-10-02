@@ -22,6 +22,12 @@ For finite retries, rejected-work revisions and serial item bodies, use
 [bounded workflows](bounded-workflows.md). It covers explicit return edges,
 attempt/round/item bounds, exact bindings and recorded execution metadata.
 
+For an explicitly selected agent or child definition, author `agent` or
+`workflow` as `guid:<canonical-lowercase-UUID>`. Literal slugs remain compatible;
+explicit GUIDs are never replaced with a same-slug target. Review permissions
+and configured overrides using the
+[exact-reference rules](bounded-workflows.md#preserve-an-explicitly-selected-target).
+
 Repo registration also reconciles workflow source files. Source-owned
 workflows should be edited and committed at their source path so a subsequent
 sync does not replace an unrelated platform edit.

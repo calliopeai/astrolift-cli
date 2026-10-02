@@ -98,8 +98,8 @@ One `[[stage]]` is one ordered `WorkflowStage`; array index becomes `order`.
 |---|---|
 | `kind` | `agent_dispatch`, `workflow`, `human_gate`, `checkpoint`, `aggregation`, `collection`, or `format_record` |
 | `role` | Human-readable responsibility used by builders/importers |
-| `agent` | Organization-local agent workload slug; may resolve after import |
-| `workflow` | Nested-workflow definition reference, required for `kind = "workflow"`; review its resolved identity |
+| `agent` | Agent workload `guid:<canonical-UUID>` or organization-local literal slug; a slug may resolve after import |
+| `workflow` | Definition `guid:<canonical-UUID>` or literal slug, required for `kind = "workflow"`; review its resolved identity |
 | `environment_spec_slug` | Image/config/secret recipe frozen onto the task |
 | `skills` | Ordered catalogue/local/org-repo overlays using the agent skill grammar |
 | `prompt` | Agent instruction overlay or human-gate question |
@@ -111,6 +111,12 @@ One `[[stage]]` is one ordered `WorkflowStage`; array index becomes `order`.
 | `timeout` | Non-negative seconds; default 300 |
 | `fan_out` | `0`, a positive integer, or `"dynamic"` |
 | `approvers` | Human-gate principal selectors |
+
+Explicit `guid:` references retain the selected target through export and source
+reconciliation. Malformed, deleted or inaccessible GUID targets are refused
+without a slug fallback. Literal slugs preserve existing compatibility behavior.
+See [exact target references](../guides/bounded-workflows.md#preserve-an-explicitly-selected-target)
+for UUID spelling, permissions and configured binding overrides.
 
 There is no `skill_slug` field in Workflow TOML. Author `skills = [...]`;
 Astrolift persists the ordered list as the stage's `skill_refs` and resolves
