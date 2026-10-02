@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-10-02
+
 ### Added
 
 - Author bounded workflow back-edges, review loops, nested workflow and serial
