@@ -865,8 +865,11 @@ HTTPS source produces unavailable pricing rather than zero.
 
 Existing project-resource update/reprovision/attach/remove commands always carry
 the fresh reviewed `contextRevision` through the write. Supply
-`--expected-context-revision` to pin an earlier explicit review. Detach now needs
-`--resource <GUID>` as well as the attachment GUID, so its ownership is explicit.
+`--expected-context-revision` to pin an earlier explicit review. Detach keeps its
+existing attachment-GUID invocation: it resolves that exact visible owner and
+rereads the owner GUID with the captured revision before the write. Optional
+`--resource <GUID>` pins the owner explicitly; missing or inaccessible attachments
+are refused without a resource scan or name fallback.
 Attachments must share the owning project and cluster. An asynchronous operation
 receipt proves acceptance/enqueue only; read its operation identity and status
 separately. A lost response is unconfirmed and is never automatically retried.

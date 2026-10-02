@@ -530,10 +530,16 @@ func runProjectResourceAttach(cmd *cobra.Command, ctx context.Context, client *a
 
 func runProjectResourceDetach(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, attachmentID string) error {
 	resourceID := resourceStringFlag(cmd, "resource")
-	if _, parseErr := uuid.Parse(resourceID); parseErr != nil {
-		return fmt.Errorf("--resource <GUID> is required for exact consumer ownership")
+	var resource *projectResource
+	var err error
+	if resourceID == "" {
+		resource, err = resolveProjectAttachmentResource(ctx, client, project.ID, attachmentID, resourceStringFlag(cmd, "expected-context-revision"))
+	} else {
+		if _, parseErr := uuid.Parse(resourceID); parseErr != nil {
+			return fmt.Errorf("--resource requires an exact GUID")
+		}
+		resource, err = resolveProjectResourceRevision(ctx, client, project.ID, resourceID, resourceStringFlag(cmd, "expected-context-revision"))
 	}
-	resource, err := resolveProjectResourceRevision(ctx, client, project.ID, resourceID, resourceStringFlag(cmd, "expected-context-revision"))
 	if err != nil {
 		return err
 	}
