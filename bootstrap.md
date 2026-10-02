@@ -55,7 +55,8 @@ The build injects the version via `-ldflags` from the nearest git tag.
 
 Config lives at `~/.config/astrolift/config.yaml`. Credentials are stored
 per-server at `~/.config/astrolift/credentials/<server-slug>.yaml` with
-mode 0600. The CLI refuses to read credentials files with wider permissions.
+POSIX mode 0600 or a protected Windows current-user/SYSTEM ACL. The CLI validates
+the actual opened file and refuses broader or unrecognized access controls.
 
 ## Conventions
 

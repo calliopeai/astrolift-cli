@@ -337,7 +337,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro auth` | Browser device-flow login, logout, status, refresh, plus `wait` for the relay path. `login --no-wait` starts the flow, reports the session (`--json` makes it an object), and exits instead of blocking for fifteen minutes; `auth wait --session-id <id>` finishes it once a human has approved. That is how a browserless caller hands a login off. `login --no-browser` waits without launching a browser. |
 | `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `pods`, `rollback`, `promote`) plus sub-resources. `app secrets` (`list`/`create`/`delete`) drives `setAppSecret`/`deleteAppSecret`; `list` returns metadata only (key, environment, source, who last touched it) and never a value, `create` is an upsert reading the value from `--value`/`--stdin`/a hidden prompt and never echoing it, and both report a queued proposal id instead of an applied write on installs that require secret-change approval. `app services list` and `app domains list` are read-only views of the managed services and custom domains bound to one app (`astroliftManagedServicesPage` / `astroliftAppDomains`); provisioning a managed service is `astro project resources`, and there is no domain create/remove from the CLI yet. `app events` (also `app events list`) reads `astroliftEventsPage` for the app's deploy/secret/scale/health activity, filterable by `--type`/`--severity`/`--search`. `tokens`, `members`, `jobs`, and `audit` remain unimplemented placeholders. `deploy` requires `--image-tag` for CI-pushed apps; platform builds resolve the deploy branch or `--ref` to a commit, and apps using manifest images can omit it; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `app pods` lists the pods `exec` picks from — the pod name for `--pod` and container names for `-c`, with `--workload`/`--ready` to narrow. `promote --from <env> --to <env>` moves an env's running deployment (image+config) to another via `promoteDeployment`. `app previews` drives per-PR preview environments (`list`, `show`, `logs`, `open`, `teardown`, `pin`, `unpin`); pick one with `--pr <n>`, or `--branch <name>` for a manual preview, which carries no PR number. `previews logs` is `app logs` pointed at the environment the platform synthesized for the preview, so `--since`/`--tail`/`-f`/`--level`/`--search` behave identically. `previews pin` exempts a preview from garbage collection on both axes — TTL expiry *and* max-active eviction — until someone runs `unpin`, which is what separates it from extending a TTL; `--reason <text>` records why, and `list`/`show` surface the pin. `unpin` clears the whole record (who, when, why), is a no-op on an unpinned preview, and unlike `pin` is allowed on a torn-down one so stale state can always be cleared. |
 | `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
-| `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`, `workloads`, `vnc`, `send`, `input-receipt`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <workflow-slug>` is the distinct WorkflowDefinition seam (`runWorkflowDefinition`). `workloads ls` enumerates the org's registered `kind=agent` workloads, carrying both the slug `dispatch` takes and the GUID `workflow create --bind` takes. `vnc <task-id>` resolves a task to the absolute console URL that serves its live VNC viewer (the stored `vnc_url` is a root-relative WebSocket relay path, not openable). `send <task-id> <input>` queues a follow-up prompt for a task that is already running (`--stdin` for multi-line input; `--json`) — the steering channel: the message is applied at the agent's next turn boundary, so a send confirms queue admission; `deliveredAt` records a delivery claim, not execution. The task must be running, and not every agent runtime can accept a follow-up prompt; one that cannot leaves the message queued rather than dropping it. |
+| `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`, `workloads`, `vnc`, `send`, `input-receipt`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <definition-guid> --request-file <file> --yes` is the reviewed WorkflowDefinition alias; its optional `--wait` follows the returned exact engine identity. Slug-only starts and literal `--input` are refused; use `--inputs-file` (or `--input @file`). `workloads ls` enumerates the org's registered `kind=agent` workloads, carrying both the slug `dispatch` takes and the GUID `workflow create --bind` takes. `vnc <task-id>` resolves a task to the absolute console URL that serves its live VNC viewer (the stored `vnc_url` is a root-relative WebSocket relay path, not openable). `send <task-id> <input>` queues a follow-up prompt for a task that is already running (`--stdin` for multi-line input; `--json`) — the steering channel: the message is applied at the agent's next turn boundary, so a send confirms queue admission; `deliveredAt` records a delivery claim, not execution. The task must be running, and not every agent runtime can accept a follow-up prompt; one that cannot leaves the message queued rather than dropping it. |
 | `astro apply` | Declarative agent environment specs: `apply -f <file.toml>` reads `[[env_spec]]` tables and makes the platform match. A missing spec is created, a spec that differs is updated field by field with the diff printed, and an unchanged spec is left alone, so a second apply is a no-op. Only keys present in the file are managed. `--dry-run` prints the plan and changes nothing. |
 | `astro box` | Agent-boxes: warm containers an interactive agent session attaches to (`ensure`, `ls`, `rm`, `attach`). Unlike `agent dispatch`, which starts a batch run that ends, a box holds a tmux session open and waits, so the agent survives a dropped connection, an IDE restart, or a closed laptop, and more than one person can watch it. `ensure` is idempotent by design — it is what a button calls, so pressing it twice attaches to the box you already have rather than starting a rival one on a second node; a box that was idle-reaped restarts under the same slug, so a stored address keeps working. Name what to run with `--agent` (a registered agent whose run mode is `persistent`) or `--env-spec` (which is where the image and the secret packet come from). `--idle-timeout` takes `90m`, a number of seconds, or `never`, and is measured from the last pane activity rather than the last attach, so an agent working while you are away keeps its box. `ls` shows warm boxes only (`--all` includes the settled ones, which is how you find out why a box went away). `attach` ensures, waits, and joins the session; detaching leaves the agent running. Note: `attach` does not work yet — the exec relay admits registered apps only and a box is not one, so it fails as a permission error; tracked in calliopeai/astrolift#129. `ensure`, `ls` and `rm` are unaffected. |
 | `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, control, and delete organization workflows. `validate --server` is authoritative for the selected install. `run-manifest <file.toml>` collapses `import` → `create --bind` → activation → `run` into one call, resolving each `agent_dispatch` stage's declared agent against the org's registered workloads (`--dry-run` shows the resolved bindings; `--no-run` leaves the imported definition disabled for review). `import --replace` upserts the org's own definition sharing the manifest's slug instead of always creating a new one: in place when the stage kinds are unchanged, so configured Workflows, bindings and schedules keep working untouched, otherwise as a new version with every configured Workflow repointed to it, or a clear refusal (nothing changed) when a repoint would break one's bindings. Launching enables only the newly imported definition through the platform update API and requires workflow update permission. Use `definition <slug>` to review an import and `definition-enable <slug>` to enable it explicitly; `workflow run` never enables existing definitions implicitly. `run-cancel <slug>` stops an in-flight run — cooperatively by default so a run that owns external resources tears them down, or `--terminate --reason <text>` to hard-kill a wedged one; `--run <guid>` picks a run other than the newest, `--yes` is the confirmation (no prompt), and a run that is already terminal is refused before anything is sent. `run-show <slug>` prints a run stage by stage: order, kind, role, status, attempt, timings, and for a `human_gate` its gate state (pending / approved / rejected / closed) plus the approvers the stage declares, so "waiting on approval, and on whom" is read from the platform. Deciding a gate is not a CLI operation. Repository registration separately reconciles `workflows/**/*.toml`. |
@@ -360,8 +360,8 @@ to stderr; data goes to stdout.
 
 ### Exact workflow executions
 
-Use the `WorkflowRun` ID returned by `workflow run`, `workflow run-manifest`, or
-`agent run` to observe either a configured workflow or a definition directly.
+Use the execution GUID returned by `workflow run`, `workflow run-manifest`,
+`workflow definition-start`, or reviewed `agent run` to observe the exact run.
 `execution` looks up that record even after it leaves the recent-run list:
 
 ```bash
@@ -507,11 +507,15 @@ The CLI stores its state under `~/.config/astrolift/`:
 ~/.config/astrolift/
   config.yaml                  servers, current server, output prefs
   credentials/
-    <server-slug>.yaml         per-server tokens, mode 0600
+    <server-slug>.yaml         protected per-server tokens
 ```
 
-The CLI **refuses to read credentials files with permissions wider
-than `0600`**. Don't loosen them.
+Credential files use mode `0600` on Linux/macOS. On Windows they use a protected
+ACL owned by the current user, granting access only to that user and SYSTEM.
+The CLI checks the actual opened file before reading and refuses permissive,
+inherited or unrecognized ACLs and symlink/reparse targets. An explicit new
+login can replace a current-user-owned legacy Windows credential file with a
+protected file; reads never silently migrate or accept its old permissions.
 
 Environment variables take precedence over the config file (CI mode):
 
@@ -722,3 +726,112 @@ inventory together. The source repository is private: CI checks local integrity,
 not authenticated remote parity. A maintainer must independently verify the
 inventory against that published Git tree before approving a new pin. Offline
 builds do not need source-repository credentials.
+
+### Reviewed pipeline starts and recovery
+
+Pipeline controls use the selected organization and verified current user. List
+one bounded server page with `astro pipeline list --limit 50 --json`; pass the
+returned `nextCursor` as `--after` to continue. Names are resolved across server
+pages and ambiguous names require an exact GUID.
+
+```sh
+astro pipeline run <pipeline-guid> --branch main --request-file ./pipeline-request.json --yes --json
+astro pipeline reconcile --request-file ./pipeline-request.json --json
+astro pipeline show <run-guid> --json
+astro pipeline runs --pipeline <pipeline-guid> --limit 20 --json
+astro pipeline cancel <run-guid> --yes --json
+```
+
+A start saves its UUID and reviewed pipeline/version/branch before dispatch in
+an exclusively created private metadata file (mode `0600` on Linux/macOS;
+protected current-user/SYSTEM ACL on Windows). Retain that file if the reply is
+lost. Reusing it checks the original actor, server and organization and reads
+the original request before any submission. A read outage does not submit; a
+known reservation is inspected without resubmitting. A successful empty lookup
+can submit only the original key and branch with `--yes`, while the pipeline
+still matches the saved version. Reconciliation never submits. Do not create a
+new request file to retry an uncertain start: a new key means a different run.
+
+Cancellation binds the exact run version and recorded Temporal workflow/run IDs.
+An acknowledgement is a request accepted by the engine; inspect `status`,
+`cancellationStatus` and `cleanupStatus` independently with `pipeline show`.
+Unconfirmed submission or cancellation returns an error and preserves recovery
+identity. Request files and control output contain metadata, without inputs,
+bearer credentials, job results or log bodies.
+
+### Reviewed environment controls
+
+Restart and scale use a saved review bound to the current server, organization
+and actor. Explicit-environment exec waits for the authoritative admitted target
+before forwarding input. Review resolves the exact app and workload identity,
+including workloads beyond the old 200-row inventory limit:
+
+```sh
+astro app workload review web --app api --environment <environment-GUID> > review.json
+astro app workload scale web 2 --app api --environment <environment-GUID> --review review.json --yes
+astro app workload review web --app api --environment <environment-GUID> > review.json
+astro app workload restart web --app api --environment <environment-GUID> --review review.json --yes
+astro exec --app api --environment <environment-GUID> --workload web -- sh
+astro app exec web --app api --environment <environment-GUID> -- sh
+astro docs show environment-actions
+```
+
+Review again after any successful write. Stale, deleted, denied, mismatched or
+unavailable targets fail without primary-environment fallback. Workload receipts
+distinguish patch acceptance from rollout completion. Exec disconnect requires an
+explicit new attach and does not replay input; a lost exit receipt leaves the
+last input's outcome unknown. Pod UID checking is preflight only, and this client
+does not claim mobile-audience, atomic binding or action-admission proof support.
+
+### Exact workflow definition review and recovery
+
+Review the exact definition GUID and its JSON Schema before dispatch:
+
+```sh
+astro workflow definitions --json
+astro workflow definition-review <definition-guid> --json
+astro workflow definition-start <definition-guid> --expected-revision <revision> --expected-input-schema-digest <digest> --inputs-file ./inputs.json --request-file ./definition-request.json --yes --json
+astro workflow definition-reconcile --request-file ./definition-request.json --json
+astro docs show reviewed-starts
+```
+
+The expected revision and schema digest flags are optional as a pair; without
+them, the CLI binds the current exact review immediately before dispatch. Use
+one bounded JSON object file (at most 64 KiB) for typed or complex inputs, and
+omit it for a no-input definition. Sensitive schema fields accept opaque secret
+references, never literal credentials. Schema validation and defaults remain
+server-authoritative. Disabled or unsupported definitions cannot start.
+
+Before dispatch, the CLI flushes an exclusively created private recovery file
+(POSIX mode `0600`; Windows current-user ownership and a protected user/SYSTEM
+ACL), containing only the original UUID and actor/server/org/definition/revision/
+schema metadata. Existing files always perform read-only recovery: input files
+are never opened or resubmitted, including after an empty lookup. An absent
+record leaves the original outcome unknown; retain the file rather than making
+a replacement key. Scope changes refuse recovery. Known unconfirmed engine
+submission prints its exact identities and returns an error; reconciliation
+can display that uncertainty without writing. Engine acceptance is separate
+from execution completion. `agent run <definition-guid>` is an alias with the
+same review/recovery rules; `--wait --json` emits one metadata object, retaining
+a known unconfirmed receipt on failure. Waiting pins the original receipt and
+reports cleanup separately from engine completion. Existing app-bound
+`workflow run` is unchanged.
+
+### Search release-matched guides offline
+
+```sh
+astro docs search 'workflow recovery'
+astro docs search '"request file"' --limit 5 --json
+astro docs search 'environment exec'
+astro docs show reviewed-starts
+```
+
+Search reads this binary's embedded public Markdown guides without network,
+credentials or a configured server. It matches all case-insensitive terms;
+double quotes group a contiguous phrase with normalized whitespace. Results
+follow catalogue order with one source line and a snippet of at most 180
+characters per matching guide. `--limit` defaults to 10, accepts 1–50 and bounds
+output; JSON includes `matches`, `totalMatches` and `truncated`. Queries are
+bounded to 512 UTF-8 bytes and 32 terms/phrases. Use `docs show` for a complete
+guide and command `--help` for the actual executing command tree. These new
+commands require a release containing them; the published v0.7.2 predates them.

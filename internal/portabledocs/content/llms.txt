@@ -28,12 +28,14 @@ Use these plain-Markdown references as the current public contract. The target i
 - [App setup](https://astrolift.dev/guides/app-setup/): source registration, image deployment, health, and shared bindings
 - [Agent setup](https://astrolift.dev/guides/agent-setup/): packages, environments, secret references, dispatch, and observation
 - [Workflow setup](https://astrolift.dev/guides/workflow-setup/): author, validate, bind, configure, and run ordered stages
+- [Reviewed starts](https://astrolift.dev/guides/reviewed-starts/): exact workflow definitions and pipeline runs, typed JSON inputs, durable request identity, read-only recovery and cancellation state
 - [Shared services](https://astrolift.dev/guides/shared-services/): catalogue discovery, provision once, attach apps and agents, and inspect readiness
 - [Agent completion callbacks](https://astrolift.dev/guides/agent-completion-callbacks/): signed final events, retries for 24 hours, replay, key rotation, and Python verification
 
 ## Operational guides
 
 - [Working with apps](https://astrolift.dev/working-with-apps/)
+- [Reviewed environment controls](https://astrolift.dev/guides/environment-actions/): exact-target restart, scale, shell attachment and disconnect behavior
 - [Running an organization](https://astrolift.dev/running-an-org/)
 - [Operator quickstart](https://astrolift.dev/operators/quickstart/)
 - [Install Astrolift](https://astrolift.dev/operators/install/)

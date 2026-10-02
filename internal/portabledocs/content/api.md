@@ -120,3 +120,31 @@ the configured host allow-list. Never send the signing key in dispatch input.
 without rerunning the agent. Read the [completion callback guide](../guides/agent-completion-callbacks.md)
 for the exact signed wire contract, durable 24-hour backoff, authorization,
 retention, rotation, and Python verification snippet.
+
+## Reviewed workflow and pipeline starts
+
+`workflowDefinitionById(id: GUID!)` reads an exact visible definition, execution
+revision and JSON Schema 2020-12 input contract. `startWorkflowDefinition` binds
+the exact GUID, expected revision, schema digest and actor-scoped request UUID;
+`workflowDefinitionStartRequest(requestId)` recovers only that original start.
+Receipts contain execution GUID and recorded Temporal workflow/run IDs. Engine
+acceptance is separate from workflow completion. Inputs are encrypted on the
+server and are excluded from recovery metadata and error diagnostics.
+
+`startPipelineRun` binds an exact pipeline GUID/version/ref and durable request
+UUID. `pipelineStartRequest` recovers the original request, and
+`cancelPipelineRun` checks the exact run/version/engine identity. Cancellation
+acknowledgement, execution closure and owned-resource cleanup are independent
+states. Use bounded run/job/step pages rather than unbounded lists.
+
+See [reviewed starts](../guides/reviewed-starts.md) for native CLI commands,
+permissions, input handling, recovery differences and limits. The target server
+must expose these fields; there is no legacy-write fallback.
+
+The legacy `runWorkflowDefinition` alias keeps its original output shape and
+accepts additive nullable review/confirmation arguments. Missing review proof
+returns `PRECONDITION` upgrade guidance with no dispatch. A complete proof uses
+the same exact durable-start and current-authority gates; new clients should
+use `startWorkflowDefinition` rather than relying on slug selection or the
+legacy mirror-ID field. `runAstroliftAgent` and configured-workflow APIs retain
+their separate contracts.

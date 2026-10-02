@@ -35,12 +35,14 @@ gh workflow run release.yml --repo calliopeai/astrolift-cli -f version=0.4.0
 
 Add `-f dry_run=true` to run every check without creating the tag.
 
-That workflow validates the version, refuses to reuse an existing tag, requires
+That workflow freezes one main commit and requires native Windows ACL and saved-request
+recovery tests on that exact commit before tagging. It validates the version, refuses to reuse an existing tag, requires
 the changelog entry, verifies the complete pinned prerequisite-chart inventory
 and actual Helm renders, runs build/vet/test, and proves the release ldflags still
 stamp a real version into the binary — then creates and pushes the annotated
 tag. Pushing the tag is what triggers `build-publish.yml`, which runs
-GoReleaser: cross-platform archives, `astro-checksums.txt`, the GitHub release,
+GoReleaser after Linux verification and the native Windows private-file gate pass
+on the tagged commit: cross-platform archives, `astro-checksums.txt`, the GitHub release,
 Docker Hub + GHCR images, and a smoke test that downloads the published assets
 back and runs them.
 

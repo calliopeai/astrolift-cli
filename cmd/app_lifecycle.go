@@ -1278,17 +1278,23 @@ thin wrapper over 'astro exec' scoped to the app from --app or the local
 astrolift.toml; an optional [workload] narrows pod selection.
 
 With a '-- <command...>' suffix runs that command; otherwise an interactive
-shell. Requires the app.exec_pod permission; every session is audited. See
-'astro exec --help' for --pod / --container / --no-tty details.
+shell. Requires the app.exec_pod permission. Use --environment <GUID> for an
+exact reviewed environment; failures never fall back to the primary. See
+'astro exec --help' for --pod / --container / --no-tty and session details.
 
 Examples:
   astro app exec -- bash
   astro app exec web -- python manage.py migrate
   astro app exec --app api worker -- sh`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
 			return err
+		}
+		if execEnvironment != "" {
+			if _, err := resolveOrg(cmd, cmd.Context(), client, cfg); err != nil {
+				return err
+			}
 		}
 		slug, err := resolveAppSlug(cmd, "")
 		if err != nil {
@@ -1384,6 +1390,7 @@ func init() {
 	appLogsCmd.Flags().StringVar(&appLogsSearch, "search", "", "Filter to lines matching a substring")
 
 	// exec — reuse the same target vars cmd/exec.go binds, so runExec sees them
+	appExecCmd.Flags().StringVar(&execEnvironment, "environment", "", "Exact environment GUID; review and admission required, no primary fallback")
 	appExecCmd.Flags().StringVar(&execPod, "pod", "", "Exact pod name (skips auto-resolution)")
 	appExecCmd.Flags().StringVarP(&execContainer, "container", "c", "", "Container name (multi-container pods)")
 	appExecCmd.Flags().BoolVar(&execNoTTY, "no-tty", false, "Force non-interactive (no TTY) even on a terminal")
