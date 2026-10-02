@@ -110,6 +110,10 @@ CLI to retain or resend input values for an existing file.
 
 These commands address a `WorkflowDefinition` directly. Existing
 `astro workflow run` remains the separate app-bound configured-workflow path.
+The next CLI adapts legacy `astro agent run` to this reviewed path; see the
+[migration guide](agent-setup.md#migrate-a-legacy-workflow-definition-run).
+Older slug-only API calls are refused with `PRECONDITION` rather than silently
+dispatching without revision/schema/request proof.
 
 ## Start and inspect a pipeline
 

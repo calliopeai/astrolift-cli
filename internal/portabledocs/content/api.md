@@ -140,3 +140,11 @@ states. Use bounded run/job/step pages rather than unbounded lists.
 See [reviewed starts](../guides/reviewed-starts.md) for native CLI commands,
 permissions, input handling, recovery differences and limits. The target server
 must expose these fields; there is no legacy-write fallback.
+
+The legacy `runWorkflowDefinition` alias keeps its original output shape and
+accepts additive nullable review/confirmation arguments. Missing review proof
+returns `PRECONDITION` upgrade guidance with no dispatch. A complete proof uses
+the same exact durable-start and current-authority gates; new clients should
+use `startWorkflowDefinition` rather than relying on slug selection or the
+legacy mirror-ID field. `runAstroliftAgent` and configured-workflow APIs retain
+their separate contracts.

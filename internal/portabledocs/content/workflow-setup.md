@@ -75,3 +75,10 @@ from app-bound configured `workflow run`; do not substitute a same-slug definiti
 for an already reviewed GUID. Define the contract with
 `workflow.input_schema_json` in the [TOML reference](../reference/workflow-toml.md),
 then review its current revision and schema digest before dispatch.
+
+The next CLI's `astro agent run` is a compatibility entry for that reviewed
+Definition path. It requires a definition GUID, `--request-file` and `--yes`;
+input-bearing definitions use `--inputs-file` or file-only `--input @file`.
+Slug-only or literal-input callers must migrate. See
+[agent setup](agent-setup.md#migrate-a-legacy-workflow-definition-run). This does
+not change the separate app-bound configured `workflow run` contract.

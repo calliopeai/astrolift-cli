@@ -290,3 +290,11 @@ unchanged version review and confirmation. Both preserve uncertain identities.
 Omit `--inputs-file` for a no-input definition. Exact environment controls and
 shell admission are documented in the
 [environment guide](../guides/environment-actions.md).
+
+The next CLI adapts legacy `astro agent run` to this same reviewed Definition
+service: pass an exact definition GUID, `--request-file`, `--yes`, and
+`--inputs-file` for an input-bearing schema. `--input` accepts only `@file` as a
+compatibility alias; literal JSON is refused. `--wait` reads metadata for the
+exact execution and pinned engine identity and preserves one JSON receipt.
+See the [migration guide](../guides/agent-setup.md#migrate-a-legacy-workflow-definition-run).
+Direct agent-task dispatch and app-bound configured workflow runs are separate.
