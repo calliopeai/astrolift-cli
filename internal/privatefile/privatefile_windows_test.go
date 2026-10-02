@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -75,7 +77,6 @@ func TestPrivateFileWindowsTamperedACLsRefuseBeforeContentRead(t *testing.T) {
 		{"null", "D:NO_ACCESS_CONTROL", true},
 		{"empty", "D:P", true},
 		{"unprotected", "D:" + owner, false},
-		{"inherited-entry", "D:P(A;ID;FA;;;" + user.String() + ")", true},
 		{"unsupported-deny-entry", "D:P(D;;FW;;;WD)" + owner, true},
 	} {
 		t.Run(sample.name, func(t *testing.T) {
@@ -132,4 +133,88 @@ func TestPrivateFileWindowsActualSymlinkRefusesReadAndReplacement(t *testing.T) 
 	if err != nil || string(actual) != "original" {
 		t.Fatal("reparse refusal modified its referent")
 	}
+}
+
+func TestPrivateFileWindowsInheritedDescriptorAndPersistedProtection(t *testing.T) {
+	user, err := currentUserSID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	inherited := "D:P(A;ID;FA;;;" + user.String() + ")"
+	input, err := windows.SecurityDescriptorFromString("O:" + user.String() + inherited)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The input genuinely contains the inherited flag; reject it at validation.
+	inputACL, _, err := input.DACL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inputACE *windows.ACCESS_ALLOWED_ACE
+	if err := windows.GetAce(inputACL, 0, &inputACE); err != nil {
+		t.Fatal(err)
+	}
+	if inputACE.Header.AceFlags&windows.INHERITED_ACE == 0 {
+		t.Fatal("input lost its inherited ACE flag")
+	}
+	if err := validateACL(input); err == nil || !strings.Contains(err.Error(), "ACL entry") {
+		t.Fatal("accepted an actual inherited ACL descriptor")
+	}
+	runtime.KeepAlive(input)
+
+	path := filepath.Join(t.TempDir(), "private")
+	if err := Write(path, []byte("private-test-content")); err != nil {
+		t.Fatal(err)
+	}
+	changeDACL(t, path, inherited, true)
+	defer changeDACL(t, path, "D:P(A;;FA;;;"+user.String()+")(A;;FA;;;SY)", true)
+	file, err := openHandle(path, windows.READ_CONTROL, windows.OPEN_EXISTING, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, err := securityInfo(file)
+	_ = file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	control, _, err := actual.Control()
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, _, err := actual.Owner()
+	if err != nil || owner == nil || !windows.EqualSid(owner, user) {
+		t.Fatal("persisted owner changed")
+	}
+	acl, _, err := actual.DACL()
+	if err != nil || acl == nil || acl.AceCount != 1 {
+		t.Fatal("persisted ACL did not contain the single expected entry")
+	}
+	var ace *windows.ACCESS_ALLOWED_ACE
+	if err := windows.GetAce(acl, 0, &ace); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("persisted owner=current-user protected=%t present=%t ACE type=%d flags=0x%x mask=0x%x", control&windows.SE_DACL_PROTECTED != 0, control&windows.SE_DACL_PRESENT != 0, ace.Header.AceType, ace.Header.AceFlags, ace.Mask)
+	if control&windows.SE_DACL_PROTECTED == 0 || control&windows.SE_DACL_PRESENT == 0 || ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE || ace.Header.AceSize < 20 || ace.Mask != fileAllAccess {
+		t.Fatal("unexpected persisted ACL protection or entry")
+	}
+	sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
+	if !sid.IsValid() || int(ace.Header.AceSize) < 8+sid.Len() || !windows.EqualSid(sid, user) {
+		t.Fatal("persisted ACE did not grant only the expected owner")
+	}
+	data, readErr := ReadFile(path, 1024)
+	switch ace.Header.AceFlags {
+	case 0:
+		// Protected assignment can convert inherited entries to explicit ones:
+		// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/0f0c6ffc-f57d-47f8-a6c8-63889e874e24
+		if readErr != nil || string(data) != "private-test-content" {
+			t.Fatal("OS-normalized private owner ACL was not readable")
+		}
+	case windows.INHERITED_ACE:
+		if readErr == nil || len(data) != 0 {
+			t.Fatal("persisted inherited entry was readable")
+		}
+	default:
+		t.Fatal("unexpected persisted ACE flags")
+	}
+	runtime.KeepAlive(actual)
 }
