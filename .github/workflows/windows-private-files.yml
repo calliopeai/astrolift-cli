@@ -1,9 +1,6 @@
 name: Windows private files
 
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
   workflow_call:
     inputs:
