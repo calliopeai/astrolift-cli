@@ -64,3 +64,17 @@ on a workload list or its page boundaries. Use the app's `pytest.ini` and backen
 `conftest`, with a separate test database and local cache settings as described
 for the other receipts. This review-only case needs no Kind cluster and does not
 claim a provider mutation or workload execution.
+
+## Managed resource paging and exact context
+
+`test_managed_resources.py` invokes the compiled CLI against real ASGI,
+PostgreSQL and bearer/RBAC authorization. A dedicated database such as
+`astrolift_cli_resources_2207` keeps this fixture separate from other runs.
+It walks 251 project resources and 251 independently visible consumers, checks
+the compatible default JSON array, reads exact app/project GUID context,
+attaches one disposable local consumer with a reviewed revision, then refuses
+a changed cluster, deleted same-name target, foreign/malformed cursor and
+revoked role. Basic reads perform no pricing query and expose no configuration
+markers. This suite does not contact a provider or dispatch a Temporal worker;
+worker fencing and provider lifecycle acceptance are covered by the app's
+separate real PostgreSQL/Temporal tests.
