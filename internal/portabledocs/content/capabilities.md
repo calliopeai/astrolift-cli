@@ -15,6 +15,10 @@ astro workflow definitions --json
 `status` returns `version`, `apiVersion`, `capabilities`, and `authMethods`.
 A capability says the installation implements a feature; it does not grant
 permission or prove that a particular cluster has the required provider driver.
+Bounded returns and serial item bodies require
+`workflows.bounded_review_loops` and `workflows.serial_collections`, respectively.
+See [bounded workflows](bounded-workflows.md) for finite caps, exact body
+bindings, recorded rounds and supported source-import limits.
 Reviewed starts require `workflows.reviewed_definition_starts`,
 `workflows.definition_input_contracts`, `workflows.definition_start_recovery`,
 `pipelines.versioned_start_requests` and `pipelines.start_request_recovery` as
@@ -38,6 +42,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Register and operate an application | `app-setup` | [Set up an app](app-setup.md) |
 | Package, register, and dispatch an agent | `agent-setup` | [Set up an agent](agent-setup.md) |
 | Compose and run stages | `workflow-setup` | [Set up a workflow](workflow-setup.md) |
+| Bound revisions, retries and record bodies | `bounded-workflows` | [Bounded workflows](bounded-workflows.md) |
 | Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |
 | Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |

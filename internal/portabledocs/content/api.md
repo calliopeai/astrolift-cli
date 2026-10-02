@@ -121,6 +121,33 @@ without rerunning the agent. Read the [completion callback guide](../guides/agen
 for the exact signed wire contract, durable 24-hour backoff, authorization,
 retention, rotation, and Python verification snippet.
 
+## Bounded workflow authoring and execution metadata
+
+Installations advertising `workflows.bounded_review_loops` and
+`workflows.serial_collections` expose stage `maxAttempts`, `backEdge` and
+`iteration` on reads and stage create/update inputs. The server validates the
+combined finite execution budget before dispatch; a capability is not an
+authorization grant. See [bounded workflows](../guides/bounded-workflows.md)
+for the native object contracts and supported source-import subset.
+
+Stage agent and nested-workflow string references also accept
+`guid:<canonical-lowercase-UUID>`. Authoring round-trips preserve explicit GUIDs;
+unavailable or inaccessible targets are refused without substituting a slug.
+Literal slugs keep their existing resolution behavior. See the
+[exact-reference rules](../guides/bounded-workflows.md#preserve-an-explicitly-selected-target)
+for binding overrides and visibility checks.
+
+`workflowExecutionStages(executionId, limit, after)` reads pages belonging to
+one exact execution GUID or mirror ID. Preserve the returned execution GUID,
+organization and recorded Temporal workflow/run IDs across pages. Its stage
+items expose `roundNumber`, `attemptNumber`, return `causedBy`, timestamps,
+`collectionIndex` / `collectionParentExecutionGuid` / `collectionStageId`, and
+separate fan-out identities. Item and branch indexes are zero-based. A missing
+cause/parent remains unknown. `complete` on a collection means bodies finished
+under the authored policy, so inspect per-item outcomes rather than assuming
+all agent results succeeded. Run-control acceptance remains separate from
+closure and resource cleanup.
+
 ## Reviewed workflow and pipeline starts
 
 `workflowDefinitionById(id: GUID!)` reads an exact visible definition, execution
