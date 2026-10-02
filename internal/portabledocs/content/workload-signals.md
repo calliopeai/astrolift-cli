@@ -1,5 +1,13 @@
 # Workload golden signals
 
+This guide requires a platform whose schema exposes the per-signal scope,
+source, target and runtime fields below. Check the installation's API schema;
+an older schema may not support this query. CLI v0.8.0 does not embed the
+`workload-signals` topic: offline `astro docs show workload-signals` requires a
+compatible later CLI. API field availability does not guarantee observations:
+collectors, instrumentation and verified workload membership must also satisfy
+the conditions described here.
+
 `astroliftAppGoldenSignals` reports the effective scope, source, canonical target
 and availability of **each** signal. Select the app, recorded environment and
 workload explicitly. A missing environment or workload never falls back to a

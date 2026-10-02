@@ -1,5 +1,13 @@
 # Exact preview identity and explicit runtime reads
 
+CLI v0.8.0 predates the exact-preview commands in this guide. Use a compatible
+CLI containing `app previews show`, `open` and `logs` with `--id`, and a platform
+whose schema exposes the preview/environment identity fields below. Check
+`astro version`, `astro app previews --help` and the installation's API schema
+before using these examples. A compatible API does not guarantee runtime cost
+or metrics availability; explicit reads still require current permissions and
+the applicable collectors and pricing evidence.
+
 Preview catalog browsing and preview detail have separate APIs. Use the immutable
 preview GUID for detail; a branch, pull request number, retained hostname, or
 conventional environment name does not identify a workload target.
