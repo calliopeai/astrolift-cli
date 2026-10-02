@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/privatefile"
 	"github.com/spf13/cobra"
 )
 
@@ -132,9 +133,12 @@ func TestReviewedWorkflowDefinitionStartDurableComplexInputs(t *testing.T) {
 			t.Fatal("runtime inputs or token exposed")
 		}
 	}
-	info, _ := os.Stat(file)
-	if info.Mode().Perm() != 0600 {
-		t.Fatal("recovery file is not private")
+	protected, err := privatefile.Open(file, 16*1024)
+	if err != nil {
+		t.Fatalf("recovery file is not private: %v", err)
+	}
+	if err := protected.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
