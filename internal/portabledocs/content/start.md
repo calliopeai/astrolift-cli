@@ -8,11 +8,12 @@ The CLI and platform source repositories are public. Download the release archiv
 checksum file for your platform:
 
 ```bash
-tag="$(gh release view --repo calliopeai/astrolift-cli \
-  --json tagName --jq .tagName)"
-gh release download "$tag" --repo calliopeai/astrolift-cli \
-  --pattern 'astro-darwin-arm64.tar.gz' \
-  --pattern 'astro-checksums.txt'
+release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+  https://github.com/calliopeai/astrolift-cli/releases/latest)"
+tag="${release_url##*/}"
+release_base="https://github.com/calliopeai/astrolift-cli/releases/download/${tag}"
+curl -fL "$release_base/astro-darwin-arm64.tar.gz" -o astro-darwin-arm64.tar.gz
+curl -fL "$release_base/astro-checksums.txt" -o astro-checksums.txt
 shasum -a 256 -c <(grep '  astro-darwin-arm64.tar.gz$' astro-checksums.txt)
 tar -xzf astro-darwin-arm64.tar.gz
 mkdir -p "$HOME/.local/bin"
@@ -22,8 +23,8 @@ astro version
 
 That example is for Apple silicon. The [CLI install
 reference](reference/cli.md#install) lists every release asset and the Linux
-checksum command. GitHub authentication is optional for public downloads; it
-can increase API rate limits. Pin a release tag in automation.
+checksum command. This download path requires no GitHub account. The example
+resolves the latest published tag once; pin an explicit tag in automation.
 
 ## Authenticate
 

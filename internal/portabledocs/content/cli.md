@@ -6,21 +6,20 @@ the non-interactive client used in CI.
 ## Install
 
 The [CLI releases](https://github.com/calliopeai/astrolift-cli/releases) and
-[source](https://github.com/calliopeai/astrolift-cli) are public. GitHub CLI can
-download public releases without an account; authentication is optional.
+[source](https://github.com/calliopeai/astrolift-cli) are public. The following `curl` path needs no GitHub account.
 
 Find the current immutable tag and download both the archive and its checksum.
 For example, on Apple silicon:
 
 ```bash
-tag="$(gh release view --repo calliopeai/astrolift-cli \
-  --json tagName --jq .tagName)"
+release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+  https://github.com/calliopeai/astrolift-cli/releases/latest)"
+tag="${release_url##*/}"
+release_base="https://github.com/calliopeai/astrolift-cli/releases/download/${tag}"
 asset=astro-darwin-arm64.tar.gz
 download_dir="$(mktemp -d)"
-gh release download "$tag" --repo calliopeai/astrolift-cli \
-  --pattern "$asset" \
-  --pattern 'astro-checksums.txt' \
-  --dir "$download_dir"
+curl -fL "$release_base/$asset" -o "$download_dir/$asset"
+curl -fL "$release_base/astro-checksums.txt" -o "$download_dir/astro-checksums.txt"
 
 (cd "$download_dir" && \
   shasum -a 256 -c <(grep "  ${asset}$" astro-checksums.txt))
@@ -44,7 +43,10 @@ Add `~/.local/bin` to `PATH` when it is not already there. Use `sha256sum
 
 Build from source with `git clone https://github.com/calliopeai/astrolift-cli.git`
 followed by `make build`. Prefer the checksum-verified release archives for
-repeatable installations.
+repeatable installations. Pin `tag=vX.Y.Z` instead of resolving latest in CI.
+The legacy `scripts/install.sh` still requires an authenticated GitHub CLI or
+token unless `ASTRO_INSTALL_BASE_URL` supplies a mirror; it has no anonymous
+GitHub fallback. The archive path above avoids that requirement.
 
 ## Configure and authenticate
 
