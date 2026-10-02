@@ -162,15 +162,27 @@ func TestAgentHostTerminalSnapshotRetainsLifecycleAndPTYContent(t *testing.T) {
 }
 
 func TestAgentHostExplicitUnavailableSupportsWatchFallback(t *testing.T) {
+	closed := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(closed)
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
 		if err != nil {
 			return
 		}
 		defer func() { _ = conn.Close() }()
 		var request map[string]interface{}
-		_ = conn.ReadJSON(&request)
-		_ = conn.WriteJSON(map[string]interface{}{"jsonrpc": "2.0", "id": request["id"], "error": map[string]interface{}{"code": -32003, "message": "Attach unavailable", "data": map[string]interface{}{"ahp_available": false, "reason": "agent_live_attach disabled", "fallback": "agent_task.watch"}}})
+		if err := conn.ReadJSON(&request); err != nil {
+			t.Error(err)
+			return
+		}
+		if err := conn.WriteJSON(map[string]interface{}{"jsonrpc": "2.0", "id": request["id"], "error": map[string]interface{}{"code": -32003, "message": "Attach unavailable", "data": map[string]interface{}{"ahp_available": false, "reason": "agent_live_attach disabled", "fallback": "agent_task.watch"}}}); err != nil {
+			t.Error(err)
+			return
+		}
+		// Keep this RPC-error fixture open until the caller detaches. Closing
+		// immediately races the typed response against transport shutdown.
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		_, _, _ = conn.ReadMessage()
 	}))
 	defer server.Close()
 	client := NewClient(server.URL, "token", false)
@@ -181,5 +193,10 @@ func TestAgentHostExplicitUnavailableSupportsWatchFallback(t *testing.T) {
 	var unavailable *AgentHostUnavailable
 	if !errors.As(err, &unavailable) || !strings.Contains(unavailable.Reason, "disabled") {
 		t.Fatalf("missing fallback reason: %v", err)
+	}
+	select {
+	case <-closed:
+	case <-ctx.Done():
+		t.Fatal("unavailable attach did not detach its transport")
 	}
 }
