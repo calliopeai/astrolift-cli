@@ -49,6 +49,42 @@ timeout = 900
 of the patterns advertised by the target server (including `single`, `chained`,
 `fan_out`, `supervisor_worker`, and `review_loop`). `description` is optional.
 
+`input_schema_json` is an optional JSON string in `[workflow]`, supported by
+installations advertising `workflows.definition_input_contracts`. It contains
+a JSON Schema draft 2020-12 root object. Omission imports the explicit closed
+no-input schema. A raw TOML `input_schema` table is not the importer contract.
+The importer validates supported constraints and export preserves the schema
+as a canonical JSON string. Review the resulting schema digest before a
+[direct definition start](../guides/reviewed-starts.md).
+
+```toml
+[workflow]
+slug = "example-review"
+name = "Example review"
+pattern = "single"
+input_schema_json = '''{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "message": {"type": "string"},
+    "limit": {"type": "integer", "minimum": 1, "default": 3}
+  },
+  "required": ["message"],
+  "additionalProperties": false
+}'''
+
+[[stage]]
+kind = "checkpoint"
+```
+
+The server accepts supported nested objects, arrays, local JSON pointers and
+composition. External/dynamic references and regular-expression constraints
+are refused. Sensitive string fields use `writeOnly` or
+`x-astrolift-sensitive`; supplied values must be `secret://` references, and
+sensitive defaults are refused. Use authoritative `--server` validation against
+the intended installation; local TOML shape validation is insufficient for a
+new schema contract.
+
 The old `WorkflowDefinition.states`, `transitions`, and `model_label` fields do
 not select an LLM or drive an agent pipeline. Ordered `WorkflowStage` rows do.
 The model comes from the selected agent's runtime/environment package.

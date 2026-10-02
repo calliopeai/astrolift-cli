@@ -64,3 +64,14 @@ stage metadata under `_astrolift_workflow`.
 Inspect the run's stage and execution diagnostics before retrying or cancelling.
 Task completion callbacks are per-task notifications; workflow-level and
 progress callbacks are separate capabilities and are not part of that contract.
+
+## Review exact definition inputs and durable starts
+
+For direct definition dispatch, use the
+[reviewed-start guide](reviewed-starts.md). It explains immutable GUID selection,
+JSON Schema 2020-12 inputs, unsupported and no-input states, private metadata
+request files and read-only recovery after a lost reply. This is a separate path
+from app-bound configured `workflow run`; do not substitute a same-slug definition
+for an already reviewed GUID. Define the contract with
+`workflow.input_schema_json` in the [TOML reference](../reference/workflow-toml.md),
+then review its current revision and schema digest before dispatch.
