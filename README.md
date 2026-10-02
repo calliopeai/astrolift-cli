@@ -51,26 +51,28 @@ FROM calliopeai/astrolift-cli:0.3.0 AS astro-cli
 COPY --from=astro-cli /usr/local/bin/astro /usr/local/bin/astro
 ```
 
-### Installer script (needs a GitHub credential)
+### Installer script
 
 ```bash
-gh repo clone calliopeai/astrolift-cli
+git clone https://github.com/calliopeai/astrolift-cli.git
 cd astrolift-cli
 ./scripts/install.sh
 ```
 
 The installer detects your OS and architecture, downloads the matching
 archive, **verifies it against `astro-checksums.txt`**, and installs `astro`
-into `/usr/local/bin` or `~/.local/bin`. It authenticates in this order:
+into `/usr/local/bin` or `~/.local/bin`. GitHub credentials are optional.
+The download paths, in order, are:
 
 1. `ASTRO_INSTALL_BASE_URL` — a mirror you control, or an offline fixture
 2. an authenticated `gh` (whatever `gh auth login` is already using)
 3. `GITHUB_TOKEN` / `GH_TOKEN` / `ASTRO_GITHUB_TOKEN` — for containers and CI
-   images that have no `gh` binary:
+   images that have no `gh` binary
+4. anonymous GitHub API requests when no credentials are available
 
-```bash
-GITHUB_TOKEN="$(gh auth token)" ./scripts/install.sh
-```
+An optional token raises the GitHub API rate limit. The installer requires
+`curl`, `tar`, `install`, and either `sha256sum` or `shasum`. Authentication
+and missing-release errors identify the HTTP status without printing tokens.
 
 Set `ASTRO_INSTALL_TAG=vX.Y.Z` to pin a release, `ASTRO_INSTALL_DIR` to choose
 the destination.
@@ -335,7 +337,7 @@ continues on the server; this change introduces no generic command preflight.
 |---|---|
 | `astro server` | Manage Astrolift installs the CLI knows about (add / list / use / remove). One install = one DNS zone + database. |
 | `astro auth` | Browser device-flow login, logout, status, refresh, plus `wait` for the relay path. `login --no-wait` starts the flow, reports the session (`--json` makes it an object), and exits instead of blocking for fifteen minutes; `auth wait --session-id <id>` finishes it once a human has approved. That is how a browserless caller hands a login off. `login --no-browser` waits without launching a browser. |
-| `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `pods`, `rollback`, `promote`) plus sub-resources. `app secrets` (`list`/`create`/`delete`) drives `setAppSecret`/`deleteAppSecret`; `list` returns metadata only (key, environment, source, who last touched it) and never a value, `create` is an upsert reading the value from `--value`/`--stdin`/a hidden prompt and never echoing it, and both report a queued proposal id instead of an applied write on installs that require secret-change approval. `app services list` and `app domains list` are read-only views of the managed services and custom domains bound to one app (`astroliftManagedServicesPage` / `astroliftAppDomains`); provisioning a managed service is `astro project resources`, and there is no domain create/remove from the CLI yet. `app events` (also `app events list`) reads `astroliftEventsPage` for the app's deploy/secret/scale/health activity, filterable by `--type`/`--severity`/`--search`. `tokens`, `members`, `jobs`, and `audit` remain unimplemented placeholders. `deploy` requires `--image-tag` for CI-pushed apps; platform builds resolve the deploy branch or `--ref` to a commit, and apps using manifest images can omit it; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `app pods` lists the pods `exec` picks from — the pod name for `--pod` and container names for `-c`, with `--workload`/`--ready` to narrow. `promote --from <env> --to <env>` moves an env's running deployment (image+config) to another via `promoteDeployment`. `app previews` drives per-PR preview environments (`list`, `show`, `logs`, `open`, `teardown`, `pin`, `unpin`); pick one with `--pr <n>`, or `--branch <name>` for a manual preview, which carries no PR number. `previews logs` is `app logs` pointed at the environment the platform synthesized for the preview, so `--since`/`--tail`/`-f`/`--level`/`--search` behave identically. `previews pin` exempts a preview from garbage collection on both axes — TTL expiry *and* max-active eviction — until someone runs `unpin`, which is what separates it from extending a TTL; `--reason <text>` records why, and `list`/`show` surface the pin. `unpin` clears the whole record (who, when, why), is a no-op on an unpinned preview, and unlike `pin` is allowed on a torn-down one so stale state can always be cleared. |
+| `astro app` | App lifecycle (`init`, `register`, `deploy`, `list`, `show`, `logs`, `exec`, `pods`, `rollback`, `promote`) plus sub-resources. `app secrets` (`list`/`create`/`delete`) drives `setAppSecret`/`deleteAppSecret`; `list` returns metadata only (key, environment, source, who last touched it) and never a value, `create` is an upsert reading the value from `--value`/`--stdin`/a hidden prompt and never echoing it, and both report a queued proposal id instead of an applied write on installs that require secret-change approval. `app services list` and `app domains list` are read-only views of the managed services and custom domains bound to one app (`astroliftManagedServicesPage` / `astroliftAppDomains`); provisioning a managed service is `astro project resources`, and there is no domain create/remove from the CLI yet. `app events` (also `app events list`) reads `astroliftEventsPage` for the app's deploy/secret/scale/health activity, filterable by `--type`/`--severity`/`--search`. `tokens`, `members`, `jobs`, and `audit` remain unimplemented placeholders. `deploy` requires `--image-tag` for CI-pushed apps; platform builds resolve the deploy branch or `--ref` to a commit, and apps using manifest images can omit it; `--wait` polls to a terminal state. `app exec` wraps `astro exec` scoped to the app. `app pods` lists the pods `exec` picks from — the pod name for `--pod` and container names for `-c`, with `--workload`/`--ready` to narrow. `promote --from <env> --to <env>` moves an env's running deployment (image+config) to another via `promoteDeployment`. `app previews` drives per-PR preview environments (`list`, `show`, `logs`, `open`, `teardown`, `pin`, `unpin`); use `--id <GUID>` for an exact read, including previews older than the recent 200-row catalog. `--pr <n>` and `--branch <name>` discover a GUID in that catalog and then reread it. Basic list/show never request pod usage or pricing; `show --cost` explicitly requests one live snapshot. `show --json` includes the stored environment GUID, name, cluster and versions, or an explicit unavailable/retired binding. `previews logs` carries that exact environment GUID and reviewed versions on every page, refuses stale or retired bindings, and never joins by hostname or environment name; so `--since`/`--tail`/`-f`/`--level`/`--search` behave identically. `previews pin` exempts a preview from garbage collection on both axes — TTL expiry *and* max-active eviction — until someone runs `unpin`, which is what separates it from extending a TTL; `--reason <text>` records why, and `list`/`show` surface the pin. `unpin` clears the whole record (who, when, why), is a no-op on an unpinned preview, and unlike `pin` is allowed on a torn-down one so stale state can always be cleared. |
 | `astro exec` | Run a command or interactive shell in a running container (`--app <slug>` [`--workload`/`--pod`/`-c`] `-- <cmd>`). Streams over the exec WebSocket relay; requires `app.exec_pod`; every session is audited. |
 | `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`, `workloads`, `vnc`, `send`, `input-receipt`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <definition-guid> --request-file <file> --yes` is the reviewed WorkflowDefinition alias; its optional `--wait` follows the returned exact engine identity. Slug-only starts and literal `--input` are refused; use `--inputs-file` (or `--input @file`). `workloads ls` enumerates the org's registered `kind=agent` workloads, carrying both the slug `dispatch` takes and the GUID `workflow create --bind` takes. `vnc <task-id>` resolves a task to the absolute console URL that serves its live VNC viewer (the stored `vnc_url` is a root-relative WebSocket relay path, not openable). `send <task-id> <input>` queues a follow-up prompt for a task that is already running (`--stdin` for multi-line input; `--json`) — the steering channel: the message is applied at the agent's next turn boundary, so a send confirms queue admission; `deliveredAt` records a delivery claim, not execution. The task must be running, and not every agent runtime can accept a follow-up prompt; one that cannot leaves the message queued rather than dropping it. |
 | `astro apply` | Declarative agent environment specs: `apply -f <file.toml>` reads `[[env_spec]]` tables and makes the platform match. A missing spec is created, a spec that differs is updated field by field with the diff printed, and an unchanged spec is left alone, so a second apply is a no-op. Only keys present in the file are managed. `--dry-run` prints the plan and changes nothing. |
@@ -835,3 +837,39 @@ output; JSON includes `matches`, `totalMatches` and `truncated`. Queries are
 bounded to 512 UTF-8 bytes and 32 terms/phrases. Use `docs show` for a complete
 guide and command `--help` for the actual executing command tree. These new
 commands require a release containing them; the published v0.7.2 predates them.
+
+### Scoped managed resource reads
+
+`astro project resources list` preserves its JSON array output and now walks
+permission-checked server cursors. `--page --json` returns one bounded
+`{items,totalCount,nextCursor}` page; use `--after` only with `--page`.
+`--limit` accepts 1–200. Search and kind/status/environment/cluster-GUID filters
+are sent to the server. A refused continuation or a walk exceeding the safety
+bound returns an error without emitting a partial JSON array. App-owned
+`astro app services list` has the same additive `--page` mode.
+
+```sh
+astro project resources list --project platform --page --limit 50 --json
+astro project resources show <resource-guid> --project platform --json
+astro project resources attachments <resource-guid> --project platform --limit 50 --json
+astro project resources cost <resource-guid> --project platform --expected-context-revision <revision> --json
+astro app services show <resource-guid> --app example-api --json
+```
+
+Project and app-owned resources remain separate. Basic reads contain metadata,
+not configuration values, connection material, provider failure bodies or nested
+grants. Names on project show/cost/actions use at most two discovery rows, then
+reread the selected exact GUID; deleted GUIDs never follow a same-name replacement.
+Cost is explicit and permission checked; missing amount, currency, timestamp or
+HTTPS source produces unavailable pricing rather than zero.
+
+Existing project-resource update/reprovision/attach/remove commands always carry
+the fresh reviewed `contextRevision` through the write. Supply
+`--expected-context-revision` to pin an earlier explicit review. Detach keeps its
+existing attachment-GUID invocation: it resolves that exact visible owner and
+rereads the owner GUID with the captured revision before the write. Optional
+`--resource <GUID>` pins the owner explicitly; missing or inaccessible attachments
+are refused without a resource scan or name fallback.
+Attachments must share the owning project and cluster. An asynchronous operation
+receipt proves acceptance/enqueue only; read its operation identity and status
+separately. A lost response is unconfirmed and is never automatically retried.

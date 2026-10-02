@@ -23,6 +23,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,7 @@ var appServicesListEnv string
 // the walk stays bounded rather than looping without limit.
 const (
 	appServicesPageSize = 50
-	appServicesMaxPages = 4
+	appServicesMaxPages = resourceScanMaxPages
 )
 
 // ---- GraphQL operations -----------------------------------------------------
@@ -50,15 +51,12 @@ const appManagedServicesPageQuery = `query($appSlug: String!, $environmentName: 
       variant
       isolation
       status
-      statusError
       environmentName
       clusterSlug
       projectSlug
       bindingReady
-      grantState
       createdAt
       updatedAt
-      attachments { id consumerKind consumerSlug environmentName }
     }
     nextCursor
     totalCount
@@ -83,7 +81,7 @@ type appManagedService struct {
 	Variant         string                        `json:"variant"`
 	Isolation       string                        `json:"isolation"`
 	Status          string                        `json:"status"`
-	StatusError     string                        `json:"statusError"`
+	StatusError     string                        `json:"-"`
 	EnvironmentName string                        `json:"environmentName"`
 	ClusterSlug     string                        `json:"clusterSlug"`
 	ProjectSlug     string                        `json:"projectSlug"`
@@ -91,39 +89,26 @@ type appManagedService struct {
 	GrantState      string                        `json:"grantState"`
 	CreatedAt       string                        `json:"createdAt"`
 	UpdatedAt       string                        `json:"updatedAt"`
-	Attachments     []appManagedServiceAttachment `json:"attachments"`
+	Attachments     []appManagedServiceAttachment `json:"-"`
 }
 
-// fetchAppManagedServices walks astroliftManagedServicesPage for one app.
-// The second return reports that the page cap cut the walk short.
-func fetchAppManagedServices(ctx context.Context, client *api.Client, appSlug, environmentName string) ([]appManagedService, bool, error) {
-	all := make([]appManagedService, 0, appServicesPageSize)
-	cursor := ""
-	for page := 0; page < appServicesMaxPages; page++ {
-		vars := map[string]interface{}{"appSlug": appSlug, "limit": appServicesPageSize}
-		if environmentName != "" {
-			vars["environmentName"] = environmentName
-		}
-		if cursor != "" {
-			vars["after"] = cursor
-		}
+type appServicePage struct {
+	Items      []appManagedService `json:"items"`
+	NextCursor *string             `json:"nextCursor"`
+	TotalCount int                 `json:"totalCount"`
+}
 
-		var resp struct {
-			Page struct {
-				Items      []appManagedService `json:"items"`
-				NextCursor string              `json:"nextCursor"`
-			} `json:"astroliftManagedServicesPage"`
-		}
-		if err := client.GraphQL(ctx, appManagedServicesPageQuery, vars, &resp); err != nil {
-			return nil, false, fmt.Errorf("listing managed services for %s: %w", appSlug, err)
-		}
-		all = append(all, resp.Page.Items...)
-		if resp.Page.NextCursor == "" {
-			return all, false, nil
-		}
-		cursor = resp.Page.NextCursor
+func fetchAppServicePage(ctx context.Context, client *api.Client, variables map[string]interface{}) (*appServicePage, error) {
+	var response struct {
+		Page *appServicePage `json:"astroliftManagedServicesPage"`
 	}
-	return all, true, nil
+	if err := client.GraphQL(ctx, appManagedServicesPageQuery, variables, &response); err != nil {
+		return nil, fmt.Errorf("managed service page unavailable; restart the page or review current permissions")
+	}
+	if response.Page == nil {
+		return nil, fmt.Errorf("managed service page unavailable")
+	}
+	return response.Page, nil
 }
 
 // ---- astro app services ------------------------------------------------------
@@ -159,49 +144,113 @@ var appServicesListCmd = &cobra.Command{
 }
 
 func runAppServicesList(cmd *cobra.Command, ctx context.Context, client *api.Client, appSlug string) error {
-	rows, truncated, err := fetchAppManagedServices(ctx, client, appSlug, strings.TrimSpace(appServicesListEnv))
+	limit := appServicesPageSize
+	if cmd.Flags().Lookup("limit") != nil {
+		limit, _ = cmd.Flags().GetInt("limit")
+	}
+	if limit < 1 || limit > 200 {
+		return fmt.Errorf("--limit must be between 1 and 200")
+	}
+	vars := map[string]interface{}{"appSlug": appSlug, "limit": limit}
+	if strings.TrimSpace(appServicesListEnv) != "" {
+		vars["environmentName"] = strings.TrimSpace(appServicesListEnv)
+	}
+	paged := boolFlag(cmd, "page")
+	if after := resourceStringFlag(cmd, "after"); after != "" {
+		if !paged {
+			return fmt.Errorf("--after requires --page")
+		}
+		vars["after"] = after
+	}
+	page, err := fetchAppServicePage(ctx, client, vars)
 	if err != nil {
 		return err
 	}
-
-	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, rows)
+	if paged && boolFlag(cmd, "json") {
+		return renderJSON(cmd, page)
 	}
-
+	rows := page.Items
+	if !paged {
+		seen := map[string]bool{}
+		for count := 1; page.NextCursor != nil; count++ {
+			if count >= appServicesMaxPages || seen[*page.NextCursor] {
+				return fmt.Errorf("managed service walk incomplete; use --page with explicit continuation")
+			}
+			seen[*page.NextCursor] = true
+			vars["after"] = *page.NextCursor
+			page, err = fetchAppServicePage(ctx, client, vars)
+			if err != nil {
+				return err
+			}
+			rows = append(rows, page.Items...)
+		}
+		if rows == nil {
+			rows = []appManagedService{}
+		}
+		if boolFlag(cmd, "json") {
+			return renderJSON(cmd, rows)
+		}
+	}
 	out := cmd.OutOrStdout()
 	if len(rows) == 0 {
 		fmt.Fprintf(out, "No managed services bound to app %q.\n", appSlug)
 		return nil
 	}
-
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tKIND\tVARIANT\tENVIRONMENT\tSTATUS\tBINDING READY\tCREATED")
-	for _, s := range rows {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			s.Name, s.Kind, dashIfEmpty(s.Variant), dashIfEmpty(s.EnvironmentName),
-			appManagedServiceStatusLabel(s), yesNo(s.BindingReady), shortTime(&s.CreatedAt))
+	fmt.Fprintln(w, "NAME\tKIND\tVARIANT\tENVIRONMENT\tSTATUS\tBINDING READY\tID\tCREATED")
+	for _, row := range rows {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", row.Name, row.Kind, dashIfEmpty(row.Variant), dashIfEmpty(row.EnvironmentName), dashIfEmpty(row.Status), yesNo(row.BindingReady), row.ID, shortTime(&row.CreatedAt))
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "\n%d managed service(s) shown.\n", len(rows))
-	if truncated {
-		fmt.Fprintf(cmd.ErrOrStderr(),
-			"note: only the %d most recently created managed services were scanned\n", appServicesPageSize*appServicesMaxPages)
+	if paged && page.NextCursor != nil {
+		fmt.Fprintf(out, "Next cursor: %s\n", *page.NextCursor)
 	}
 	return nil
 }
 
-// appManagedServiceStatusLabel appends the error when a service is in a
-// failed state, so "list" surfaces why without a separate "show".
-func appManagedServiceStatusLabel(s appManagedService) string {
-	if strings.TrimSpace(s.StatusError) != "" {
-		return fmt.Sprintf("%s (%s)", s.Status, s.StatusError)
+var appServicesShowCmd = &cobra.Command{Use: "show <resource-GUID>", Short: "Review exact app-owned managed service metadata", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	app, err := resolveAppSlug(cmd, "")
+	if err != nil {
+		return err
 	}
-	return dashIfEmpty(s.Status)
+	client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+	if err != nil {
+		return err
+	}
+	return runAppServiceShow(cmd, cmd.Context(), client, app, args[0])
+}}
+
+func runAppServiceShow(cmd *cobra.Command, ctx context.Context, client *api.Client, appSlug, id string) error {
+	if _, err := uuid.Parse(id); err != nil {
+		return fmt.Errorf("an exact resource GUID is required")
+	}
+	var response struct {
+		Row *projectResource `json:"astroliftManagedService"`
+	}
+	query := `query($id:GUID!,$expectedContextRevision:String){astroliftManagedService(id:$id,expectedContextRevision:$expectedContextRevision){` + resourceContextFields + `}}`
+	vars := map[string]interface{}{"id": id}
+	revision := resourceStringFlag(cmd, "expected-context-revision")
+	if revision != "" {
+		vars["expectedContextRevision"] = revision
+	}
+	if err := client.GraphQL(ctx, query, vars, &response); err != nil {
+		return fmt.Errorf("resource context unavailable or changed")
+	}
+	row := response.Row
+	if row == nil || row.ID != id || row.OwnerScope != "app" || row.RegisteredAppSlug != appSlug || row.RegisteredAppID == "" || row.ContextRevision == "" || (client.Org() != "" && row.OrganizationID != client.Org()) || (revision != "" && row.ContextRevision != revision) {
+		return fmt.Errorf("resource context unavailable or changed")
+	}
+	return renderProjectResource(cmd, row)
 }
 
 func init() {
 	appServicesListCmd.Flags().StringVar(&appServicesListEnv, "environment", "", "Filter to one environment")
-	appServicesCmd.AddCommand(appServicesListCmd)
+	appServicesListCmd.Flags().Bool("page", false, "Return one page with items, totalCount and nextCursor")
+	appServicesListCmd.Flags().Int("limit", 50, "Server page size (1-200)")
+	appServicesListCmd.Flags().String("after", "", "Continuation cursor; requires --page")
+	appServicesShowCmd.Flags().String("expected-context-revision", "", "Refuse a changed resource context")
+	appServicesCmd.AddCommand(appServicesListCmd, appServicesShowCmd)
 }

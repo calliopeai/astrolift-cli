@@ -41,10 +41,14 @@ var topics = []Topic{
 	{Slug: "callbacks", Title: "Signed task completion callbacks and outage retries", Filename: "callbacks.md", OnlinePath: "/guides/agent-completion-callbacks/"},
 	{Slug: "environment-actions", Title: "Review exact environments for workload controls and exec", Filename: "environment-actions.md", OnlinePath: "/guides/environment-actions/"},
 	{Slug: "reviewed-starts", Title: "Review exact workflow and pipeline starts and recover original requests", Filename: "reviewed-starts.md", OnlinePath: "/guides/reviewed-starts/"},
+	{Slug: "preview-targets", Title: "Review exact preview identities and pinned environment actions", Filename: "preview-targets.md", OnlinePath: "/guides/preview-targets/"},
+	{Slug: "workload-signals", Title: "Observe workload metrics with explicit scope and instrumentation", Filename: "workload-signals.md", OnlinePath: "/guides/workload-signals/"},
 }
 
 var aliases = map[string]string{
 	"apps":                 "app-setup",
+	"previews":             "preview-targets",
+	"metrics":              "workload-signals",
 	"services":             "shared-services",
 	"resources":            "shared-services",
 	"callback":             "callbacks",

@@ -1,7 +1,7 @@
 # GoReleaser config for astro CLI distribution (#17).
 #
 # Builds amd64 + arm64 binaries for Linux + macOS + Windows;
-# publishes authenticated GitHub release assets and a Docker image.
+# publishes public GitHub release assets and Docker images.
 #
 # Run `goreleaser release --snapshot --clean` for a local
 # dry-run; CI invokes `goreleaser release` on git tags.
@@ -43,7 +43,7 @@ archives:
         formats:
           - zip
     # ``astro-{os}-{arch}.tar.gz`` (e.g. ``astro-darwin-arm64.tar.gz``)
-    # is the asset shape the in-app Downloads page and authenticated installer
+    # is the asset shape the in-app Downloads page and source installer
     # expect. Keep it stable across
     # releases — changing this requires updating the in-app
     # ``downloads-client.tsx`` table in lockstep.
@@ -82,9 +82,8 @@ changelog:
       - "^test:"
       - "^chore:"
 
-# Homebrew and Scoop publication is intentionally disabled while release
-# archives live in this private repository. Public formulas cannot authenticate
-# those download URLs. Re-enable only after a public binary mirror exists.
+# Release archives are public. Homebrew and Scoop publication remains disabled
+# until formula and manifest maintenance and verification are configured.
 
 # Docker images — published to Docker Hub + GHCR under the calliopeai
 # org. Image name matches the rest of the astrolift family
