@@ -801,8 +801,9 @@ omit it for a no-input definition. Sensitive schema fields accept opaque secret
 references, never literal credentials. Schema validation and defaults remain
 server-authoritative. Disabled or unsupported definitions cannot start.
 
-Before dispatch, the CLI synchronizes an exclusively created mode-0600 recovery
-file containing only the original UUID and actor/server/org/definition/revision/
+Before dispatch, the CLI flushes an exclusively created private recovery file
+(POSIX mode `0600`; Windows current-user ownership and a protected user/SYSTEM
+ACL), containing only the original UUID and actor/server/org/definition/revision/
 schema metadata. Existing files always perform read-only recovery: input files
 are never opened or resubmitted, including after an empty lookup. An absent
 record leaves the original outcome unknown; retain the file rather than making

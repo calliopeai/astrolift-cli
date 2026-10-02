@@ -58,7 +58,16 @@ astro auth status
 ```
 
 Configuration lives under `~/.config/astrolift/`. Credentials are stored per
-server and must be mode `0600`. Flags override `ASTROLIFT_*` environment
+server. The next CLI's private-file contract requires POSIX regular files with
+mode `0600`, or Windows files owned by the current process user with a protected
+non-inherited DACL allowing only that user and optionally `LOCAL_SYSTEM`.
+Windows reads check the actual handle's owner and ACL and reject broad/inherited
+permissions and final reparse-point targets. An explicit login can privately
+replace a current-user-owned legacy Windows credential file without reading it;
+ordinary reads refuse that file. Recovery files are never automatically replaced.
+Use a CLI release containing these platform-specific protections; this wording
+does not certify native Windows execution for an older release.
+Flags override `ASTROLIFT_*` environment
 variables, which override the config file.
 
 Global flags include `--api-url`, `--token`, `--org`, `--team`, `--project`,
@@ -293,8 +302,10 @@ shell admission are documented in the
 
 The next CLI adapts legacy `astro agent run` to this same reviewed Definition
 service: pass an exact definition GUID, `--request-file`, `--yes`, and
-`--inputs-file` for an input-bearing schema. `--input` accepts only `@file` as a
-compatibility alias; literal JSON is refused. `--wait` reads metadata for the
+`--inputs-file` for an input-bearing schema. For a new request, `--input` accepts
+only `@file` as a compatibility alias; literal JSON is refused. Existing request
+files recover read-only and ignore input flags without reading their files or
+parsing their values. `--wait` reads metadata for the
 exact execution and pinned engine identity and preserves one JSON receipt.
 See the [migration guide](../guides/agent-setup.md#migrate-a-legacy-workflow-definition-run).
 Direct agent-task dispatch and app-bound configured workflow runs are separate.

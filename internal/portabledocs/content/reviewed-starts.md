@@ -55,7 +55,10 @@ universal workflow input. Fields marked `writeOnly` or
 defaults. References are opaque inputs and are not expanded by this start
 mechanism; configure the agent's actual secret bindings separately.
 
-Use `chmod 600 inputs.json`. The CLI accepts a readable regular JSON file of at
+Protect the input file yourself: use `chmod 600 inputs.json` on POSIX systems,
+or a private file ACL on Windows. Input files are user-supplied files; they are
+not created or given the CLI's recovery-file protections automatically.
+The CLI accepts a readable regular JSON file of at
 most 64 KiB, containing exactly one object. It preserves JSON number values and
 supports nested structures. It refuses symlink input files. Input values are
 sent to the API, which stores frozen inputs encrypted; they are never written
@@ -79,8 +82,16 @@ an input-bearing contract requires a file, including `{}` when defaults suffice.
 
 ## Keep the request file and reconcile
 
-Before dispatch, the CLI exclusively creates and synchronizes a mode-0600
-metadata file. It contains a new UUID, exact definition GUID, reviewed revision
+Before dispatch, the CLI exclusively creates and flushes a private metadata
+file. On POSIX it must be a regular file with mode `0600`. On Windows the owner
+must be the current process user, with a protected, non-inherited DACL allowing
+only that user and optionally `LOCAL_SYSTEM`. Windows reads validate the actual
+file handle's owner and ACL and refuse broader, inherited or unsupported ACLs
+and final reparse-point targets. Recovery files are never automatically replaced;
+an existing file with inadequate protection is refused. File contents are
+flushed before dispatch; POSIX also synchronizes the containing directory.
+
+The file contains a new UUID, exact definition GUID, reviewed revision
 and schema digest, server, organization and user identity. It contains no
 runtime inputs, results or bearer credentials. Protect it and retain it after a
 timeout, refusal or lost reply; replacing an uncertain request with a new file
@@ -131,6 +142,7 @@ Lists are bounded server pages. Continue with the returned `nextCursor` as
 require an exact GUID. A pipeline request file binds the server, organization,
 actor, exact pipeline GUID, version, ref and original UUID before dispatch.
 Retain it if a response is lost.
+Pipeline recovery files use the same POSIX/Windows protections described above.
 
 Pipeline recovery differs from definition recovery because its saved inputs are
 only reviewed metadata. Reusing a pipeline file first reads the original request.
