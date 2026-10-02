@@ -20,7 +20,7 @@
   {
     "name": "astrolift-platform",
     "description": "The capability map of the Astrolift platform an app runs on — workload kinds, delivery, scheduling, secrets, managed services, observability, agents/workflows, tokens, and RBAC. Read before designing anything that touches deployment, infrastructure, scheduling, or integrations, so you build WITH the platform instead of around it.",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "path": "skills/astrolift-platform"
   },
   {

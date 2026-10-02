@@ -43,3 +43,6 @@ Use these plain-Markdown references as the current public contract. The target i
 ## Portable release-matched copy
 
 The astro CLI embeds a release-matched Markdown snapshot. Run `astro docs list`, `astro docs show <topic>`, or `astro docs export <directory>`. Generated CLI Markdown and man pages come from the executing command tree.
+
+- [Exact preview targets](https://astrolift.dev/guides/preview-targets/): Exact preview and environment GUID/version bindings, explicit runtime cost and scoped log reads.
+- [Workload signals](https://astrolift.dev/guides/workload-signals/): Per-signal scope, runtime membership, instrumentation, collectors, limits and unavailable states.

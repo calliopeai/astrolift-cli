@@ -106,12 +106,12 @@ pre-release so `:latest` consumers stop resolving to it, and cut the fix.
 
 Release archives and source are publicly readable from
 [GitHub Releases](https://github.com/calliopeai/astrolift-cli/releases).
-The legacy `scripts/install.sh` still requires authenticated `gh` or a
-`GITHUB_TOKEN`/`GH_TOKEN`/`ASTRO_GITHUB_TOKEN`, unless an
-`ASTRO_INSTALL_BASE_URL` mirror is configured. It does not yet fall back to
-anonymous GitHub downloads. Use the tested anonymous archive/checksum path in
-the [CLI install reference](https://astrolift.dev/reference/cli/#install) when
-GitHub credentials are unavailable.
+`scripts/install.sh` supports anonymous GitHub API downloads when no credentials
+are configured. Mirrors, an authenticated `gh`, and explicit tokens remain
+supported. Anonymous metadata and asset requests omit Authorization, and the
+archive checksum is verified before installation. Pin `ASTRO_INSTALL_TAG` when
+reproducible installs are required. See the
+[CLI install reference](https://astrolift.dev/reference/cli/#install).
 
 After publication, download the archives and `astro-checksums.txt` anonymously,
 verify each SHA-256 checksum, and run `astro version` from the host archive.

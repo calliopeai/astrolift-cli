@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +40,9 @@ func f64ptr(f float64) *float64 { return &f }
 func prPreview(pr int, branch string) previewEnvironment {
 	n := strconv.Itoa(pr)
 	return previewEnvironment{
-		ID:                 "guid-pr-" + branch,
+		ID:      uuid.NewSHA1(uuid.NameSpaceURL, []byte("guid-pr-"+branch)).String(),
+		Version: 1, EnvironmentStatus: "available", RuntimeStatus: "available",
+		Environment:        &previewTarget{PreviewID: uuid.NewSHA1(uuid.NameSpaceURL, []byte("guid-pr-"+branch)).String(), PreviewVersion: 1, AppID: "db383296-81b1-4e63-bdde-92a4611ef5f3", AppVersion: 1, AppSlug: "web", EnvironmentID: uuid.NewSHA1(uuid.NameSpaceURL, []byte("env-"+branch)).String(), EnvironmentVersion: 1, EnvironmentName: "preview-pr-" + n, ClusterID: "907bb9c7-03d0-424b-b8dd-ff4dcad88328", ClusterVersion: 1, Namespace: "acme-web-pr-" + n},
 		RegisteredAppSlug:  "web",
 		PRNumber:           pr,
 		Branch:             branch,
@@ -57,6 +60,15 @@ func prPreview(pr int, branch string) previewEnvironment {
 
 // previewRow renders a preview as the JSON map the GraphQL server returns.
 func previewRow(p previewEnvironment) map[string]interface{} {
+	if p.Version == 0 {
+		p.Version = 1
+	}
+	if p.RuntimeStatus == "" {
+		p.RuntimeStatus = "not_requested"
+	}
+	if p.EnvironmentStatus == "" {
+		p.EnvironmentStatus = "unavailable"
+	}
 	raw, err := json.Marshal(p)
 	if err != nil {
 		panic(err)
@@ -96,7 +108,14 @@ func previewsServer(t *testing.T, route func(req gqlRequest) map[string]interfac
 		if captured != nil {
 			*captured = append(*captured, req)
 		}
-		data := route(req)
+		fixtureReq := req
+		if strings.Contains(req.Query, "astroliftPreviewEnvironment(") {
+			fixtureReq.Query = previewEnvironmentsPageQuery
+		}
+		data := route(fixtureReq)
+		if strings.Contains(req.Query, "astroliftPreviewEnvironment(") {
+			data = previewExactFixture(data, req.Variables["id"])
+		}
 		if data == nil {
 			t.Errorf("unrouted operation:\n%s", req.Query)
 			data = map[string]interface{}{}
@@ -177,7 +196,7 @@ func TestResolvePreviewByPRNumber(t *testing.T) {
 // A manual preview reports prNumber 0. It must be unreachable through --pr —
 // otherwise `--pr 0` (or a mis-parsed flag) would silently select one.
 func TestResolvePreviewByPRSkipsManualPreviews(t *testing.T) {
-	manual := previewEnvironment{ID: "guid-manual", IsManual: true, PRNumber: 0, Branch: "spike", Status: "running"}
+	manual := previewEnvironment{ID: "39b02b97-6b5c-54cc-867c-2eb7631f432d", IsManual: true, PRNumber: 0, Branch: "spike", Status: "running"}
 	rows := []previewEnvironment{manual, prPreview(12, "feat/b")}
 
 	if _, err := resolvePreview(rows, previewSelector{pr: 0, prSet: true}); err == nil {
@@ -187,7 +206,7 @@ func TestResolvePreviewByPRSkipsManualPreviews(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolving a manual preview by branch: %v", err)
 	}
-	if got.ID != "guid-manual" {
+	if got.ID != "39b02b97-6b5c-54cc-867c-2eb7631f432d" {
 		t.Errorf("branch selector resolved %q, want guid-manual", got.ID)
 	}
 }
@@ -199,7 +218,7 @@ func TestResolvePreviewByBranchRejectsAmbiguity(t *testing.T) {
 	shared := "feat/shared"
 	rows := []previewEnvironment{
 		prPreview(12, shared),
-		{ID: "guid-manual", IsManual: true, PRNumber: 0, Branch: shared, Status: "running"},
+		{ID: "39b02b97-6b5c-54cc-867c-2eb7631f432d", IsManual: true, PRNumber: 0, Branch: shared, Status: "running"},
 	}
 	_, err := resolvePreview(rows, previewSelector{branch: shared})
 	if err == nil {
@@ -290,21 +309,6 @@ func TestPreviewURL(t *testing.T) {
 	}
 }
 
-func TestHostFromURL(t *testing.T) {
-	cases := []struct{ in, want string }{
-		{"https://pr-12.web.acme.example.com", "pr-12.web.acme.example.com"},
-		{"https://PR-12.Web.Acme.Example.com/", "pr-12.web.acme.example.com"},
-		{"http://localhost:8080/path", "localhost"},
-		{"pr-12.web.acme.example.com", "pr-12.web.acme.example.com"},
-		{"", ""},
-	}
-	for _, c := range cases {
-		if got := hostFromURL(c.in); got != c.want {
-			t.Errorf("hostFromURL(%q) = %q, want %q", c.in, got, c.want)
-		}
-	}
-}
-
 func TestPreviewMemoryLabel(t *testing.T) {
 	cases := []struct {
 		bytes float64
@@ -343,62 +347,13 @@ func TestPreviewCostLabelDistinguishesNullFromZero(t *testing.T) {
 	}
 }
 
-// ---- previewEnvironmentName --------------------------------------------------
-
-// Both backend creation paths write AppEnvironment.url as
-// "https://" + preview.hostname, which is the only exact join key available.
-func TestPreviewEnvironmentNameMatchesOnHostname(t *testing.T) {
-	envs := []previewAppEnvironment{
-		{Name: "production", URL: "https://web.acme.example.com"},
-		{Name: "preview-pr-12", URL: "https://PR-12.web.acme.example.com/"},
-	}
-	got := previewEnvironmentName(envs, prPreview(12, "feat/b"))
-	if got != "preview-pr-12" {
-		t.Errorf("environment = %q, want preview-pr-12", got)
-	}
-}
-
-// A manual preview's environment is named after its branch, not its PR, so
-// the host match is what reaches it at all.
-func TestPreviewEnvironmentNameResolvesManualPreview(t *testing.T) {
-	manual := previewEnvironment{
-		IsManual: true, PRNumber: 0, Branch: "spike/thing",
-		Hostname: "preview-spike-thing.web.acme.example.com",
-	}
-	envs := []previewAppEnvironment{
-		{Name: "production", URL: "https://web.acme.example.com"},
-		{Name: "preview-spike-thing", URL: "https://preview-spike-thing.web.acme.example.com"},
-	}
-	if got := previewEnvironmentName(envs, manual); got != "preview-spike-thing" {
-		t.Errorf("environment = %q, want preview-spike-thing", got)
-	}
-}
-
-func TestPreviewEnvironmentNameFallsBackToConvention(t *testing.T) {
-	// The url is not the preview hostname (an install without a managed
-	// zone rewrites it), but the conventional environment exists.
-	envs := []previewAppEnvironment{{Name: "preview-pr-12", URL: "https://something-else.example.com"}}
-	if got := previewEnvironmentName(envs, prPreview(12, "feat/b")); got != "preview-pr-12" {
-		t.Errorf("environment = %q, want the conventional preview-pr-12", got)
-	}
-}
-
-// Guessing "preview-pr-N" when the platform has no such environment turns a
-// resolution failure into a silently empty log tail.
-func TestPreviewEnvironmentNameDoesNotInventAName(t *testing.T) {
-	envs := []previewAppEnvironment{{Name: "production", URL: "https://web.acme.example.com"}}
-	if got := previewEnvironmentName(envs, prPreview(12, "feat/b")); got != "" {
-		t.Errorf("environment = %q, want empty for an unresolvable preview", got)
-	}
-}
-
 // ---- astro app previews list -------------------------------------------------
 
 func TestAppPreviewsListRendersRows(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -423,7 +378,7 @@ func TestAppPreviewsListHidesTornDownByDefault(t *testing.T) {
 	gone.TornDownAt = strptr("2026-08-10T00:00:00+00:00")
 	rows := []previewEnvironment{gone, prPreview(12, "feat/b")}
 
-	srv := gqlServer(t, previewPage(rows, ""), nil)
+	srv := previewStaticServer(t, previewPage(rows, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -454,7 +409,7 @@ func TestAppPreviewsListEmptyMentionsAll(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage(nil, ""), nil)
+	srv := previewStaticServer(t, previewPage(nil, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -508,7 +463,7 @@ func TestAppPreviewsListLimitTruncates(t *testing.T) {
 	defer resetPreviewsFlags()
 
 	rows := []previewEnvironment{prPreview(12, "feat/b"), prPreview(7, "feat/a")}
-	srv := gqlServer(t, previewPage(rows, ""), nil)
+	srv := previewStaticServer(t, previewPage(rows, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -528,7 +483,7 @@ func TestAppPreviewsListJSONShape(t *testing.T) {
 
 	p := prPreview(12, "feat/b")
 	p.EstimatedDailyCostUSD = f64ptr(1.25)
-	srv := gqlServer(t, previewPage([]previewEnvironment{p}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{p}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -567,7 +522,7 @@ func TestAppPreviewsShowRendersDetail(t *testing.T) {
 
 	p := prPreview(12, "feat/b")
 	p.EstimatedDailyCostUSD = f64ptr(1.25)
-	srv := gqlServer(t, previewPage([]previewEnvironment{prPreview(7, "feat/a"), p}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(7, "feat/a"), p}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -606,7 +561,7 @@ func TestAppPreviewsShowWithoutHostname(t *testing.T) {
 	building.Status = "building"
 	building.Hostname = ""
 	building.LastDeployedAt = nil
-	srv := gqlServer(t, previewPage([]previewEnvironment{building}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{building}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -628,7 +583,7 @@ func TestAppPreviewsShowUnknownPRErrors(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -667,7 +622,7 @@ func TestAppPreviewsShowJSONEmitsTheRow(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -693,7 +648,7 @@ func TestAppPreviewsOpenPrintsURL(t *testing.T) {
 	previewsOpenURLOnly = true // never shell out to a browser in tests
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -711,7 +666,7 @@ func TestAppPreviewsOpenJSONCarriesURL(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -740,7 +695,7 @@ func TestAppPreviewsOpenWithoutHostnameErrors(t *testing.T) {
 	building := prPreview(12, "feat/b")
 	building.Status = "building"
 	building.Hostname = ""
-	srv := gqlServer(t, previewPage([]previewEnvironment{building}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{building}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -784,14 +739,14 @@ func TestAppPreviewsTeardownSendsPreviewGUID(t *testing.T) {
 		t.Fatalf("runAppPreviewsTeardown: %v", err)
 	}
 
-	if len(captured) != 2 {
-		t.Fatalf("expected a list then a mutation, got %d requests", len(captured))
+	if len(captured) != 3 {
+		t.Fatalf("expected catalog, exact read, then mutation, got %d requests", len(captured))
 	}
-	input, ok := captured[1].Variables["input"].(map[string]interface{})
+	input, ok := captured[len(captured)-1].Variables["input"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("mutation input missing: %#v", captured[1].Variables)
 	}
-	if input["id"] != "guid-pr-feat/b" {
+	if input["id"] != "a57661a6-f9e4-5fc6-9b9e-b44dd516736b" {
 		t.Errorf("teardown id = %v, want the selected preview's guid", input["id"])
 	}
 	if !strings.Contains(out.String(), "Teardown requested") {
@@ -986,7 +941,7 @@ func TestAppPreviewsPinSendsPinnedTrueForTheSelectedPreview(t *testing.T) {
 	}
 
 	input := mutationInput(t, captured, "setPreviewPinned")
-	if input["id"] != "guid-pr-feat/b" {
+	if input["id"] != "a57661a6-f9e4-5fc6-9b9e-b44dd516736b" {
 		t.Errorf("pin id = %v, want the selected preview's guid", input["id"])
 	}
 	if input["pinned"] != true {
@@ -1310,7 +1265,7 @@ func TestAppPreviewsPinReusesSelectorResolution(t *testing.T) {
 			name: "ambiguous branch refuses to guess",
 			rows: []previewEnvironment{
 				prPreview(12, shared),
-				{ID: "guid-manual", IsManual: true, PRNumber: 0, Branch: shared, Status: "running"},
+				{ID: "39b02b97-6b5c-54cc-867c-2eb7631f432d", IsManual: true, PRNumber: 0, Branch: shared, Status: "running"},
 			},
 			sel:     previewSelector{branch: shared},
 			pinned:  false,
@@ -1399,7 +1354,7 @@ func TestAppPreviewsListRendersThePinnedColumn(t *testing.T) {
 		pinnedRow(prPreview(12, "feat/b"), "holding for the design review"),
 		prPreview(7, "feat/a"),
 	}
-	srv := gqlServer(t, previewPage(rows, ""), nil)
+	srv := previewStaticServer(t, previewPage(rows, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -1436,7 +1391,7 @@ func TestAppPreviewsShowRendersThePinTrail(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage([]previewEnvironment{
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{
 		pinnedRow(prPreview(12, "feat/b"), "holding for the design review"),
 	}, ""), nil)
 	defer srv.Close()
@@ -1467,7 +1422,7 @@ func TestAppPreviewsShowOmitsThePinTrailWhenUnpinned(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
-	srv := gqlServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
+	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(12, "feat/b")}, ""), nil)
 	defer srv.Close()
 
 	cmd, out := appTestCmd()
@@ -1595,7 +1550,10 @@ func TestAppPreviewsLogsErrorsWhenEnvironmentUnresolvable(t *testing.T) {
 	srv := previewsServer(t, func(req gqlRequest) map[string]interface{} {
 		switch {
 		case strings.Contains(req.Query, "astroliftPreviewEnvironmentsPage"):
-			return previewPage([]previewEnvironment{prPreview(12, "feat/b")}, "")
+			p := prPreview(12, "feat/b")
+			p.Environment = nil
+			p.EnvironmentStatus = "unavailable"
+			return previewPage([]previewEnvironment{p}, "")
 		case strings.Contains(req.Query, "astroliftEnvironments"):
 			return map[string]interface{}{"astroliftEnvironments": []map[string]interface{}{
 				{"name": "production", "url": "https://web.acme.example.com"},
@@ -1611,7 +1569,7 @@ func TestAppPreviewsLogsErrorsWhenEnvironmentUnresolvable(t *testing.T) {
 	cmd, _ := appTestCmd()
 	err := runAppPreviewsLogs(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web",
 		previewSelector{pr: 12, prSet: true})
-	if err == nil || !strings.Contains(err.Error(), "could not resolve the environment") {
+	if err == nil || !strings.Contains(err.Error(), "binding is unavailable") {
 		t.Fatalf("err = %v, want an unresolved-environment error", err)
 	}
 }
@@ -1732,7 +1690,7 @@ func TestAppPreviewsTeardownJSONReportsTheRequest(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
 		t.Fatalf("decoding JSON: %v\n%s", err, out.String())
 	}
-	if result.ID != "guid-pr-feat/b" || result.PRNumber != 12 || !result.TeardownRequested {
+	if result.ID != "a57661a6-f9e4-5fc6-9b9e-b44dd516736b" || result.PRNumber != 12 || !result.TeardownRequested {
 		t.Errorf("unexpected teardown result: %+v", result)
 	}
 	// The teardown is asynchronous, so reporting the pre-teardown status is
@@ -1760,4 +1718,19 @@ func TestAppPreviewsSelectorFlagsOnEveryVerb(t *testing.T) {
 			t.Errorf("astro app previews %s is not registered", name)
 		}
 	}
+}
+
+// Adapt existing catalog fixtures to the new singular read, always matching GUID.
+func previewExactFixture(data map[string]interface{}, id interface{}) map[string]interface{} {
+	page, _ := data["astroliftPreviewEnvironmentsPage"].(map[string]interface{})
+	rows, _ := page["items"].([]map[string]interface{})
+	for _, row := range rows {
+		if row["id"] == id {
+			return map[string]interface{}{"astroliftPreviewEnvironment": row}
+		}
+	}
+	return map[string]interface{}{"astroliftPreviewEnvironment": nil}
+}
+func previewStaticServer(t *testing.T, data map[string]interface{}, captured *[]gqlRequest) *httptest.Server {
+	return previewsServer(t, func(gqlRequest) map[string]interface{} { return data }, captured)
 }

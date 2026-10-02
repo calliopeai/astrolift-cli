@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/calliopeai/astrolift-cli/internal/config"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -50,21 +50,32 @@ type projectResourceAttachment struct {
 }
 
 type projectResource struct {
-	ID                string                      `json:"id"`
-	Name              string                      `json:"name"`
-	Kind              string                      `json:"kind"`
-	Variant           string                      `json:"variant"`
-	Status            string                      `json:"status"`
-	StatusError       string                      `json:"statusError"`
-	Config            map[string]interface{}      `json:"config"`
-	ProjectSlug       string                      `json:"projectSlug"`
-	ClusterSlug       string                      `json:"clusterSlug"`
-	EnvironmentName   string                      `json:"environmentName"`
-	ProviderPortalURL string                      `json:"providerPortalUrl"`
-	EditableFields    []string                    `json:"editableFields"`
-	Attachments       []projectResourceAttachment `json:"attachments"`
-	CreatedAt         string                      `json:"createdAt"`
-	UpdatedAt         string                      `json:"updatedAt"`
+	ID                   string `json:"id"`
+	ContextRevision      string `json:"contextRevision"`
+	Version              int    `json:"version"`
+	Name                 string `json:"name"`
+	Kind                 string `json:"kind"`
+	Variant              string `json:"variant"`
+	Status               string `json:"status"`
+	OwnerScope           string `json:"ownerScope"`
+	OrganizationID       string `json:"organizationId"`
+	ProjectID            string `json:"projectId"`
+	ProjectSlug          string `json:"projectSlug"`
+	RegisteredAppID      string `json:"registeredAppId"`
+	RegisteredAppSlug    string `json:"registeredAppSlug"`
+	ClusterID            string `json:"clusterId"`
+	ClusterSlug          string `json:"clusterSlug"`
+	ClusterVersion       int    `json:"clusterVersion"`
+	EnvironmentID        string `json:"environmentId"`
+	EnvironmentName      string `json:"environmentName"`
+	EnvironmentVersion   *int   `json:"environmentVersion"`
+	OperationKind        string `json:"operationKind"`
+	OperationWorkflowID  string `json:"operationWorkflowId"`
+	OperationRunID       string `json:"operationRunId"`
+	OperationStartedAt   string `json:"operationStartedAt"`
+	OperationCompletedAt string `json:"operationCompletedAt"`
+	CreatedAt            string `json:"createdAt"`
+	UpdatedAt            string `json:"updatedAt"`
 }
 
 type projectResourceCostPreview struct {
@@ -135,10 +146,10 @@ var projectResourceListCmd = &cobra.Command{
 
 var projectResourceShowCmd = &cobra.Command{
 	Use:   "show <name-or-id>",
-	Short: "Show one shared resource and its attachments",
+	Short: "Review one shared resource by exact GUID (or bounded name discovery)",
 	Args:  cobra.ExactArgs(1),
 	RunE: projectResourceRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef) error {
-		resource, err := resolveProjectResource(ctx, client, project.ID, cmd.Flags().Arg(0))
+		resource, err := resolveProjectResourceRevision(ctx, client, project.ID, cmd.Flags().Arg(0), resourceStringFlag(cmd, "expected-context-revision"))
 		if err != nil {
 			return err
 		}
@@ -372,141 +383,6 @@ func runProjectResourceCatalog(cmd *cobra.Command, ctx context.Context, client *
 	return w.Flush()
 }
 
-func listProjectResources(ctx context.Context, client *api.Client, projectID string) ([]projectResource, error) {
-	var resp struct {
-		Resources []projectResource `json:"astroliftProjectManagedServices"`
-	}
-	query := `query($projectId: GUID!) {
-  astroliftProjectManagedServices(projectId: $projectId) {
-    id name kind variant status statusError config projectSlug clusterSlug
-    environmentName providerPortalUrl editableFields createdAt updatedAt
-    attachments { id consumerKind consumerSlug environmentName }
-  }
-}`
-	if err := client.GraphQL(ctx, query, map[string]interface{}{"projectId": projectID}, &resp); err != nil {
-		return nil, fmt.Errorf("listing project resources: %w", err)
-	}
-	return resp.Resources, nil
-}
-
-func runProjectResourceList(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef) error {
-	resources, err := listProjectResources(ctx, client, project.ID)
-	if err != nil {
-		return err
-	}
-	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, resources)
-	}
-	if len(resources) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No project resources found.")
-		return nil
-	}
-	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tKIND\tVARIANT\tSTATUS\tCLUSTER\tATTACHED\tID")
-	for _, resource := range resources {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
-			resource.Name, resource.Kind, dashIfEmpty(resource.Variant), resource.Status,
-			dashIfEmpty(resource.ClusterSlug), len(resource.Attachments), resource.ID)
-	}
-	return w.Flush()
-}
-
-func resolveProjectResource(ctx context.Context, client *api.Client, projectID, selector string) (*projectResource, error) {
-	resources, err := listProjectResources(ctx, client, projectID)
-	if err != nil {
-		return nil, err
-	}
-	matches := make([]projectResource, 0, 1)
-	for _, resource := range resources {
-		if resource.ID == selector || resource.Name == selector {
-			matches = append(matches, resource)
-		}
-	}
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("project resource %q not found", selector)
-	}
-	if len(matches) > 1 {
-		return nil, fmt.Errorf("project resource name %q is ambiguous; use its GUID", selector)
-	}
-	return &matches[0], nil
-}
-
-func renderProjectResource(cmd *cobra.Command, resource *projectResource) error {
-	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, resource)
-	}
-	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "Name:        %s\n", resource.Name)
-	fmt.Fprintf(out, "ID:          %s\n", resource.ID)
-	fmt.Fprintf(out, "Kind:        %s / %s\n", resource.Kind, dashIfEmpty(resource.Variant))
-	fmt.Fprintf(out, "Status:      %s\n", resource.Status)
-	fmt.Fprintf(out, "Cluster:     %s\n", dashIfEmpty(resource.ClusterSlug))
-	fmt.Fprintf(out, "Environment: %s\n", resource.EnvironmentName)
-	if resource.ProviderPortalURL != "" {
-		fmt.Fprintf(out, "Provider:    %s\n", resource.ProviderPortalURL)
-	}
-	if resource.StatusError != "" {
-		fmt.Fprintf(out, "Error:       %s\n", resource.StatusError)
-	}
-	if len(resource.EditableFields) > 0 {
-		fmt.Fprintf(out, "Editable:    %s\n", strings.Join(resource.EditableFields, ", "))
-	}
-	if len(resource.Attachments) > 0 {
-		fmt.Fprintln(out, "Attachments:")
-		for _, attachment := range resource.Attachments {
-			fmt.Fprintf(out, "  %s  %s:%s (%s)\n", attachment.ID, attachment.ConsumerKind, attachment.ConsumerSlug, attachment.EnvironmentName)
-		}
-	}
-	configJSON, _ := json.MarshalIndent(resource.Config, "", "  ")
-	fmt.Fprintf(out, "Config:\n%s\n", configJSON)
-	return nil
-}
-
-func runProjectResourceCost(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, selector string) error {
-	resource, err := resolveProjectResource(ctx, client, project.ID, selector)
-	if err != nil {
-		return err
-	}
-	var resp struct {
-		Preview *projectResourceCostPreview `json:"astroliftManagedServiceCostPreview"`
-	}
-	query := `query($managedServiceId: GUID!) {
-  astroliftManagedServiceCostPreview(managedServiceId: $managedServiceId) {
-    managedServiceId available reason message monthlyTotal currency lineItems
-    pricingSourceUrl pricingFetchedAt notes approximate
-  }
-}`
-	if err := client.GraphQL(ctx, query, map[string]interface{}{"managedServiceId": resource.ID}, &resp); err != nil {
-		return fmt.Errorf("previewing project resource cost: %w", err)
-	}
-	if resp.Preview == nil {
-		return fmt.Errorf("project resource %q is no longer visible", selector)
-	}
-	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, resp.Preview)
-	}
-	if !resp.Preview.Available || resp.Preview.MonthlyTotal == nil {
-		detail := resp.Preview.Message
-		if detail == "" {
-			detail = resp.Preview.Reason
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Cost unavailable: %s\n", detail)
-		return nil
-	}
-	prefix := ""
-	if resp.Preview.Approximate {
-		prefix = "approximately "
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s%.2f %s/month\n", prefix, *resp.Preview.MonthlyTotal, resp.Preview.Currency)
-	if resp.Preview.PricingSourceURL != "" {
-		fmt.Fprintf(cmd.OutOrStdout(), "Pricing source: %s\n", resp.Preview.PricingSourceURL)
-	}
-	for _, note := range resp.Preview.Notes {
-		fmt.Fprintf(cmd.OutOrStdout(), "Note: %s\n", note)
-	}
-	return nil
-}
-
 func parseResourceConfig(raw, size string) (map[string]interface{}, error) {
 	if strings.TrimSpace(raw) == "" {
 		raw = "{}"
@@ -548,27 +424,27 @@ func runProjectResourceAdd(cmd *cobra.Command, ctx context.Context, client *api.
 	const mutation = `mutation($input: ProvisionProjectManagedServiceInput!) {
   provisionProjectManagedService(input: $input) {
     ok errors { code message field }
-    data { id name kind variant status statusError config projectSlug clusterSlug environmentName editableFields createdAt updatedAt attachments { id consumerKind consumerSlug environmentName } }
+    data { id name kind variant status projectSlug clusterSlug environmentName createdAt updatedAt operationKind operationWorkflowId operationRunId operationStartedAt operationCompletedAt }
   }
 }`
 	var resp struct {
 		Result projectResourceMutation `json:"provisionProjectManagedService"`
 	}
 	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": input}, &resp); err != nil {
-		return fmt.Errorf("provisioning project resource: %w", err)
+		return fmt.Errorf("provision request failed; outcome may be unconfirmed")
 	}
 	if !resp.Result.OK || resp.Result.Data == nil {
-		return fmt.Errorf("provision failed: %s", firstDeployError(resp.Result.Errors))
+		return fmt.Errorf("provision failed: %s", resourceErrorCode(resp.Result.Errors))
 	}
 	return renderProjectResource(cmd, resp.Result.Data)
 }
 
 func runProjectResourceUpdate(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, selector string, opts projectResourceOptions) error {
-	resource, err := resolveProjectResource(ctx, client, project.ID, selector)
+	resource, err := resolveProjectResourceRevision(ctx, client, project.ID, selector, resourceStringFlag(cmd, "expected-context-revision"))
 	if err != nil {
 		return err
 	}
-	input := map[string]interface{}{"id": resource.ID}
+	input := map[string]interface{}{"id": resource.ID, "expectedContextRevision": resource.ContextRevision}
 	if opts.Name != "" {
 		input["name"] = opts.Name
 	}
@@ -579,47 +455,48 @@ func runProjectResourceUpdate(cmd *cobra.Command, ctx context.Context, client *a
 		}
 		input["config"] = config
 	}
-	if len(input) == 1 {
+	if len(input) == 2 {
 		return fmt.Errorf("provide --name and/or --config")
 	}
 	return mutateProjectResource(cmd, ctx, client, "updateProjectManagedService", "UpdateManagedServiceInput!", input)
 }
 
 func runProjectResourceReprovision(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, selector string) error {
-	resource, err := resolveProjectResource(ctx, client, project.ID, selector)
+	resource, err := resolveProjectResourceRevision(ctx, client, project.ID, selector, resourceStringFlag(cmd, "expected-context-revision"))
 	if err != nil {
 		return err
 	}
-	return mutateProjectResource(cmd, ctx, client, "reprovisionProjectManagedService", "ReprovisionManagedServiceInput!", map[string]interface{}{"managedServiceId": resource.ID})
+	return mutateProjectResource(cmd, ctx, client, "reprovisionProjectManagedService", "ReprovisionManagedServiceInput!", map[string]interface{}{"managedServiceId": resource.ID, "expectedContextRevision": resource.ContextRevision})
 }
 
 func mutateProjectResource(cmd *cobra.Command, ctx context.Context, client *api.Client, field, inputType string, input map[string]interface{}) error {
 	mutation := fmt.Sprintf(`mutation($input: %s) {
   %s(input: $input) {
     ok errors { code message field }
-    data { id name kind variant status statusError config projectSlug clusterSlug environmentName editableFields createdAt updatedAt attachments { id consumerKind consumerSlug environmentName } }
+    data { id name kind variant status projectSlug clusterSlug environmentName createdAt updatedAt operationKind operationWorkflowId operationRunId operationStartedAt operationCompletedAt }
   }
 }`, inputType, field)
 	var envelope map[string]projectResourceMutation
 	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": input}, &envelope); err != nil {
-		return fmt.Errorf("%s: %w", field, err)
+		return fmt.Errorf("%s request failed; outcome may be unconfirmed", field)
 	}
 	result := envelope[field]
 	if !result.OK || result.Data == nil {
-		return fmt.Errorf("%s failed: %s", field, firstDeployError(result.Errors))
+		return fmt.Errorf("%s failed: %s", field, resourceErrorCode(result.Errors))
 	}
 	return renderProjectResource(cmd, result.Data)
 }
 
 func runProjectResourceAttach(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, selector string, opts projectResourceOptions) error {
-	resource, err := resolveProjectResource(ctx, client, project.ID, selector)
-	if err != nil {
-		return err
-	}
 	if len(opts.Agents)+len(opts.AppEnvironments) != 1 {
 		return fmt.Errorf("provide exactly one --agent <env-spec-slug> or --app-env <guid>")
 	}
-	input := map[string]interface{}{"managedServiceId": resource.ID}
+
+	resource, err := resolveProjectResourceRevision(ctx, client, project.ID, selector, resourceStringFlag(cmd, "expected-context-revision"))
+	if err != nil {
+		return err
+	}
+	input := map[string]interface{}{"managedServiceId": resource.ID, "expectedContextRevision": resource.ContextRevision}
 	if len(opts.Agents) == 1 {
 		input["agentEnvironmentSpecSlug"] = opts.Agents[0]
 	} else {
@@ -639,10 +516,10 @@ func runProjectResourceAttach(cmd *cobra.Command, ctx context.Context, client *a
 		} `json:"attachProjectManagedService"`
 	}
 	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": input}, &resp); err != nil {
-		return fmt.Errorf("attaching project resource: %w", err)
+		return fmt.Errorf("attach request failed; outcome may be unconfirmed")
 	}
 	if !resp.Result.OK || resp.Result.Data == nil {
-		return fmt.Errorf("attach failed: %s", firstDeployError(resp.Result.Errors))
+		return fmt.Errorf("attach failed: %s", resourceErrorCode(resp.Result.Errors))
 	}
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Result.Data)
@@ -651,7 +528,21 @@ func runProjectResourceAttach(cmd *cobra.Command, ctx context.Context, client *a
 	return nil
 }
 
-func runProjectResourceDetach(cmd *cobra.Command, ctx context.Context, client *api.Client, _ projectRef, attachmentID string) error {
+func runProjectResourceDetach(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, attachmentID string) error {
+	resourceID := resourceStringFlag(cmd, "resource")
+	var resource *projectResource
+	var err error
+	if resourceID == "" {
+		resource, err = resolveProjectAttachmentResource(ctx, client, project.ID, attachmentID, resourceStringFlag(cmd, "expected-context-revision"))
+	} else {
+		if _, parseErr := uuid.Parse(resourceID); parseErr != nil {
+			return fmt.Errorf("--resource requires an exact GUID")
+		}
+		resource, err = resolveProjectResourceRevision(ctx, client, project.ID, resourceID, resourceStringFlag(cmd, "expected-context-revision"))
+	}
+	if err != nil {
+		return err
+	}
 	const mutation = `mutation($input: DetachProjectManagedServiceInput!) {
   detachProjectManagedService(input: $input) {
     ok errors { code message field }
@@ -665,11 +556,11 @@ func runProjectResourceDetach(cmd *cobra.Command, ctx context.Context, client *a
 			Data   *projectResourceAttachment `json:"data"`
 		} `json:"detachProjectManagedService"`
 	}
-	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": map[string]interface{}{"attachmentId": attachmentID}}, &resp); err != nil {
-		return fmt.Errorf("detaching project resource: %w", err)
+	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": map[string]interface{}{"attachmentId": attachmentID, "managedServiceId": resource.ID, "expectedContextRevision": resource.ContextRevision}}, &resp); err != nil {
+		return fmt.Errorf("detach request failed; outcome may be unconfirmed")
 	}
 	if !resp.Result.OK || resp.Result.Data == nil {
-		return fmt.Errorf("detach failed: %s", firstDeployError(resp.Result.Errors))
+		return fmt.Errorf("detach failed: %s", resourceErrorCode(resp.Result.Errors))
 	}
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Result.Data)
@@ -679,11 +570,11 @@ func runProjectResourceDetach(cmd *cobra.Command, ctx context.Context, client *a
 }
 
 func runProjectResourceRemove(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, selector string, opts projectResourceOptions) error {
-	resource, err := resolveProjectResource(ctx, client, project.ID, selector)
+	resource, err := resolveProjectResourceRevision(ctx, client, project.ID, selector, resourceStringFlag(cmd, "expected-context-revision"))
 	if err != nil {
 		return err
 	}
-	input := map[string]interface{}{"id": resource.ID, "deleteData": opts.DeleteData, "forceDestroy": opts.ForceDestroy}
+	input := map[string]interface{}{"id": resource.ID, "expectedContextRevision": resource.ContextRevision, "deleteData": opts.DeleteData, "forceDestroy": opts.ForceDestroy}
 	const mutation = `mutation($input: DeprovisionManagedServiceInput!) {
   deprovisionProjectManagedService(input: $input) {
     ok errors { code message field }
@@ -701,10 +592,10 @@ func runProjectResourceRemove(cmd *cobra.Command, ctx context.Context, client *a
 		} `json:"deprovisionProjectManagedService"`
 	}
 	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": input}, &resp); err != nil {
-		return fmt.Errorf("deprovisioning project resource: %w", err)
+		return fmt.Errorf("deprovision request failed; outcome may be unconfirmed")
 	}
 	if !resp.Result.OK || resp.Result.Data == nil {
-		return fmt.Errorf("remove failed: %s", firstDeployError(resp.Result.Errors))
+		return fmt.Errorf("remove failed: %s", resourceErrorCode(resp.Result.Errors))
 	}
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Result.Data)

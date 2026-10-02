@@ -77,7 +77,7 @@ astro agent run <definition-guid> --inputs-file ./inputs.json \
 astro workflow definition-reconcile --request-file ./definition-request.json --json
 ```
 
-Use a CLI release containing this migration; published v0.7.2 predates it.
+Use CLI v0.8.0 or later for this reviewed Definition migration.
 For a new request, `--input @inputs.json` remains a file-only compatibility
 alias; a literal JSON `--input` is refused with migration guidance. Existing
 request files take read-only recovery and ignore input flags without opening

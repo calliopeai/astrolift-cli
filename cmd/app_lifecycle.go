@@ -211,12 +211,13 @@ const deregisterAstroliftAppMutation = `mutation($input: DeregisterAppInput!) {
   }
 }`
 
-const astroliftAppLogsQuery = `query($appSlug: String!, $since: DateTime!, $until: DateTime!, $environmentName: String, $workloadSlug: String, $level: String, $search: String, $limit: Int!, $cursor: String) {
-  astroliftAppLogs(appSlug: $appSlug, since: $since, until: $until, environmentName: $environmentName, workloadSlug: $workloadSlug, level: $level, search: $search, limit: $limit, cursor: $cursor) {
+const astroliftAppLogsQuery = `query($appSlug: String!, $since: DateTime!, $until: DateTime!, $environmentName: String, $workloadSlug: String, $level: String, $search: String, $limit: Int!, $cursor: String, $previewId: GUID, $expectedEnvironmentId: GUID, $ifMatchPreviewVersion: Int, $ifMatchEnvironmentVersion: Int) {
+  astroliftAppLogs(appSlug: $appSlug, since: $since, until: $until, environmentName: $environmentName, workloadSlug: $workloadSlug, level: $level, search: $search, limit: $limit, cursor: $cursor, previewId: $previewId, expectedEnvironmentId: $expectedEnvironmentId, ifMatchPreviewVersion: $ifMatchPreviewVersion, ifMatchEnvironmentVersion: $ifMatchEnvironmentVersion) {
     items { podName container timestamp message level stream }
     nextCursor
     reachedRetention
     historicalAvailable
+    reason
     totalCount
   }
 }`
@@ -379,6 +380,7 @@ func (l appLogLine) key() string {
 }
 
 type appLogPage struct {
+	Reason              string       `json:"reason"`
 	Items               []appLogLine `json:"items"`
 	NextCursor          string       `json:"nextCursor"`
 	ReachedRetention    bool         `json:"reachedRetention"`
@@ -1092,6 +1094,10 @@ Filter with --level and --search; pick an environment with --env.`,
 }
 
 func runAppLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, workload string) error {
+	return runAppLogsWithTarget(cmd, ctx, client, slug, workload, nil)
+}
+
+func runAppLogsWithTarget(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, workload string, target map[string]interface{}) error {
 	window, err := time.ParseDuration(appLogsSince)
 	if err != nil {
 		return fmt.Errorf("--since %q is not a valid duration (e.g. 30m, 1h, 24h): %w", appLogsSince, err)
@@ -1112,6 +1118,10 @@ func runAppLogs(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 	}
 	if appLogsSearch != "" {
 		base["search"] = appLogsSearch
+	}
+
+	for key, value := range target {
+		base[key] = value
 	}
 
 	if boolFlag(cmd, "json") {
@@ -1258,6 +1268,9 @@ func printLogLine(out io.Writer, l appLogLine) {
 // to stderr so they don't pollute the log stream on stdout.
 func logMetaNotes(cmd *cobra.Command, meta appLogPage) {
 	errOut := cmd.ErrOrStderr()
+	if meta.Reason == "ERROR" {
+		fmt.Fprintln(errOut, "note: log backend is unavailable; this empty response does not establish that no logs exist")
+	}
 	if !meta.HistoricalAvailable {
 		fmt.Fprintln(errOut,
 			"note: this cluster has no historical log backend configured (live tail only)")

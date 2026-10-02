@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+## 0.9.0 — 2026-10-02
+
+- Read preview GUIDs and their persisted environment identity directly, with
+  explicitly requested pricing and reviewed log routes that never infer a
+  replacement from a hostname or environment name (#2206).
+- Page project resources, resource consumers and app services. Default lists
+  retain JSON arrays; `--page` returns one bounded continuation envelope. Show
+  credential-free exact owner/placement metadata, require fresh context on
+  existing-resource writes, and preserve attachment-only detach through exact
+  visible-owner discovery rather than a catalogue scan (#2207).
+- Bundle 18 offline guides, adding exact previews and workload measurement scope.
+  Keep canonical documentation and the platform skill byte-identical to their
+  reviewed source; document collector, instrumentation and redeploy requirements.
+
+- The public release installer supports anonymous latest or pinned downloads when
+  no GitHub credentials are configured. Mirrors and authenticated downloads remain
+  available; checksums are verified before installation, and access errors identify
+  missing releases, rejected authentication or rate limits. The canonical and offline
+  installation guides document the same behavior (#134).
+
 ## 0.8.0 — 2026-10-02
 
 ### Added
