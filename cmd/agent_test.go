@@ -57,77 +57,12 @@ func agentTestCmd() (*cobra.Command, *bytes.Buffer) {
 	return c, out
 }
 
-func TestAgentRunSendsMutationAndParsesIDs(t *testing.T) {
-	agentRunInput = `{"pr":12}`
-	agentRunWait = false
-	defer func() { agentRunInput = "" }()
-
-	var captured gqlRequest
-	srv := gqlServer(t, map[string]interface{}{
-		"runWorkflowDefinition": map[string]interface{}{
-			"ok":                 true,
-			"errors":             []interface{}{},
-			"workflowRunId":      "42",
-			"temporalWorkflowId": "WorkflowDefinitionRunWorkflow-42",
-		},
-	}, &captured)
-	defer srv.Close()
-
-	client := api.NewClient(srv.URL, "tok", false)
-	cmd, out := agentTestCmd()
-	if err := runAgentRun(cmd, context.Background(), client, &config.Config{}, "triage-pr"); err != nil {
-		t.Fatalf("runAgentRun: %v", err)
-	}
-
-	// Sent the right operation + variables.
-	if !strings.Contains(captured.Query, "runWorkflowDefinition(workflowSlug: $workflowSlug, triggerPayload: $triggerPayload)") {
-		t.Errorf("query did not call runWorkflowDefinition with expected args:\n%s", captured.Query)
-	}
-	if captured.Variables["workflowSlug"] != "triage-pr" {
-		t.Errorf("workflowSlug var = %v, want triage-pr", captured.Variables["workflowSlug"])
-	}
-	payload, ok := captured.Variables["triggerPayload"].(map[string]interface{})
-	if !ok || payload["pr"].(float64) != 12 {
-		t.Errorf("triggerPayload var = %v, want {pr:12}", captured.Variables["triggerPayload"])
-	}
-
-	// Parsed both ids from the camelCase result.
-	got := out.String()
-	if !strings.Contains(got, "WorkflowRun ID:    42") {
-		t.Errorf("output missing workflowRunId:\n%s", got)
-	}
-	if !strings.Contains(got, "Temporal workflow: WorkflowDefinitionRunWorkflow-42") {
-		t.Errorf("output missing temporalWorkflowId:\n%s", got)
-	}
-}
-
-func TestAgentRunSurfacesValidationError(t *testing.T) {
-	agentRunInput = ""
-	agentRunWait = false
-
-	srv := gqlServer(t, map[string]interface{}{
-		"runWorkflowDefinition": map[string]interface{}{
-			"ok": false,
-			"errors": []interface{}{
-				map[string]interface{}{
-					"field":    "workflowSlug",
-					"messages": []interface{}{`Workflow "nope" not found or disabled`},
-				},
-			},
-			"workflowRunId":      nil,
-			"temporalWorkflowId": nil,
-		},
-	}, nil)
-	defer srv.Close()
-
-	client := api.NewClient(srv.URL, "tok", false)
+func TestAgentRunRequiresAnExactReviewedDefinition(t *testing.T) {
+	client := api.NewClient("http://127.0.0.1:1", "token", false)
 	cmd, _ := agentTestCmd()
-	err := runAgentRun(cmd, context.Background(), client, &config.Config{}, "nope")
-	if err == nil {
-		t.Fatal("expected error when ok=false")
-	}
-	if !strings.Contains(err.Error(), "workflowSlug") || !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error did not surface the validation message: %v", err)
+	err := runAgentRun(cmd, context.Background(), client, &config.Config{}, "triage-pr")
+	if err == nil || !strings.Contains(err.Error(), "exact definition GUID") {
+		t.Fatalf("expected exact review migration guidance, got %v", err)
 	}
 }
 

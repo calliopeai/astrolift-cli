@@ -209,70 +209,75 @@ func printDefinitionStart(cmd *cobra.Command, r *reviewedDefinitionStart, filena
 }
 
 func runDefinitionStart(cmd *cobra.Command, ctx context.Context, client *api.Client, id string) error {
+	_, err := runDefinitionStartWithReceipt(cmd, ctx, client, id)
+	return err
+}
+
+func runDefinitionStartWithReceipt(cmd *cobra.Command, ctx context.Context, client *api.Client, id string) (*reviewedDefinitionStart, error) {
 	filename, _ := cmd.Flags().GetString("request-file")
 	if filename == "" {
-		return errors.New("--request-file is required to preserve the original request identity")
+		return nil, errors.New("--request-file is required to preserve the original request identity")
 	}
 	if !definitionGUIDValid(id) {
-		return errors.New("an exact canonical definition GUID is required")
+		return nil, errors.New("an exact canonical definition GUID is required")
 	}
 	server, actor, err := reviewedRequestScope(cmd, client)
 	if err != nil {
-		return errors.New("cannot verify the current server, organization and actor")
+		return nil, errors.New("cannot verify the current server, organization and actor")
 	}
 	r, err := readReviewedRequest(filename)
 	if err == nil {
 		if err := checkDefinitionRequest(r, server, client.Org(), actor); err != nil {
-			return err
+			return nil, err
 		}
 		if r.TargetID != id {
-			return errors.New("definition GUID differs from the saved request")
+			return nil, errors.New("definition GUID differs from the saved request")
 		}
 		// Existing files are read-only recovery even when --yes or inputs flags
 		// are present. Never open inputs or inspect the current definition here.
 		start, err := readDefinitionStart(ctx, client, r)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return printDefinitionStart(cmd, start, filename, true)
+		return start, printDefinitionStart(cmd, start, filename, true)
 	}
 	if !errors.Is(err, os.ErrNotExist) {
-		return errors.New("cannot read a valid private request file; it has not been replaced")
+		return nil, errors.New("cannot read a valid private request file; it has not been replaced")
 	}
 	if !boolFlag(cmd, "yes") {
-		return errors.New("--yes is required to dispatch a new reviewed definition")
+		return nil, errors.New("--yes is required to dispatch a new reviewed definition")
 	}
 	definition, err := fetchReviewedDefinition(ctx, client, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !definition.Definition.IsEnabled || !definition.InputContract.Supported {
-		return errors.New("the definition is disabled or its input schema is unsupported; no start was submitted")
+		return nil, errors.New("the definition is disabled or its input schema is unsupported; no start was submitted")
 	}
 	expectedRevision, _ := cmd.Flags().GetString("expected-revision")
 	expectedDigest, _ := cmd.Flags().GetString("expected-input-schema-digest")
 	if (expectedRevision == "") != (expectedDigest == "") {
-		return errors.New("provide both expected revision and input schema digest, or neither")
+		return nil, errors.New("provide both expected revision and input schema digest, or neither")
 	}
 	if expectedRevision != "" && (expectedRevision != definition.Revision || expectedDigest != definition.InputContract.Digest) {
-		return errors.New("definition revision or input schema changed since review; no start was submitted")
+		return nil, errors.New("definition revision or input schema changed since review; no start was submitted")
 	}
 	inputsFilename, _ := cmd.Flags().GetString("inputs-file")
 	inputs := map[string]interface{}{}
 	if definition.InputContract.AcceptsInputs {
 		if inputsFilename == "" {
-			return errors.New("--inputs-file is required for this input contract; use a JSON object, including {} for defaults")
+			return nil, errors.New("--inputs-file is required for this input contract; use a JSON object, including {} for defaults")
 		}
 		inputs, err = readDefinitionInputs(inputsFilename)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else if inputsFilename != "" {
-		return errors.New("this definition accepts no inputs; omit --inputs-file")
+		return nil, errors.New("this definition accepts no inputs; omit --inputs-file")
 	}
 	r = &reviewedStartRequest{Format: 1, Kind: "workflow-definition", Server: server, OrganizationID: client.Org(), ActorUserID: actor, TargetID: id, TargetName: definition.Definition.Name, RequestID: uuid.NewString(), Revision: definition.Revision, InputSchemaDigest: definition.InputContract.Digest}
 	if err := createReviewedRequest(filename, *r); err != nil {
-		return errors.New("cannot durably save the request identity; no start was submitted, retain any created file")
+		return nil, errors.New("cannot durably save the request identity; no start was submitted, retain any created file")
 	}
 	var resp struct {
 		Result struct {
@@ -282,23 +287,23 @@ func runDefinitionStart(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	}
 	input := map[string]interface{}{"definitionId": id, "expectedRevision": r.Revision, "expectedInputSchemaDigest": r.InputSchemaDigest, "requestId": r.RequestID, "inputs": inputs, "confirmed": true}
 	if err := client.GraphQL(ctx, reviewedDefinitionStartMutation, map[string]interface{}{"input": input}, &resp); err != nil {
-		return errors.New("start outcome is unknown; retain the request file and use workflow definition-reconcile, without resubmitting inputs")
+		return nil, errors.New("start outcome is unknown; retain the request file and use workflow definition-reconcile, without resubmitting inputs")
 	}
 	if resp.Result.Start != nil {
 		if err := checkDefinitionStart(resp.Result.Start, r); err != nil {
-			return err
+			return nil, err
 		}
 		if err := printDefinitionStart(cmd, resp.Result.Start, filename, true); err != nil {
-			return err
+			return resp.Result.Start, err
 		}
 	}
 	if !resp.Result.OK {
-		return errors.New("start was not confirmed; retain the request file and reconcile its original identity")
+		return resp.Result.Start, errors.New("start was not confirmed; retain the request file and reconcile its original identity")
 	}
 	if resp.Result.Start == nil {
-		return errors.New("start returned no verified execution identity; retain the request file and reconcile")
+		return nil, errors.New("start returned no verified execution identity; retain the request file and reconcile")
 	}
-	return nil
+	return resp.Result.Start, nil
 }
 
 func runDefinitionReconcile(cmd *cobra.Command, ctx context.Context, client *api.Client) error {
