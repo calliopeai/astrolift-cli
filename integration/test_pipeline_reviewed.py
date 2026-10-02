@@ -62,7 +62,7 @@ def running_api():
 
 
 @contextmanager
-def forwarding_proxy(api_port):
+def forwarding_proxy(api_port, *, start_operation="StartPipelineRun", start_field="startPipelineRun"):
     """Fault real transport only; all GraphQL results come from config.asgi."""
     state = SimpleNamespace(requests=[], drop_start=False, reject_schema=False)
 
@@ -76,10 +76,10 @@ def forwarding_proxy(api_port):
             body = self.rfile.read(int(self.headers["Content-Length"]))
             query = json.loads(body)
             state.requests.append((query, self.headers.get("X-Astrolift-Organization")))
-            starting = "mutation StartPipelineRun" in query["query"]
+            starting = f"mutation {start_operation}" in query["query"]
             if starting and state.reject_schema:
                 query["query"] = query["query"].replace(
-                    "startPipelineRun(", "unsupportedReviewedPipelineRun("
+                    f"{start_field}(", "unsupportedReviewedStart("
                 )
                 body = json.dumps(query).encode()
             headers = {

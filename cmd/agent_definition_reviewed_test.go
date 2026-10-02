@@ -305,3 +305,92 @@ func TestReviewedAgentWaitIgnoresReplacementRequestFile(t *testing.T) {
 		t.Fatal("watch identity was derived from replaced request metadata")
 	}
 }
+
+func TestReviewedAgentWaitRefusesPermanentReadErrorsWithOriginalReceipt(t *testing.T) {
+	for _, scenario := range []struct {
+		name   string
+		status int
+		code   string
+	}{
+		{"unauthorized", 401, ""}, {"forbidden", 403, ""}, {"not-found", 404, ""},
+		{"permission", 200, "PERMISSION_DENIED"}, {"unauthenticated", 200, "UNAUTHENTICATED"},
+		{"validation", 200, "GRAPHQL_VALIDATION_FAILED"}, {"precondition", 200, "PRECONDITION"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			c, out, errOut, file := definitionTestCommand(t)
+			_ = c.Flags().Set("json", "true")
+			agentRunWait, agentRunInput = true, ""
+			defer func() { agentRunWait = false }()
+			polls, starts := 0, 0
+			srv := definitionTestServer(t, func(q gqlRequest, w http.ResponseWriter) {
+				data := definitionTestData()
+				if strings.Contains(q.Query, "mutation StartWorkflowDefinition") {
+					starts++
+					input := q.Variables["input"].(map[string]interface{})
+					data["startWorkflowDefinition"] = map[string]interface{}{"ok": true, "data": definitionTestStart(input["requestId"].(string), "submitted")}
+				}
+				if strings.Contains(q.Query, "query ReviewedAgentDefinitionExecution") {
+					polls++
+					w.WriteHeader(scenario.status)
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{"errors": []interface{}{map[string]interface{}{"message": "PRIVATE_FAILURE_BODY", "extensions": map[string]interface{}{"code": scenario.code}}}})
+					return
+				}
+				definitionTestResponse(t, w, data)
+			})
+			defer srv.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			err := runAgentRun(c, ctx, definitionTestClient(srv), nil, definitionTestID)
+			if err == nil || !strings.Contains(err.Error(), "refused observation") || polls != 1 || starts != 1 {
+				t.Fatalf("permanent read failure kept polling or dispatched again: %v polls=%d starts=%d", err, polls, starts)
+			}
+			if strings.Contains(out.String()+errOut.String()+err.Error(), "PRIVATE_FAILURE_BODY") {
+				t.Fatal("server error body disclosed")
+			}
+			var receipt map[string]interface{}
+			if err := json.Unmarshal(out.Bytes(), &receipt); err != nil || receipt["start"].(map[string]interface{})["executionId"] != definitionTestExecution {
+				t.Fatal("known accepted identity lost")
+			}
+			if _, err := readReviewedRequest(file); err != nil {
+				t.Fatal("original request lost")
+			}
+		})
+	}
+}
+
+func TestReviewedAgentWaitRetriesTransientReadsWithoutAnotherDispatch(t *testing.T) {
+	for _, status := range []int{408, 429, 503} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			c, _, _, _ := definitionTestCommand(t)
+			agentRunWait, agentRunInput = true, ""
+			oldPoll := agentDefinitionPollInterval
+			agentDefinitionPollInterval = time.Millisecond
+			defer func() { agentRunWait = false; agentDefinitionPollInterval = oldPoll }()
+			polls, starts := 0, 0
+			srv := definitionTestServer(t, func(q gqlRequest, w http.ResponseWriter) {
+				data := definitionTestData()
+				if strings.Contains(q.Query, "mutation StartWorkflowDefinition") {
+					starts++
+					input := q.Variables["input"].(map[string]interface{})
+					data["startWorkflowDefinition"] = map[string]interface{}{"ok": true, "data": definitionTestStart(input["requestId"].(string), "submitted")}
+				}
+				if strings.Contains(q.Query, "query ReviewedAgentDefinitionExecution") {
+					polls++
+					if polls == 1 {
+						w.WriteHeader(status)
+						_, _ = w.Write([]byte("PRIVATE_FAILURE_BODY"))
+						return
+					}
+					data["workflowExecution"] = map[string]interface{}{"guid": definitionTestExecution, "recordId": "17", "organizationGuid": definitionTestOrg, "status": "completed", "temporalWorkflowId": "WorkflowDefinitionRunWorkflow-17", "temporalRunId": "opaque-engine-run-id", "isTerminal": true, "observationError": "", "taskCleanup": map[string]interface{}{"status": "pending", "remaining": 1, "retryable": true}}
+				}
+				definitionTestResponse(t, w, data)
+			})
+			defer srv.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			if err := runAgentRun(c, ctx, definitionTestClient(srv), nil, definitionTestID); err != nil || polls != 2 || starts != 1 {
+				t.Fatalf("transient observation did not recover the same execution: %v polls=%d starts=%d", err, polls, starts)
+			}
+		})
+	}
+}
