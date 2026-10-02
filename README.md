@@ -785,6 +785,36 @@ explicit new attach and does not replay input; a lost exit receipt leaves the
 last input's outcome unknown. Pod UID checking is preflight only, and this client
 does not claim mobile-audience, atomic binding or action-admission proof support.
 
+### Bounded workflow authoring and recorded rounds
+
+`workflow init --pattern review_loop` creates an explicit rejection return with
+a finite `max_rounds` cap. Supported authoring patterns are `single`, `chained`,
+`fan_out` and `review_loop`; supervisor/advisor labels do not select an implemented
+executor. Local validation preserves per-stage `max_attempts`, `back_edge` /
+`back_edge_json`, `iteration` / `iteration_json` and nested `workflow` targets.
+It supports serial `collection` and `format_record` stages, and refuses malformed
+local caps. The server remains authoritative for total execution budgets,
+collection body ranges, imported source semantics and current target bindings.
+
+```sh
+astro status --json
+astro workflow init --pattern review_loop -o review.toml
+astro workflow validate review.toml
+astro workflow validate review.toml --server
+astro workflow execution-stages <execution-guid> --json
+astro docs show bounded-workflows
+astro docs search 'serial collection'
+```
+
+The exact stage reader includes recorded rounds, attempt numbers, return causes,
+serial item/parent identities and separate parallel branch identities. Text
+prints item/branch labels starting at one; JSON preserves the recorded zero-based
+indexes. Missing metadata stays unavailable. These reads require a matching
+server schema and current workflow-read authority; a schema or authorization
+failure does not select another execution or substitute inferred history.
+The offline bounded-workflow topic and `astrolift-workflows` skill also travel
+with `astro onboard`'s docs/skills components, without a network connection.
+
 ### Exact workflow definition review and recovery
 
 Review the exact definition GUID and its JSON Schema before dispatch:

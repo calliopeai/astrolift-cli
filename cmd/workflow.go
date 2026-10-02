@@ -59,17 +59,23 @@ type workflowDef struct {
 }
 
 type workflowStage struct {
-	Kind                string      `toml:"kind"`
-	Role                string      `toml:"role"`
-	Agent               string      `toml:"agent"`
-	EnvironmentSpecSlug string      `toml:"environment_spec_slug"`
-	Skills              []string    `toml:"skills"`
-	OnFailure           string      `toml:"on_failure"`
-	Timeout             int         `toml:"timeout"`
-	FanOut              interface{} `toml:"fan_out"` // tri-state: 0/N (int) or "dynamic"
-	Prompt              string      `toml:"prompt"`
-	OutputKey           string      `toml:"output_key"`
-	Approvers           []string    `toml:"approvers"`
+	Kind                string                 `toml:"kind"`
+	Role                string                 `toml:"role"`
+	Agent               string                 `toml:"agent"`
+	Workflow            string                 `toml:"workflow"`
+	EnvironmentSpecSlug string                 `toml:"environment_spec_slug"`
+	Skills              []string               `toml:"skills"`
+	OnFailure           string                 `toml:"on_failure"`
+	Timeout             int                    `toml:"timeout"`
+	FanOut              interface{}            `toml:"fan_out"` // tri-state: 0/N (int) or "dynamic"
+	Prompt              string                 `toml:"prompt"`
+	OutputKey           string                 `toml:"output_key"`
+	Approvers           []string               `toml:"approvers"`
+	MaxAttempts         *int                   `toml:"max_attempts"`
+	BackEdge            map[string]interface{} `toml:"back_edge"`
+	BackEdgeJSON        *string                `toml:"back_edge_json"`
+	Iteration           map[string]interface{} `toml:"iteration"`
+	IterationJSON       *string                `toml:"iteration_json"`
 }
 
 // Valid value sets mirror the backend models (WorkflowDefinition.PatternKind,
@@ -78,10 +84,11 @@ type workflowStage struct {
 var (
 	workflowPatterns = map[string]bool{
 		"single": true, "chained": true, "fan_out": true,
-		"supervisor_worker": true, "review_loop": true, "advisor": true,
+		"review_loop": true,
 	}
 	workflowStageKinds = map[string]bool{
 		"agent_dispatch": true, "human_gate": true, "checkpoint": true, "aggregation": true,
+		"workflow": true, "collection": true, "format_record": true,
 	}
 	workflowOnFailure = map[string]bool{
 		"fail": true, "retry": true, "skip": true, "escalate": true,
@@ -99,14 +106,14 @@ func validateWorkflowManifestShape(m *workflowManifest) error {
 		return fmt.Errorf("[workflow] name is required")
 	}
 	if m.Workflow.Pattern != "" && !workflowPatterns[m.Workflow.Pattern] {
-		return fmt.Errorf("workflow.pattern %q is invalid (one of: chained, single, fan_out, supervisor_worker, review_loop, advisor)", m.Workflow.Pattern)
+		return fmt.Errorf("workflow.pattern %q is invalid (one of: chained, single, fan_out, review_loop)", m.Workflow.Pattern)
 	}
 	for i, s := range m.Stages {
 		if s.Kind == "" {
 			return fmt.Errorf("stage[%d].kind is required", i)
 		}
 		if !workflowStageKinds[s.Kind] {
-			return fmt.Errorf("stage[%d].kind %q is invalid (one of: agent_dispatch, human_gate, checkpoint, aggregation)", i, s.Kind)
+			return fmt.Errorf("stage[%d].kind %q is invalid (one of: agent_dispatch, workflow, human_gate, checkpoint, aggregation, collection, format_record)", i, s.Kind)
 		}
 		if s.OnFailure != "" && !workflowOnFailure[s.OnFailure] {
 			return fmt.Errorf("stage[%d].on_failure %q is invalid (one of: fail, retry, skip, escalate)", i, s.OnFailure)
@@ -128,7 +135,7 @@ func validateWorkflowManifestShape(m *workflowManifest) error {
 			}
 		}
 	}
-	return nil
+	return validateWorkflowBoundsShape(m)
 }
 
 // ---- init ------------------------------------------------------------------
@@ -143,14 +150,14 @@ var workflowInitCmd = &cobra.Command{
 	Short: "Scaffold a starter workflow manifest TOML",
 	Long: `Write a starter §5.4 workflow manifest for the chosen --pattern.
 
-Patterns: chained (default), single, review_loop, fan_out, supervisor_worker.
+Patterns: chained (default), single, review_loop, fan_out.
 This is a purely client-side template — it never contacts the server. Edit the
 result, then run ` + "`astro workflow validate`" + ` (add --server for the
 authoritative check).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tmpl, ok := workflowTemplates[workflowInitPattern]
 		if !ok {
-			return fmt.Errorf("unknown --pattern %q (one of: chained, single, review_loop, fan_out, supervisor_worker)", workflowInitPattern)
+			return fmt.Errorf("unknown --pattern %q (one of: chained, single, review_loop, fan_out)", workflowInitPattern)
 		}
 		if _, err := os.Stat(workflowInitOut); err == nil {
 			return fmt.Errorf("%s already exists", workflowInitOut)
@@ -231,7 +238,8 @@ const previewWorkflowManifestQuery = `query($toml: String!) {
     errorColumn
     definition { slug name pattern description }
     stages {
-      order kind role agent environmentSpecSlug skills onFailure timeout
+      order kind role agent workflow environmentSpecSlug skills onFailure timeout
+      maxAttempts backEdge iteration
       fanOut prompt outputKey approvers
     }
   }
@@ -245,18 +253,22 @@ type workflowPreviewDef struct {
 }
 
 type workflowPreviewStage struct {
-	Order               int      `json:"order"`
-	Kind                string   `json:"kind"`
-	Role                string   `json:"role"`
-	Agent               *string  `json:"agent"`
-	EnvironmentSpecSlug *string  `json:"environmentSpecSlug"`
-	Skills              []string `json:"skills"`
-	OnFailure           string   `json:"onFailure"`
-	Timeout             int      `json:"timeout"`
-	FanOut              string   `json:"fanOut"`
-	Prompt              *string  `json:"prompt"`
-	OutputKey           *string  `json:"outputKey"`
-	Approvers           []string `json:"approvers"`
+	Order               int                    `json:"order"`
+	Kind                string                 `json:"kind"`
+	Role                string                 `json:"role"`
+	Agent               *string                `json:"agent"`
+	Workflow            *string                `json:"workflow"`
+	EnvironmentSpecSlug *string                `json:"environmentSpecSlug"`
+	Skills              []string               `json:"skills"`
+	OnFailure           string                 `json:"onFailure"`
+	Timeout             int                    `json:"timeout"`
+	FanOut              string                 `json:"fanOut"`
+	Prompt              *string                `json:"prompt"`
+	OutputKey           *string                `json:"outputKey"`
+	Approvers           []string               `json:"approvers"`
+	MaxAttempts         int                    `json:"maxAttempts"`
+	BackEdge            map[string]interface{} `json:"backEdge"`
+	Iteration           map[string]interface{} `json:"iteration"`
 }
 
 type workflowManifestPreview struct {
@@ -279,7 +291,13 @@ func runWorkflowValidateServer(cmd *cobra.Command, ctx context.Context, client *
 	}
 	p := resp.Preview
 	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, &p)
+		if err := renderJSON(cmd, &p); err != nil {
+			return err
+		}
+		if !p.Ok {
+			return fmt.Errorf("server validation failed%s: %s", previewErrorLocation(p), previewErrorMessage(p))
+		}
+		return nil
 	}
 	if !p.Ok {
 		return fmt.Errorf("server validation failed%s: %s", previewErrorLocation(p), previewErrorMessage(p))
@@ -295,6 +313,9 @@ func runWorkflowValidateServer(cmd *cobra.Command, ctx context.Context, client *
 		if s.Agent != nil && *s.Agent != "" {
 			agent = " agent=" + *s.Agent
 		}
+		if s.Workflow != nil && *s.Workflow != "" {
+			agent += " workflow=" + *s.Workflow
+		}
 		environment := ""
 		if s.EnvironmentSpecSlug != nil && *s.EnvironmentSpecSlug != "" {
 			environment = " environment_spec=" + *s.EnvironmentSpecSlug
@@ -303,8 +324,8 @@ func runWorkflowValidateServer(cmd *cobra.Command, ctx context.Context, client *
 		if s.OutputKey != nil && *s.OutputKey != "" {
 			outputKey = " output_key=" + *s.OutputKey
 		}
-		fmt.Fprintf(out, "  [%d] %s role=%s%s%s%s on_failure=%s timeout=%d fan_out=%s\n",
-			s.Order, s.Kind, s.Role, agent, environment, outputKey, s.OnFailure, s.Timeout, s.FanOut)
+		fmt.Fprintf(out, "  [%d] %s role=%s%s%s%s on_failure=%s max_attempts=%d timeout=%d fan_out=%s\n",
+			s.Order, s.Kind, s.Role, agent, environment, outputKey, s.OnFailure, s.MaxAttempts, s.Timeout, s.FanOut)
 	}
 	return nil
 }
@@ -434,7 +455,7 @@ func stageLabel(s workflowStage) string {
 }
 
 func init() {
-	workflowInitCmd.Flags().StringVar(&workflowInitPattern, "pattern", "chained", "Starter pattern: chained, single, review_loop, fan_out, supervisor_worker")
+	workflowInitCmd.Flags().StringVar(&workflowInitPattern, "pattern", "chained", "Starter pattern: chained, single, review_loop, fan_out")
 	workflowInitCmd.Flags().StringVarP(&workflowInitOut, "out", "o", "workflow.toml", "Output file for the scaffolded manifest")
 
 	workflowValidateCmd.Flags().BoolVar(&workflowValidateServer, "server", false, "Validate via the server (previewWorkflowManifest) instead of local shape checks")

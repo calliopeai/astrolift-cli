@@ -26,6 +26,73 @@ func executionStagePage(items []interface{}, next interface{}) map[string]interf
 	}
 }
 
+func TestWorkflowExecutionStagesRetainsBoundedRoundsAndSeparateCollectionIdentity(t *testing.T) {
+	for _, asJSON := range []bool{false, true} {
+		t.Run(fmt.Sprint(asJSON), func(t *testing.T) {
+			stage := executionStage(2)
+			stage["roundNumber"] = 3
+			stage["collectionIndex"] = 0
+			stage["collectionStageId"] = "019930ef-735d-7000-8000-000000000101"
+			stage["collectionParentExecutionGuid"] = "019930ef-735d-7000-8000-000000000102"
+			stage["causedBy"] = map[string]interface{}{"edge": "review->draft", "reason": "gate_rejected", "maxRounds": 3, "edgeRound": 2}
+			srv := newRunControlServer(t, func(req gqlRequest) (map[string]interface{}, []string) {
+				if strings.Contains(req.Query, "workflowExecutionStages") {
+					return map[string]interface{}{"workflowExecutionStages": executionStagePage([]interface{}{stage}, nil)}, nil
+				}
+				return map[string]interface{}{"workflowExecution": executionRow()}, nil
+			})
+			cmd, out, _ := workflowTestCmd()
+			_ = cmd.Flags().Set("json", fmt.Sprint(asJSON))
+			if err := runWorkflowExecutionStages(cmd, context.Background(), executionTestClient(srv.URL), "91", workflowExecutionOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if asJSON {
+				var result struct{ Stages []exactWorkflowStage }
+				if err := json.Unmarshal(out.Bytes(), &result); err != nil || len(result.Stages) != 1 {
+					t.Fatalf("bad metadata output: %v: %s", err, out)
+				}
+				row := result.Stages[0]
+				if row.RoundNumber == nil || *row.RoundNumber != 3 || *row.CollectionIndex != 0 || row.CausedBy.EdgeRound != 2 || row.FanoutIndex != nil {
+					t.Fatalf("mixed collection/review/branch identity: %+v", row)
+				}
+			} else {
+				for _, expected := range []string{"ROUND", "ITEM", "BRANCH", "review->draft", "edge round 2/3", "collection parent:", "item 1"} {
+					if !strings.Contains(out.String(), expected) {
+						t.Fatalf("missing %q: %s", expected, out)
+					}
+				}
+				if strings.Contains(out.String(), "fan-out parent:") {
+					t.Fatal("serial item became an inferred parallel branch")
+				}
+			}
+		})
+	}
+}
+
+func TestWorkflowExecutionStagesRefusesInvalidRecordedBoundMetadata(t *testing.T) {
+	for _, fields := range []map[string]interface{}{
+		{"roundNumber": 0}, {"collectionIndex": -1}, {"fanoutIndex": 50},
+		{"collectionParentExecutionGuid": "not-a-guid"},
+		{"causedBy": map[string]interface{}{"edge": "review->draft", "reason": "gate_rejected", "maxRounds": 2, "edgeRound": 3}},
+	} {
+		row := executionStage(1)
+		for key, value := range fields {
+			row[key] = value
+		}
+		raw, err := json.Marshal(row)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var stage exactWorkflowStage
+		if err := json.Unmarshal(raw, &stage); err != nil {
+			t.Fatal(err)
+		}
+		if validateExactStage(stage) == nil {
+			t.Fatalf("invalid metadata accepted: %+v", fields)
+		}
+	}
+}
+
 func TestWorkflowExecutionStagesConsumesAllPagesAndKeepsRecordedHistoryWhenTemporalUnavailable(t *testing.T) {
 	for _, asJSON := range []bool{false, true} {
 		t.Run(fmt.Sprint(asJSON), func(t *testing.T) {

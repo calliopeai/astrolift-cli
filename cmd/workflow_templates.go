@@ -28,6 +28,7 @@ role       = "implementer"
 agent      = "my-coder"          # local agent slug; omit for role-only globals
 skills     = ["write-tests"]
 on_failure = "retry"
+max_attempts = 3
 timeout    = 600
 
 [[stage]]
@@ -69,15 +70,24 @@ description = "Author produces work; reviewer approves or loops for revision."
 kind       = "agent_dispatch"
 role       = "author"
 agent      = "my-coder"
+output_key = "draft"
 on_failure = "retry"
+max_attempts = 3
 timeout    = 600
 
 [[stage]]
 kind      = "human_gate"
 role      = "reviewer"
+output_key = "review"
 prompt    = "Approve, or send back for revision?"
 approvers = ["team:reviewers"]
 timeout   = 86400
+
+[stage.back_edge]
+to = "draft"
+when = "gate_rejected"
+max_rounds = 3
+on_exhausted = "fail"
 `
 
 const workflowTemplateFanOut = workflowTemplateHeader + `
@@ -94,6 +104,7 @@ kind       = "agent_dispatch"
 role       = "worker"
 agent      = "my-worker"
 on_failure = "retry"
+max_attempts = 3
 timeout    = 600
 fan_out    = 3                   # static N; or "dynamic" to derive from prior output
 
@@ -103,35 +114,9 @@ role    = "aggregator"
 timeout = 300
 `
 
-const workflowTemplateSupervisorWorker = workflowTemplateHeader + `
-# Pattern: supervisor_worker — a supervisor plans and dispatches dynamic workers.
-
-[workflow]
-slug        = "supervisor-worker"
-name        = "Supervisor / Worker"
-pattern     = "supervisor_worker"
-description = "A supervisor decomposes the task and fans out to workers."
-
-[[stage]]
-kind       = "agent_dispatch"
-role       = "supervisor"
-agent      = "my-supervisor"
-on_failure = "retry"
-timeout    = 600
-
-[[stage]]
-kind       = "agent_dispatch"
-role       = "worker"
-agent      = "my-worker"
-on_failure = "retry"
-timeout    = 600
-fan_out    = "dynamic"           # derive the worker count from the supervisor's output
-`
-
 var workflowTemplates = map[string]string{
-	"chained":           workflowTemplateChained,
-	"single":            workflowTemplateSingle,
-	"review_loop":       workflowTemplateReviewLoop,
-	"fan_out":           workflowTemplateFanOut,
-	"supervisor_worker": workflowTemplateSupervisorWorker,
+	"chained":     workflowTemplateChained,
+	"single":      workflowTemplateSingle,
+	"review_loop": workflowTemplateReviewLoop,
+	"fan_out":     workflowTemplateFanOut,
 }
