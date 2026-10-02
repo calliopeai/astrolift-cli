@@ -23,6 +23,6 @@ Read `bootstrap.md` first.
 - All platform I/O through `internal/api`
 - Exit codes: `0` ok, `1` operational, `2` config / usage
 - Every command supports `--json` via `internal/output`
-- Credentials at `~/.config/astrolift/credentials/<server>.yaml` mode `0600`
+- Credentials at `~/.config/astrolift/credentials/<server>.yaml`: POSIX `0600` or protected Windows user/SYSTEM ACL
 
 Full conventions, build commands, and directory layout in `bootstrap.md`.
