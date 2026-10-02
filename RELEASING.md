@@ -19,9 +19,9 @@ release is cheap, a two-month-old binary is not.
 ## Before you tag
 
 1. `main` is green.
-2. Promote the changelog: rename `## Unreleased` in `CHANGELOG.md` to
-   `## X.Y.Z` and merge that first. The release workflow refuses to tag a
-   version with no changelog heading.
+2. Add or promote a `## X.Y.Z` heading in `CHANGELOG.md` and merge it first.
+   Include the user-visible changes and compatibility requirements. The release
+   workflow refuses a version with no changelog heading.
 3. Pick the version by what changed — pre-1.0, breaking CLI surface changes
    bump the minor.
 
@@ -48,13 +48,18 @@ The equivalent by hand, if the workflow is unavailable:
 
 ```bash
 git checkout main && git pull
-git tag -a v0.4.0 -m "astro v0.4.0"
+git tag -s v0.4.0 -m "astro v0.4.0"
+git verify-tag v0.4.0
 git push origin v0.4.0
 ```
 
 > Tags must be pushed with a real user credential or `PAT_CALLIOPE_CI`. GitHub
 > does not start workflow runs from events raised by the default
 > `GITHUB_TOKEN`, so a tag pushed by a workflow using it would never build.
+
+The current dispatch workflow creates an unsigned annotated tag. When a signed
+release tag is required, use the manual path after the same checks pass on the
+exact `main` commit. Never move an existing release tag.
 
 ## After the tag
 
@@ -94,29 +99,26 @@ pre-release so `:latest` consumers stop resolving to it, and cut the fix.
 |---|---|---|
 | Docker Hub `calliopeai/astrolift-cli` | **Yes** | Multi-arch, no credentials needed |
 | GHCR `ghcr.io/calliopeai/astrolift-cli` | **Yes** | Multi-arch mirror of the same build |
-| GitHub release archives | **No** | Private repo; requires a token (#53) |
-| Homebrew tap / Scoop bucket | Disabled | Cannot authenticate private downloads |
+| GitHub release archives | **Yes** | Public source repository and public releases |
+| Homebrew tap / Scoop bucket | Disabled | No formula or manifest publication is configured |
 
-Because the source repository is private, release archives are readable only
-with a GitHub token that can see it. GitHub answers anonymous requests for a
-private repo with **404**, not 401, which is why an unauthenticated install
-looks like a missing asset rather than an auth failure.
+Release archives and source are publicly readable from
+[GitHub Releases](https://github.com/calliopeai/astrolift-cli/releases).
+The legacy `scripts/install.sh` still requires authenticated `gh` or a
+`GITHUB_TOKEN`/`GH_TOKEN`/`ASTRO_GITHUB_TOKEN`, unless an
+`ASTRO_INSTALL_BASE_URL` mirror is configured. It does not yet fall back to
+anonymous GitHub downloads. Use the tested anonymous archive/checksum path in
+the [CLI install reference](https://astrolift.dev/reference/cli/#install) when
+GitHub credentials are unavailable.
 
-`scripts/install.sh` handles all three credential shapes: an authenticated
-`gh`, a `GITHUB_TOKEN`/`GH_TOKEN` environment variable, or an
-`ASTRO_INSTALL_BASE_URL` mirror.
+After publication, download the archives and `astro-checksums.txt` anonymously,
+verify each SHA-256 checksum, and run `astro version` from the host archive.
+Check that callback commands and offline topics are present and that the archive
+contains `share/doc/astrolift` and `share/man/man1`. CI also downloads published
+Linux and macOS assets, verifies checksums, and runs the version-stamp smoke test.
+Checksums establish archive integrity; no detached asset signatures are currently
+configured. A signed Git tag records the reviewed source revision separately.
 
-## Open decisions for the repository owner
-
-These are deliberately unresolved in code; they need a call from the owner.
-
-1. **Should releases be public?** Today every documented binary install path
-   requires a token. Publishing archives to a public mirror (or making the repo
-   public) would re-enable Homebrew, Scoop, anonymous `curl`, and `go install`.
-   Until then, the token requirement is the documented reality.
-2. **Is there a vanity installer URL?** `astrolift.app` has no DNS delegation
-   at all, and `https://astrolift.dev/cli/install.sh` currently 404s. Serving
-   the installer from `astrolift.dev` would need the file published to that
-   GitHub Pages site — and it is only worth doing alongside decision 1, since
-   a `curl | sh` one-liner that still demands a token is not much of a
-   one-liner.
+Homebrew/Scoop automation and a vanity installer URL remain separate distribution
+work. The canonical installer currently lives in the source repository; do not
+advertise an unverified `astrolift.dev/cli/install.sh` endpoint.

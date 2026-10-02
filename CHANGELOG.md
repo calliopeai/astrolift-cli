@@ -1,6 +1,28 @@
 # Changelog
 
-## Unreleased
+## 0.7.2 — 2026-10-01
+
+### Added
+
+- Register signed final agent-task notifications with `agent dispatch`
+  callback URL, signing-secret reference, correlation ID, and FULL/NOTIFY mode.
+- Configure organization callback hosts and signing keys through
+  `agent callbacks show|configure|secret-set`, and replay a settled final event
+  with `agent callbacks redeliver` without executing the agent again.
+- Show callback status, attempts, and safe last error on task reads. Ordinary
+  dispatch and read-only additive-field fallback preserve older-server support;
+  callback commands require the compatible completion-callback API.
+- Bundle callback, capability, app, agent, workflow, and shared-service setup
+  guides. Offline export and onboarding retain links between bundled guides,
+  with public links for unbundled references.
+
+### Changed
+
+- Accept callback signing keys only from a file or standard input, validate their
+  UTF-8 size, and suppress reflected signing-key errors.
+- Document organization GUID-scoped agent secrets, native app-secret commands,
+  workflow activation, and shared-service project/cluster attachment boundaries.
+- Describe public GitHub release archives and checksum verification accurately.
 
 - Reconcile the embedded prerequisite chart with canonical opscode chart 0.1.1,
   retaining cert-manager fixes and adding its existing OpenSearch operator/node
