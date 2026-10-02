@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- The public release installer supports anonymous latest or pinned downloads when
+  no GitHub credentials are configured. Mirrors and authenticated downloads remain
+  available; checksums are verified before installation, and access errors identify
+  missing releases, rejected authentication or rate limits. The canonical and offline
+  installation guides document the same behavior (#134).
+
 ## 0.8.0 — 2026-10-02
 
 ### Added

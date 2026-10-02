@@ -1,27 +1,13 @@
 #!/usr/bin/env sh
-# Astrolift CLI authenticated release installer (#17, #53).
+# Astrolift CLI public release installer (#17, #53, #134).
 #
-# calliopeai/astrolift-cli is a PRIVATE repository, so release archives cannot
-# be fetched anonymously. GitHub answers anonymous requests for a private
-# repository with 404 (not 401), which is why an unauthenticated install used
-# to look like a missing asset. This script needs credentials, in this order:
+# Downloads checksum-verified archives from the public release repository.
+# An ASTRO_INSTALL_BASE_URL mirror takes priority, followed by an authenticated
+# GitHub CLI, an explicit token, or anonymous GitHub API requests.
 #
-#   1. ASTRO_INSTALL_BASE_URL  — a public/offline mirror or test fixture
-#   2. the GitHub CLI          — whatever `gh auth login` is already using
-#   3. GITHUB_TOKEN / GH_TOKEN / ASTRO_GITHUB_TOKEN — a token with read
-#      access to the repository (works in containers with no `gh` installed)
-#
-# Usage from an authenticated source checkout:
-#   gh auth login && ./scripts/install.sh
-# or, without the GitHub CLI:
-#   GITHUB_TOKEN=<token> ./scripts/install.sh
-#
-# Detects OS + architecture, checksum-verifies the release archive, and
-# installs the binary in ASTRO_INSTALL_DIR, /usr/local/bin, or ~/.local/bin.
-# Set ASTRO_INSTALL_TAG to pin a release.
-#
-# No token available? The container image is public and needs no credentials:
-#   docker run --rm calliopeai/astrolift-cli:latest version
+# Usage: ./scripts/install.sh
+# Set ASTRO_INSTALL_TAG to pin a release. Installs into ASTRO_INSTALL_DIR,
+# /usr/local/bin, or ~/.local/bin, and installs the archive's man page.
 
 set -e
 
@@ -35,48 +21,15 @@ API_URL="${API_URL%/}"
 
 err() { printf '%s\n' "error: $*" >&2; exit 1; }
 
-# err_no_credentials explains every way to get an installable artifact rather
-# than dead-ending on "gh not found".
-err_no_credentials() {
-    cat >&2 <<EOF
-error: no GitHub credentials available, and ${REPO} is a private repository.
-
-Pick one:
-
-  1. Authenticate the GitHub CLI:
-       gh auth login
-
-  2. Export a token that can read ${REPO}:
-       export GITHUB_TOKEN="\$(gh auth token)"   # reuse an existing gh login
-       export GITHUB_TOKEN=<PAT>                # or a token with the 'repo' scope
-
-  3. Skip the binary entirely — the container image is public:
-       docker run --rm calliopeai/astrolift-cli:latest version
-
-  4. Install from a mirror you control:
-       ASTRO_INSTALL_BASE_URL=https://mirror.example.com/astro $0
-EOF
-    exit 1
-}
-
-# err_release_access turns an auth/visibility HTTP status into instructions.
+# Explain access failures without assuming every missing release is an auth error.
 err_release_access() {
     _status="$1"
     _url="$2"
-    cat >&2 <<EOF
-error: GitHub returned ${_status} for ${_url}
-
-The token in use cannot read ${REPO}. GitHub reports a private repository the
-caller cannot see as 404, so a 404 here usually means "wrong or unscoped
-token", not "missing release".
-
-  export GITHUB_TOKEN="\$(gh auth token)"   # reuse an existing gh login
-  export GITHUB_TOKEN=<PAT>                # or a token with the 'repo' scope
-
-The public container image needs no token:
-  docker run --rm calliopeai/astrolift-cli:latest version
-EOF
-    exit 1
+    case "${_status}" in
+        401) err "GitHub returned 401: rejected authentication for ${_url}; refresh or remove the configured token" ;;
+        403) err "GitHub returned 403: denied ${_url}; check access or rate limits and retry later (an authenticated gh or token raises the API limit)" ;;
+        404) err "GitHub returned 404: release or asset not found at ${_url}; check ASTRO_INSTALL_TAG and repository access (a wrong or unscoped token can also hide a release)" ;;
+    esac
 }
 
 # Detect OS (GoReleaser asset names are lower-case).
@@ -117,8 +70,11 @@ TOKEN="${ASTRO_GITHUB_TOKEN:-${GITHUB_TOKEN:-${GH_TOKEN:-}}}"
 api_get() {
     _url="$1"
     _out="$2"
-    _code="$(curl -sS -o "${_out}" -w '%{http_code}' \
-        -H "Authorization: Bearer ${TOKEN}" \
+    set --
+    if [ -n "${TOKEN}" ]; then
+        set -- -H "Authorization: Bearer ${TOKEN}"
+    fi
+    _code="$(curl -sS "$@" -o "${_out}" -w '%{http_code}' \
         -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "${_url}" || echo 000)"
@@ -142,15 +98,18 @@ release_asset_id() {
         | head -n 1
 }
 
-# api_download_asset fetches release asset bytes. Only the API asset endpoint
-# accepts a bearer token; browser_download_url 404s on a private release.
+# The API asset endpoint supports anonymous public downloads and authenticated
+# private mirrors. curl does not forward credentials to another redirect host.
 api_download_asset() {
     _id="$1"
     _dest="$2"
     _url="${API_URL}/repos/${REPO}/releases/assets/${_id}"
     echo "Fetching ${_url}"
-    _code="$(curl -sSL --retry 3 --retry-delay 2 -o "${_dest}" -w '%{http_code}' \
-        -H "Authorization: Bearer ${TOKEN}" \
+    set --
+    if [ -n "${TOKEN}" ]; then
+        set -- -H "Authorization: Bearer ${TOKEN}"
+    fi
+    _code="$(curl -sSL "$@" --retry 3 --retry-delay 2 -o "${_dest}" -w '%{http_code}' \
         -H "Accept: application/octet-stream" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "${_url}" || echo 000)"
@@ -178,9 +137,9 @@ elif command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev
         --pattern "${ARCHIVE}" \
         --pattern "${CHECKSUMS}" \
         --dir "${ASTRO_INSTALL_TMP}" || err "authenticated release download failed"
-elif [ -n "${TOKEN}" ]; then
-    # No usable GitHub CLI, but a token is available: talk to the REST API
-    # directly. This is the path that works inside CI images and containers.
+else
+    # No usable GitHub CLI: use the release API, with a token only if configured.
+    # Public releases work anonymously in containers and fresh installations.
     if [ -n "${ASTRO_INSTALL_TAG:-}" ]; then
         RELEASE_URL="${API_URL}/repos/${REPO}/releases/tags/${ASTRO_INSTALL_TAG}"
     else
@@ -196,8 +155,6 @@ elif [ -n "${TOKEN}" ]; then
 
     api_download_asset "${ARCHIVE_ID}" "${ASTRO_INSTALL_TMP}/${ARCHIVE}"
     api_download_asset "${CHECKSUM_ID}" "${ASTRO_INSTALL_TMP}/${CHECKSUMS}"
-else
-    err_no_credentials
 fi
 
 EXPECTED="$(awk -v archive="${ARCHIVE}" '$2 == archive { print $1; exit }' "${ASTRO_INSTALL_TMP}/${CHECKSUMS}")"

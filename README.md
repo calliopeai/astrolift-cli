@@ -51,26 +51,28 @@ FROM calliopeai/astrolift-cli:0.3.0 AS astro-cli
 COPY --from=astro-cli /usr/local/bin/astro /usr/local/bin/astro
 ```
 
-### Installer script (needs a GitHub credential)
+### Installer script
 
 ```bash
-gh repo clone calliopeai/astrolift-cli
+git clone https://github.com/calliopeai/astrolift-cli.git
 cd astrolift-cli
 ./scripts/install.sh
 ```
 
 The installer detects your OS and architecture, downloads the matching
 archive, **verifies it against `astro-checksums.txt`**, and installs `astro`
-into `/usr/local/bin` or `~/.local/bin`. It authenticates in this order:
+into `/usr/local/bin` or `~/.local/bin`. GitHub credentials are optional.
+The download paths, in order, are:
 
 1. `ASTRO_INSTALL_BASE_URL` — a mirror you control, or an offline fixture
 2. an authenticated `gh` (whatever `gh auth login` is already using)
 3. `GITHUB_TOKEN` / `GH_TOKEN` / `ASTRO_GITHUB_TOKEN` — for containers and CI
-   images that have no `gh` binary:
+   images that have no `gh` binary
+4. anonymous GitHub API requests when no credentials are available
 
-```bash
-GITHUB_TOKEN="$(gh auth token)" ./scripts/install.sh
-```
+An optional token raises the GitHub API rate limit. The installer requires
+`curl`, `tar`, `install`, and either `sha256sum` or `shasum`. Authentication
+and missing-release errors identify the HTTP status without printing tokens.
 
 Set `ASTRO_INSTALL_TAG=vX.Y.Z` to pin a release, `ASTRO_INSTALL_DIR` to choose
 the destination.
