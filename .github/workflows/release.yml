@@ -34,14 +34,34 @@ permissions:
   contents: read
 
 jobs:
+  source:
+    name: Freeze the main revision
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  windows-private-files:
+    name: Native Windows before tagging
+    needs: source
+    uses: ./.github/workflows/windows-private-files.yml
+    with:
+      ref: ${{ needs.source.outputs.sha }}
+
   cut:
     name: Validate and tag
+    needs: [source, windows-private-files]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
+          ref: ${{ needs.source.outputs.sha }}
           token: ${{ secrets.PAT_CALLIOPE_CI }}
 
       - name: Validate the version string
