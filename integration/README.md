@@ -51,3 +51,16 @@ contents and unknown absent recovery. The task queue intentionally has no worker
 these tests prove native CLI engine submission and read-only recovery, without
 claiming stage execution, completion or Kubernetes job cleanup. Temporary token
 and configuration fixtures never read saved production credentials.
+
+## Exact workload identity beyond the inventory cap
+
+`test_environment_selector.py` validates the environment review/restart/scale
+GraphQL documents against the actual app schema and invokes the compiled CLI
+through real bearer ASGI and PostgreSQL. It inserts 201 newer siblings before
+reviewing the original workload, checks the active app-and-slug uniqueness
+constraint, and verifies exact organization, actor, app, workload and environment
+identities. The lookup uses `astroliftWorkload(appSlug, slug)` and does not depend
+on a workload list or its page boundaries. Use the app's `pytest.ini` and backend
+`conftest`, with a separate test database and local cache settings as described
+for the other receipts. This review-only case needs no Kind cluster and does not
+claim a provider mutation or workload execution.

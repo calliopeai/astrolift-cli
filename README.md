@@ -763,7 +763,8 @@ bearer credentials, job results or log bodies.
 
 Restart and scale use a saved review bound to the current server, organization
 and actor. Explicit-environment exec waits for the authoritative admitted target
-before forwarding input:
+before forwarding input. Review resolves the exact app and workload identity,
+including workloads beyond the old 200-row inventory limit:
 
 ```sh
 astro app workload review web --app api --environment <environment-GUID> > review.json

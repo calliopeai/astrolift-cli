@@ -1,52 +1,59 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
-const environmentWorkloadsQuery = `query($app: String!) {
-  astroliftApp(slug: $app) { id }
-  astroliftWorkloads(appSlug: $app) { id slug }
+const environmentWorkloadsQuery = `query EnvironmentActionWorkload($app: String!, $workload: String!) {
+  astroliftApp(slug: $app) { id slug }
+  astroliftWorkload(appSlug: $app, slug: $workload) { id slug registeredAppSlug }
 }`
 
 func environmentSelectorIDs(cmd *cobra.Command, client *api.Client, app, workload string) (string, string, error) {
+	organization := client.Org()
 	var response struct {
 		App *struct {
-			ID string `json:"id"`
-		} `json:"astroliftApp"`
-		Rows []struct {
 			ID   string `json:"id"`
 			Slug string `json:"slug"`
-		} `json:"astroliftWorkloads"`
+		} `json:"astroliftApp"`
+		Workload *struct {
+			ID      string `json:"id"`
+			Slug    string `json:"slug"`
+			AppSlug string `json:"registeredAppSlug"`
+		} `json:"astroliftWorkload"`
 	}
-	if err := client.GraphQL(cmd.Context(), environmentWorkloadsQuery, map[string]interface{}{"app": app}, &response); err != nil {
-		return "", "", fmt.Errorf("finding app/workload identities: %w", err)
+	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+	defer cancel()
+	if err := client.GraphQL(ctx, environmentWorkloadsQuery, map[string]interface{}{"app": app, "workload": workload}, &response); err != nil {
+		return "", "", fmt.Errorf("finding selected app/workload identities: %w", err)
 	}
-	if response.App == nil {
-		return "", "", fmt.Errorf("selected app is unavailable")
+	if client.Org() != organization {
+		return "", "", fmt.Errorf("organization changed during workload review")
 	}
-	id := ""
-	for _, row := range response.Rows {
-		if row.Slug == workload {
-			if id != "" {
-				return "", "", fmt.Errorf("workload slug is ambiguous")
-			}
-			id = row.ID
-		}
+	if response.App == nil || response.App.Slug != app {
+		return "", "", fmt.Errorf("selected app is unavailable or mismatched")
 	}
-	if id == "" {
+	if _, err := uuid.Parse(response.App.ID); err != nil {
+		return "", "", fmt.Errorf("selected app lacks an immutable GUID")
+	}
+	if response.Workload == nil {
 		return "", "", fmt.Errorf("workload not found in the selected app")
 	}
-	return response.App.ID, id, nil
+	if _, err := uuid.Parse(response.Workload.ID); err != nil || response.Workload.Slug != workload || response.Workload.AppSlug != app {
+		return "", "", fmt.Errorf("server returned an invalid or different app/workload target")
+	}
+	return response.App.ID, response.Workload.ID, nil
 }
 
 const environmentActionReviewQuery = `query($workload: GUID!, $environment: GUID!) {
