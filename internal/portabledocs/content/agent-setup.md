@@ -63,3 +63,35 @@ means the task was accepted, not that its work completed. Final states are
 Use [completion callbacks](agent-completion-callbacks.md) for a signed final
 notification with durable retries. Use [workflow setup](workflow-setup.md) when
 several agents or human approval stages must run in order.
+
+## Migrate a legacy workflow-definition run
+
+The reviewed-start CLI changes `astro agent run` from a slug-only definition
+start to an exact GUID with a private request file and explicit confirmation:
+
+```sh
+astro workflow definitions --json
+astro workflow definition-review <definition-guid> --json
+astro agent run <definition-guid> --inputs-file ./inputs.json \
+  --request-file ./definition-request.json --yes --json
+astro workflow definition-reconcile --request-file ./definition-request.json --json
+```
+
+Use a CLI release containing this migration; published v0.7.2 predates it.
+For a new request, `--input @inputs.json` remains a file-only compatibility
+alias; a literal JSON `--input` is refused with migration guidance. Existing
+request files take read-only recovery and ignore input flags without opening
+their files or parsing their values. Omit input flags for a no-input
+definition. `--wait` observes the exact recorded execution and engine IDs through
+metadata-only reads. It does not print agent results or inputs, and JSON emits
+one receipt rather than mixing intermediate status output into the document.
+
+The [reviewed-start guide](reviewed-starts.md) explains schema review, durable
+request identity and lost-response recovery. Existing request files recover the
+original identity without resubmitting sensitive inputs. Older slug-only
+`runWorkflowDefinition` calls now receive `PRECONDITION` upgrade guidance with
+no dispatch; there is no automatic legacy-write fallback.
+
+This migration concerns Definition execution. `runAstroliftAgent`,
+`astro agent dispatch`, `astro agent task run` and app-bound configured
+`astro workflow run` keep their separate contracts.

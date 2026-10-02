@@ -58,7 +58,16 @@ astro auth status
 ```
 
 Configuration lives under `~/.config/astrolift/`. Credentials are stored per
-server and must be mode `0600`. Flags override `ASTROLIFT_*` environment
+server. The next CLI's private-file contract requires POSIX regular files with
+mode `0600`, or Windows files owned by the current process user with a protected
+non-inherited DACL allowing only that user and optionally `LOCAL_SYSTEM`.
+Windows reads check the actual handle's owner and ACL and reject broad/inherited
+permissions and final reparse-point targets. An explicit login can privately
+replace a current-user-owned legacy Windows credential file without reading it;
+ordinary reads refuse that file. Recovery files are never automatically replaced.
+Use a CLI release containing these platform-specific protections; this wording
+does not certify native Windows execution for an older release.
+Flags override `ASTROLIFT_*` environment
 variables, which override the config file.
 
 Global flags include `--api-url`, `--token`, `--org`, `--team`, `--project`,
@@ -221,6 +230,30 @@ man -M "$HOME/.local/share/man" astro
 Release archives include generated man pages. Packagers can also run `astro
 docs export` during packaging without network access.
 
+### Search the offline guides
+
+CLI releases containing `docs search` can find setup and contract guidance
+without a network connection, credential or configured server:
+
+```sh
+astro docs search 'workflow recovery'
+astro docs search '"request file"' --limit 5 --json
+astro docs search 'environment exec'
+astro docs show reviewed-starts
+```
+
+All unquoted terms must occur somewhere in the guide or its topic/title.
+Matching is case-insensitive; double quotes group a contiguous phrase with
+normalized whitespace. Results follow the guide catalogue order, one match per
+guide, and include the source line and a snippet of at most 180 characters.
+`--limit` defaults to 10 and accepts 1 through 50. JSON includes `matches`,
+`totalMatches` and `truncated`; increase the limit or refine the query when
+truncated. Queries accept at most 512 UTF-8 bytes and 32 terms or phrases.
+Search covers the public Markdown snapshot embedded in that binary, not live
+installation data or the separately generated command reference. Use `--help`
+for commands and `docs show <topic>` to read the complete matching guide.
+The published v0.7.2 CLI predates `docs search` and reviewed-start commands.
+
 ## Completion callbacks and setup guides
 
 ```bash
@@ -241,3 +274,38 @@ astro docs show shared-services
 Callback commands require a compatible server and CLI release. See the
 [callback guide](../guides/agent-completion-callbacks.md) for authorization,
 signing-key setup, durable backoff, and receiver verification.
+
+## Reviewed starts and exact environments
+
+```sh
+astro workflow definition-review <definition-guid> --json
+astro workflow definition-start <definition-guid> --inputs-file ./inputs.json \
+  --request-file ./definition-request.json --yes --json
+astro workflow definition-reconcile --request-file ./definition-request.json --json
+astro pipeline run <pipeline-guid> --request-file ./pipeline-request.json --yes --json
+astro pipeline reconcile --request-file ./pipeline-request.json --json
+astro pipeline show <run-guid> --json
+astro pipeline cancel <run-guid> --yes --json
+astro docs show reviewed-starts
+astro docs show environment-actions
+```
+
+These commands require a CLI release containing them and compatible server
+contracts. They are not present in every older published release. Review the
+[start and recovery guide](../guides/reviewed-starts.md) before dispatch: an
+existing Definition request file never reads/resubmits inputs, whereas a pipeline
+file can resubmit its original metadata key after a successful null recovery,
+unchanged version review and confirmation. Both preserve uncertain identities.
+Omit `--inputs-file` for a no-input definition. Exact environment controls and
+shell admission are documented in the
+[environment guide](../guides/environment-actions.md).
+
+The next CLI adapts legacy `astro agent run` to this same reviewed Definition
+service: pass an exact definition GUID, `--request-file`, `--yes`, and
+`--inputs-file` for an input-bearing schema. For a new request, `--input` accepts
+only `@file` as a compatibility alias; literal JSON is refused. Existing request
+files recover read-only and ignore input flags without reading their files or
+parsing their values. `--wait` reads metadata for the
+exact execution and pinned engine identity and preserves one JSON receipt.
+See the [migration guide](../guides/agent-setup.md#migrate-a-legacy-workflow-definition-run).
+Direct agent-task dispatch and app-bound configured workflow runs are separate.

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/calliopeai/astrolift-cli/internal/auth"
+	"github.com/calliopeai/astrolift-cli/internal/privatefile"
 	"gopkg.in/yaml.v3"
 )
 
@@ -82,21 +83,11 @@ func (c *Config) Save() error {
 }
 
 // LoadCredentials reads the credentials file for the given server slug.
-// The file must be mode 0600; the function refuses to read it otherwise.
+// Private-file validation uses POSIX mode 0600 or a protected Windows ACL.
 func LoadCredentials(serverSlug string) (*auth.Credentials, error) {
 	path := filepath.Join(Dir(), "credentials", serverSlug+".yaml")
 
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading credentials: %w", err)
-	}
-
-	mode := info.Mode().Perm()
-	if mode != 0o600 {
-		return nil, fmt.Errorf("credentials file %s has mode %o; expected 0600", path, mode)
-	}
-
-	data, err := os.ReadFile(path)
+	data, err := privatefile.ReadFile(path, 1<<20)
 	if err != nil {
 		return nil, fmt.Errorf("reading credentials: %w", err)
 	}
@@ -119,7 +110,7 @@ func DeleteCredentials(serverSlug string) error {
 }
 
 // SaveCredentials writes credentials for a server slug, creating the
-// credentials directory and setting mode 0600 on the file.
+// credentials directory and protecting the file before writing its contents.
 func SaveCredentials(serverSlug string, creds *auth.Credentials) error {
 	dir := filepath.Join(Dir(), "credentials")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -132,5 +123,5 @@ func SaveCredentials(serverSlug string, creds *auth.Credentials) error {
 	}
 
 	path := filepath.Join(dir, serverSlug+".yaml")
-	return os.WriteFile(path, data, 0o600)
+	return privatefile.Write(path, data)
 }

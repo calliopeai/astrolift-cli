@@ -15,6 +15,11 @@ astro workflow definitions --json
 `status` returns `version`, `apiVersion`, `capabilities`, and `authMethods`.
 A capability says the installation implements a feature; it does not grant
 permission or prove that a particular cluster has the required provider driver.
+Reviewed starts require `workflows.reviewed_definition_starts`,
+`workflows.definition_input_contracts`, `workflows.definition_start_recovery`,
+`pipelines.versioned_start_requests` and `pipelines.start_request_recovery` as
+appropriate. See [reviewed starts](reviewed-starts.md) for the exact GUID/revision/
+schema and recovery contracts. The executing CLI must also contain those commands.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
@@ -33,6 +38,8 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Register and operate an application | `app-setup` | [Set up an app](app-setup.md) |
 | Package, register, and dispatch an agent | `agent-setup` | [Set up an agent](agent-setup.md) |
 | Compose and run stages | `workflow-setup` | [Set up a workflow](workflow-setup.md) |
+| Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |
+| Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |
 | Receive a final task event | `callbacks` | [Agent completion callbacks](agent-completion-callbacks.md) |
 
@@ -42,6 +49,12 @@ astro docs show capabilities
 astro docs export ./platform-reference
 astro onboard --help
 ```
+
+With a CLI release containing offline search, run
+`astro docs search 'workflow recovery' --json` or
+`astro docs search '"request file"'`. Search reads only the embedded public
+guides and requires neither authentication nor network access. The executing
+binary's `docs --help` lists its actual topics and commands.
 
 Offline guides travel with the executing CLI release. The website follows the
 current public documentation release. Compare `astro version` and `astro

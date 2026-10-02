@@ -27,6 +27,7 @@ func TestExportPortableDocs(t *testing.T) {
 		"guides/workflow-setup.md",
 		"guides/shared-services.md",
 		"guides/callbacks.md",
+		"guides/environment-actions.md",
 		"commands/astro.md",
 		"man/man1/astro.1",
 	} {

@@ -13,14 +13,13 @@
 // `/api/cli/v1/tasks/` routes were never built and 404 to the SPA shell.
 //
 // GraphQL operations (field names per backend/schema.graphql):
-//   - run     → runWorkflowDefinition(workflowSlug, triggerPayload) → { ok, errors{field, messages}, workflowRunId, temporalWorkflowId }
+//   - run     → reviewed startWorkflowDefinition and actor-scoped request recovery
 //   - ls      → agentTasks(orgId, status) → [AstroliftAgentTask]
 //   - inspect → agentTask(id) → AstroliftAgentTask
 //   - cancel  → cancelTask(id) → { ok, errors{code, message} }
 //   - logs    → agentTaskLogs(id, tail) → [String!]
 //
-// --wait polls astroliftWorkflowInstance(workflowId) for the returned
-// temporalWorkflowId until its status is terminal.
+// --wait reads the exact execution GUID and recorded engine IDs until closure.
 //
 // `logs` reads the task's pod logs via the agentTaskLogs query (tenant-
 // scoped server-side). There is no SSE log stream on the control plane,
@@ -34,7 +33,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -75,29 +73,6 @@ var (
 )
 
 // ---- GraphQL operations ----------------------------------------------------
-
-// runWorkflowMutation launches an agent WorkflowDefinition's stages durably
-// via Temporal. The resolver takes only workflowSlug + triggerPayload (there
-// is no dispatcher arg — routing is platform-side), and returns the
-// WorkflowRun mirror pk plus the Temporal workflow id.
-const runWorkflowMutation = `mutation($workflowSlug: String!, $triggerPayload: JSON) {
-  runWorkflowDefinition(workflowSlug: $workflowSlug, triggerPayload: $triggerPayload) {
-    ok
-    errors { field messages }
-    workflowRunId
-    temporalWorkflowId
-  }
-}`
-
-// workflowInstanceQuery is the cheap single-instance status poll used by
-// --wait. It is keyed by the Temporal workflow id (an exact describe, not a
-// visibility LIKE), so it resolves on standard SQL visibility.
-const workflowInstanceQuery = `query($workflowId: String!) {
-  astroliftWorkflowInstance(workflowId: $workflowId) {
-    workflowId
-    status
-  }
-}`
 
 const agentTasksQuery = `query($orgId: ID!, $status: String) {
   agentTasks(orgId: $orgId, status: $status) {
@@ -154,22 +129,6 @@ const agentTaskLogsQuery = `query($id: ID!, $tail: Int!) {
 
 // ---- response shapes (GraphQL camelCase) -----------------------------------
 
-type runWorkflowResult struct {
-	Ok     bool `json:"ok"`
-	Errors []struct {
-		Field    string   `json:"field"`
-		Messages []string `json:"messages"`
-	} `json:"errors"`
-	WorkflowRunID      string `json:"workflowRunId"`
-	TemporalWorkflowID string `json:"temporalWorkflowId"`
-}
-
-// workflowInstance is the AstroliftWorkflowInstance status summary (--wait).
-type workflowInstance struct {
-	WorkflowID string `json:"workflowId"`
-	Status     string `json:"status"`
-}
-
 // agentTask mirrors the AstroliftAgentTask GraphQL type.
 type agentTask struct {
 	StartupDiagnostic *startupDiagnostic `json:"startupDiagnostic,omitempty"`
@@ -217,110 +176,24 @@ var terminalWorkflowStatuses = map[string]bool{
 // ---- astro agent run -------------------------------------------------------
 
 var agentRunCmd = &cobra.Command{
-	Use:   "run <workflow-slug>",
-	Short: "Launch an agent WorkflowDefinition's stages via Temporal",
-	Long: `Calls the runWorkflowDefinition GraphQL mutation, which creates the
-WorkflowInstance + WorkflowRun mirror rows and enqueues the durable stage
-executor. Prints the WorkflowRun id and Temporal workflow id.
+	Use:   "run <definition-guid>",
+	Short: "Start an agent workflow through the reviewed Definition contract",
+	Long: `Alias for workflow definition-start. Review an exact definition GUID, provide
+--yes and retain --request-file for recovery. Inputs use --inputs-file; legacy
+--input @file.json selects the same file. Literal inputs on argv are refused.
+An existing request file performs read-only recovery without resubmitting inputs.
 
-The --input flag accepts a JSON string or a @filename to read from a file;
-it is passed through as the workflow's triggerPayload.
-
-With --wait, blocks until the Temporal workflow reaches a terminal state,
-polling astroliftWorkflowInstance and surfacing status transitions.
-
-Exit codes: 0 success, 1 dispatch/run failure.`,
+--wait observes the exact execution and recorded Temporal workflow/run IDs until
+closure. It keeps closure and task cleanup distinct and never follows a newer run.
+Use agent task run for an AgentTask, or workflow run for a configured workflow.`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		client, cfg, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
-		if err != nil {
-			return err
-		}
-		return runAgentRun(cmd, cmd.Context(), client, cfg, args[0])
-	},
+	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
+		return runAgentRun(cmd, ctx, client, nil, args[0])
+	}),
 }
 
-func runAgentRun(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, workflowSlug string) error {
-	vars := map[string]interface{}{"workflowSlug": workflowSlug}
-	if agentRunInput != "" {
-		raw := agentRunInput
-		if strings.HasPrefix(raw, "@") {
-			data, err := os.ReadFile(raw[1:])
-			if err != nil {
-				return fmt.Errorf("reading input file: %w", err)
-			}
-			raw = string(data)
-		}
-		var payload interface{}
-		if err := json.Unmarshal([]byte(raw), &payload); err != nil {
-			return fmt.Errorf("--input is not valid JSON: %w", err)
-		}
-		vars["triggerPayload"] = payload
-	}
-
-	runCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	var resp struct {
-		Result runWorkflowResult `json:"runWorkflowDefinition"`
-	}
-	if err := client.GraphQL(runCtx, runWorkflowMutation, vars, &resp); err != nil {
-		return fmt.Errorf("running workflow: %w", err)
-	}
-	if !resp.Result.Ok {
-		return fmt.Errorf("run failed: %s", firstValidationError(resp.Result.Errors))
-	}
-
-	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "WorkflowRun ID:    %s\n", resp.Result.WorkflowRunID)
-	fmt.Fprintf(out, "Temporal workflow: %s\n", resp.Result.TemporalWorkflowID)
-
-	if !agentRunWait {
-		return nil
-	}
-
-	workflowID := resp.Result.TemporalWorkflowID
-	if workflowID == "" {
-		return fmt.Errorf("cannot --wait: server returned no temporalWorkflowId")
-	}
-
-	fmt.Fprintln(out, "Waiting for terminal state...")
-	pollCtx, pollCancel := context.WithTimeout(ctx, 30*time.Minute)
-	defer pollCancel()
-
-	last := ""
-	for {
-		select {
-		case <-pollCtx.Done():
-			return fmt.Errorf("timed out waiting for terminal state (last status: %s)", last)
-		case <-time.After(5 * time.Second):
-		}
-
-		var pollResp struct {
-			Instance *workflowInstance `json:"astroliftWorkflowInstance"`
-		}
-		if err := client.GraphQL(pollCtx, workflowInstanceQuery,
-			map[string]interface{}{"workflowId": workflowID}, &pollResp); err != nil {
-			return fmt.Errorf("polling workflow instance: %w", err)
-		}
-		// describe can momentarily return null before the workflow is visible;
-		// keep polling rather than treating it as terminal.
-		if pollResp.Instance == nil {
-			continue
-		}
-		status := pollResp.Instance.Status
-		if status != last {
-			fmt.Fprintf(out, "  → %s\n", status)
-			last = status
-		}
-		if terminalWorkflowStatuses[strings.ToLower(status)] {
-			fmt.Fprintf(out, "Final status: %s\n", status)
-			if !strings.EqualFold(status, "completed") {
-				return fmt.Errorf("workflow ended in %q", status)
-			}
-			return nil
-		}
-	}
+func runAgentRun(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, id string) error {
+	return runReviewedAgentDefinition(cmd, ctx, client, id)
 }
 
 // ---- astro agent ls --------------------------------------------------------
@@ -687,7 +560,7 @@ func shortTime(s *string) string {
 
 func init() {
 	// run
-	agentRunCmd.Flags().StringVar(&agentRunInput, "input", "", "Workflow trigger payload as a JSON string or @file.json")
+	agentRunCmd.Flags().StringVar(&agentRunInput, "input", "", "Legacy @file.json alias for --inputs-file; literal JSON is refused")
 	agentRunCmd.Flags().BoolVar(&agentRunWait, "wait", false, "Block until the workflow reaches a terminal state")
 
 	// ls

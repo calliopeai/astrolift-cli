@@ -39,6 +39,8 @@ var topics = []Topic{
 	{Slug: "workflow-setup", Title: "Author, bind, and run a workflow", Filename: "workflow-setup.md", OnlinePath: "/guides/workflow-setup/"},
 	{Slug: "shared-services", Title: "Provision shared services and attach consumers", Filename: "shared-services.md", OnlinePath: "/guides/shared-services/"},
 	{Slug: "callbacks", Title: "Signed task completion callbacks and outage retries", Filename: "callbacks.md", OnlinePath: "/guides/agent-completion-callbacks/"},
+	{Slug: "environment-actions", Title: "Review exact environments for workload controls and exec", Filename: "environment-actions.md", OnlinePath: "/guides/environment-actions/"},
+	{Slug: "reviewed-starts", Title: "Review exact workflow and pipeline starts and recover original requests", Filename: "reviewed-starts.md", OnlinePath: "/guides/reviewed-starts/"},
 }
 
 var aliases = map[string]string{
