@@ -38,6 +38,17 @@ from test_pipeline_reviewed import forwarding_proxy, invoke, running_api
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
+@pytest.fixture(autouse=True)
+def expire_disposable_engine_connection():
+    # Each scenario sets a fresh real Temporal server address. Expire only the
+    # process connection cache between scenarios; keep the real SDK connector.
+    from astrolift_workflows import client
+
+    client._client = None
+    yield
+    client._client = None
+
+
 def create_definition_world():
     suffix = uuid4().hex[:12]
     org = Organization.objects.create(
