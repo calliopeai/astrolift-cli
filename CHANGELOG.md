@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Author bounded workflow back-edges, review loops, nested workflow and serial
+  collection stages, and per-stage attempt caps; inspect recorded rounds, attempts,
+  and return causes. Bundle the matching canonical guides and skills for offline CLI
+  use (#2156).
+
 ## 0.9.0 — 2026-10-02
 
 - Read preview GUIDs and their persisted environment identity directly, with
