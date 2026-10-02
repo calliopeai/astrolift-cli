@@ -34,6 +34,7 @@ Use these plain-Markdown references as the current public contract. The target i
 ## Operational guides
 
 - [Working with apps](https://astrolift.dev/working-with-apps/)
+- [Reviewed environment controls](https://astrolift.dev/guides/environment-actions/): exact-target restart, scale, shell attachment and disconnect behavior
 - [Running an organization](https://astrolift.dev/running-an-org/)
 - [Operator quickstart](https://astrolift.dev/operators/quickstart/)
 - [Install Astrolift](https://astrolift.dev/operators/install/)
