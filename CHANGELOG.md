@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.0 — 2026-10-02
+
+### Added
+
+- Review and start exact workflow definition GUIDs with revision/schema proofs,
+  typed JSON inputs, secret references and actor-scoped saved request identities.
+  Recover lost replies without reopening inputs or submitting replacement work.
+- Start pipelines with saved request keys, inspect bounded run pages, reconcile
+  original submissions and cancel exact recorded versions and engine IDs.
+- Review and control explicitly selected app environments. Selected-environment
+  shells require current workload/pod/container admission before sending input.
+- Search 16 bundled release-matched guides offline with bounded text snippets,
+  JSON output and portable command/man-page exports.
+
+### Changed
+
+- `agent run` now accepts an exact definition GUID, `--request-file` and `--yes`.
+  Use `--inputs-file` or legacy `--input @file`; new literal inputs and slug-only
+  starts are refused. Existing request files perform read-only recovery.
+- `agent run --wait` pins the verified receipt's execution and engine identities;
+  JSON emits one metadata object and retains known receipts on uncertain outcomes.
+  Engine completion and task cleanup remain separate.
+- Protect credential and recovery files with POSIX mode `0600` or an actual
+  Windows current-user/SYSTEM protected ACL. Explicit login may securely replace
+  an owned legacy Windows credential file; recovery files are never replaced.
+- Require native Windows ACL and recovery tests before tagging or publishing,
+  in addition to Linux verification and canonical documentation parity.
+
 ## 0.7.2 — 2026-10-01
 
 ### Added

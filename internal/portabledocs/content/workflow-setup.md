@@ -78,7 +78,8 @@ then review its current revision and schema digest before dispatch.
 
 The next CLI's `astro agent run` is a compatibility entry for that reviewed
 Definition path. It requires a definition GUID, `--request-file` and `--yes`;
-input-bearing definitions use `--inputs-file` or file-only `--input @file`.
-Slug-only or literal-input callers must migrate. See
+input-bearing definitions use `--inputs-file` or file-only `--input @file` for
+new requests. Slug-only or new-request literal-input callers must migrate;
+an existing request file recovers read-only without inspecting input flags. See
 [agent setup](agent-setup.md#migrate-a-legacy-workflow-definition-run). This does
 not change the separate app-bound configured `workflow run` contract.

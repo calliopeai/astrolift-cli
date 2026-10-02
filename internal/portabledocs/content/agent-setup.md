@@ -78,8 +78,10 @@ astro workflow definition-reconcile --request-file ./definition-request.json --j
 ```
 
 Use a CLI release containing this migration; published v0.7.2 predates it.
-`--input @inputs.json` remains a file-only compatibility alias; a literal JSON
-`--input` is refused with migration guidance. Omit input flags for a no-input
+For a new request, `--input @inputs.json` remains a file-only compatibility
+alias; a literal JSON `--input` is refused with migration guidance. Existing
+request files take read-only recovery and ignore input flags without opening
+their files or parsing their values. Omit input flags for a no-input
 definition. `--wait` observes the exact recorded execution and engine IDs through
 metadata-only reads. It does not print agent results or inputs, and JSON emits
 one receipt rather than mixing intermediate status output into the document.
