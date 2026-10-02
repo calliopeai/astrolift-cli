@@ -19,6 +19,8 @@ the Agent Package fields in [Agent packages](agent-packages.md).
 astrolift_version = 1
 name = "orders-api"
 
+[environments.production]
+
 [app]
 slug = "orders-api"
 display_name = "Orders API"
@@ -252,14 +254,16 @@ PVC volumes require `size`. `config_map` and `secret` require `source_name`.
 [[managed_services]]
 kind = "postgres"
 name = "primary"
-variant = ""
+variant = "rds"
 
   [managed_services.config]
   version = "17"
   size = "small"
 ```
 
-Managed-service values are provisioned outside the manifest parser and exposed
+Choose a non-empty variant advertised by the target cluster catalogue; `rds`
+is an example and requires a configured AWS provider. Managed-service values
+are provisioned outside the manifest parser and exposed
 through stable environment envelopes such as `DATABASE_URL` and `REDIS_URL`.
 Do not put credentials in `[workloads.containers.env]`; use secret bundles,
 managed-service bindings, or agent secret references.

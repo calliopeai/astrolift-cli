@@ -41,7 +41,7 @@ brief = "brief/README.md"
 skills = [
   { emr = "skills/emr" },
   "pr-review@1.2.0",
-  "steadymd/runbooks/clinical-triage@main",
+  "operations/runbooks/incident-triage@main",
 ]
 
 [[workloads]]
@@ -61,7 +61,7 @@ result_ttl_hours = 168
 LOG_LEVEL = "info"
 
 [secrets]
-ANTHROPIC_API_KEY = "secret://agents/anthropic"
+ANTHROPIC_API_KEY = "secret://agents/<organization-guid>/anthropic"
 
 [package]
 root = "."
@@ -74,8 +74,11 @@ source = "shared/schemas"
 mount = "shared/schemas"
 ```
 
-The declaration under `[secrets]` is a reference, never plaintext. The
-dispatcher owns callback, task, payload, and workspace variables; package
+Replace `<organization-guid>` with the `id` from `astro org current --json` for
+the owning organization. Agent secret references must stay under that GUID's
+`secret://agents/<organization-guid>/` namespace; an organization slug or an
+unscoped reference is rejected. The declaration under `[secrets]` is a
+reference, never plaintext. The dispatcher owns callback, task, payload, and workspace variables; package
 environment values cannot override them.
 
 ## Briefs and skills
@@ -141,7 +144,7 @@ allow_install = false
 LOG_LEVEL = "info"
 
 [secrets]
-JIRA_TOKEN = { secret_name = "secret://agents/jira" }
+JIRA_TOKEN = { secret_name = "secret://agents/<organization-guid>/jira" }
 ```
 
 Includes are relative to the including file, loaded in order, and recursively
@@ -239,3 +242,11 @@ and `flowise`. Imports return semantic gaps. Langflow/Flowise graphs may be
 flattened to one task or preserved as a federation requiring stage bindings.
 Runtime image selection is required before a package is runnable; unresolved
 external tool names remain warnings until matching ToolDefs are bound.
+
+## Receive the final result
+
+Register an optional callback at dispatch, using an organization signing secret
+reference. The [completion callback guide](../guides/agent-completion-callbacks.md)
+covers FULL and NOTIFY modes, signed final events, durable outage retries and
+backoff for at least 24 hours, delivery-state queries, and manual replay.
+The pod reporting URL `AGENT_CALLBACK_URL` is a separate platform-owned field.

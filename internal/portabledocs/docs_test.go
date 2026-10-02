@@ -22,13 +22,18 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
-		"astrolift-toml": "manifest",
-		"astrolift.toml": "manifest",
-		"toml":           "manifest",
-		"agent-package":  "agents",
-		"agent-packages": "agents",
-		"workflow":       "workflows",
-		"workflow-toml":  "workflows",
+		"astrolift-toml":       "manifest",
+		"astrolift.toml":       "manifest",
+		"toml":                 "manifest",
+		"agent-package":        "agents",
+		"agent-packages":       "agents",
+		"workflow":             "workflows",
+		"workflow-toml":        "workflows",
+		"apps":                 "app-setup",
+		"services":             "shared-services",
+		"resources":            "shared-services",
+		"callback":             "callbacks",
+		"completion-callbacks": "callbacks",
 	} {
 		topic, err := Resolve(alias)
 		if err != nil {
@@ -47,5 +52,19 @@ func TestFilesIncludesAIIndex(t *testing.T) {
 	}
 	if !strings.Contains(string(files["llms.txt"]), "Astrolift documentation") {
 		t.Fatal("llms.txt is missing or malformed")
+	}
+}
+
+func TestPortableGuideLinks(t *testing.T) {
+	topic, err := Resolve("agent-setup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := "[Package](../reference/agent-packages.md#briefs-and-skills) [Callbacks](agent-completion-callbacks.md) [Dashboard](../working-with-apps.md) [Same](#observe) [Reference](../reference/index.md) [Home](../index.md)\n```markdown\n[Literal](../reference/api.md)\n```\n"
+	got := PortableMarkdown(topic, body)
+	for _, want := range []string{"[Package](agents.md#briefs-and-skills)", "[Callbacks](callbacks.md)", "[Dashboard](https://astrolift.dev/working-with-apps/)", "[Same](#observe)", "[Reference](https://astrolift.dev/reference/)", "[Home](https://astrolift.dev/)", "[Literal](../reference/api.md)"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing portable link %q in %s", want, got)
+		}
 	}
 }

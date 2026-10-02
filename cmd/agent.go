@@ -104,6 +104,9 @@ const agentTasksQuery = `query($orgId: ID!, $status: String) {
     id
     status
     callbackUrl
+    callbackStatus
+    callbackAttempts
+    callbackLastError
     result
     createdAt
     startedAt
@@ -119,6 +122,9 @@ const agentTaskQuery = `query($id: ID!) {
     id
     status
     callbackUrl
+    callbackStatus
+    callbackAttempts
+    callbackLastError
     result
     failureMessage
     createdAt
@@ -170,6 +176,9 @@ type agentTask struct {
 	ID                string             `json:"id"`
 	Status            string             `json:"status"`
 	CallbackURL       string             `json:"callbackUrl"`
+	CallbackStatus    *string            `json:"callbackStatus"`
+	CallbackAttempts  *int               `json:"callbackAttempts"`
+	CallbackLastError *string            `json:"callbackLastError"`
 	Result            interface{}        `json:"result"`
 	FailureMessage    *string            `json:"failureMessage,omitempty"`
 	CreatedAt         string             `json:"createdAt"`
@@ -349,7 +358,7 @@ func runAgentList(cmd *cobra.Command, ctx context.Context, client *api.Client, c
 	var resp struct {
 		AgentTasks []agentTask `json:"agentTasks"`
 	}
-	if err := queryStartupDiagnostic(listCtx, client, agentTasksQuery, vars, &resp); err != nil {
+	if err := queryAgentCallbackState(listCtx, client, agentTasksQuery, vars, &resp); err != nil {
 		return fmt.Errorf("listing tasks: %w", err)
 	}
 
@@ -555,7 +564,7 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 	var resp struct {
 		AgentTask *agentTask `json:"agentTask"`
 	}
-	if err := queryStartupDiagnostic(inspectCtx, client, agentTaskQuery,
+	if err := queryAgentCallbackState(inspectCtx, client, agentTaskQuery,
 		map[string]interface{}{"id": taskID}, &resp); err != nil {
 		return fmt.Errorf("fetching task: %w", err)
 	}
@@ -571,6 +580,15 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 
 	fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
 	fmt.Fprintf(out, "Status:        %s\n", t.Status)
+	if t.CallbackStatus != nil {
+		fmt.Fprintf(out, "Callback:      %s\n", *t.CallbackStatus)
+		if t.CallbackAttempts != nil {
+			fmt.Fprintf(out, "Attempts:      %d\n", *t.CallbackAttempts)
+		}
+		if t.CallbackLastError != nil && *t.CallbackLastError != "" {
+			fmt.Fprintf(out, "Callback error: %s\n", *t.CallbackLastError)
+		}
+	}
 	if diagnostic := t.StartupDiagnostic.summary(); diagnostic != "" {
 		fmt.Fprintf(out, "Startup:       %s\n", diagnostic)
 	}
