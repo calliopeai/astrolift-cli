@@ -175,40 +175,28 @@ reconciles every `workflows/**/*.toml` file.
 
 ## Project shared resources
 
-Project resources are provider-managed services shared by apps and agents in a
-project. The selected cluster supplies the live catalogue; it includes both
-provisionable drivers and visible roadmap entries with an explanation and
-tracking issue.
+The selected cluster supplies the provider catalogue. Shared project resources
+and app-owned services have separate lists. See [shared services](../guides/shared-services.md)
+for bounded metadata pages, exact GUID review and permission-checked actions.
 
 ```bash
-astro project resources catalog --project emr-bug-triage --cluster production
-
-astro project resources add --project emr-bug-triage \
-  --cluster production \
-  --kind postgres \
-  --variant rds \
-  --name triage-db \
-  --size medium \
-  --config @database.json \
-  --agent emr-triage-intake
-
-astro project resources list --project emr-bug-triage
-astro project resources show triage-db --project emr-bug-triage
-astro project resources attach triage-db --project emr-bug-triage \
-  --app-env <app-environment-guid>
-astro project resources detach <attachment-guid> --project emr-bug-triage
-astro project resources update triage-db --project emr-bug-triage \
-  --config @database.json
-astro project resources reprovision triage-db --project emr-bug-triage
-astro project resources remove triage-db --project emr-bug-triage --delete-data
+astro project resources catalog --project platform --cluster production
+astro project resources add --project platform --cluster production \
+  --kind postgres --variant rds --name report-db --size medium \
+  --config @database.json --agent report-prod
+astro project resources list --project platform --json
 ```
 
-`--config` accepts a JSON object or `@file.json`; `--size` is a portable preset
-merged into that object. Use `--json` for automation. Planned or unavailable
-catalogue entries are deliberately shown but cannot be provisioned. Resource
-writes require both the caller's project RBAC grant and a token carrying the
-`project:write` scope; a newly approved `astro auth login` session includes the
-scope, but an older saved session must be refreshed or re-authenticated.
+CLI v0.8.0 predates the additive resource-page and reviewed-context flags.
+In a release containing those commands, `list --page --json` returns
+`{items,totalCount,nextCursor}`; default JSON remains an array and refuses an
+incomplete walk. `show` rereads the exact GUID; `attachments` pages visible
+consumer identities. Cost is explicit. Existing-resource writes carry the
+reviewed context revision. `detach <attachment-guid>` resolves its exact visible
+owner and rereads that resource with the captured revision; `--resource <GUID>`
+can pin the owner explicitly. Missing or inaccessible attachments are refused.
+Project writes need both project RBAC and token scope `project:write`.
+
 
 ## CI
 
@@ -272,7 +260,7 @@ truncated. Queries accept at most 512 UTF-8 bytes and 32 terms or phrases.
 Search covers the public Markdown snapshot embedded in that binary, not live
 installation data or the separately generated command reference. Use `--help`
 for commands and `docs show <topic>` to read the complete matching guide.
-The published v0.7.2 CLI predates `docs search` and reviewed-start commands.
+CLI v0.8.0 includes offline search, reviewed starts and explicit environment controls. Older releases may lack these commands; check `astro version` and `astro --help`.
 
 ## Completion callbacks and setup guides
 
@@ -289,6 +277,8 @@ astro docs show app-setup
 astro docs show agent-setup
 astro docs show workflow-setup
 astro docs show shared-services
+astro docs show preview-targets
+astro docs show workload-signals
 ```
 
 Callback commands require a compatible server and CLI release. See the

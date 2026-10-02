@@ -30,6 +30,8 @@ func TestAliasesResolve(t *testing.T) {
 		"workflow":             "workflows",
 		"workflow-toml":        "workflows",
 		"apps":                 "app-setup",
+		"previews":             "preview-targets",
+		"metrics":              "workload-signals",
 		"services":             "shared-services",
 		"resources":            "shared-services",
 		"callback":             "callbacks",
