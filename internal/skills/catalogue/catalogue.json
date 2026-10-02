@@ -26,7 +26,7 @@
   {
     "name": "astrolift-workflows",
     "description": "Author and operate Astrolift workflows with finite stage attempts, human-review return edges, serial record collections and exact reviewed starts. Use for Astrolift workflow setup or migration; generic standalone framework execution is outside this skill.",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "path": "skills/astrolift-workflows"
   },
   {

@@ -95,8 +95,8 @@ The body is the contiguous range after the collection through `body_end`.
 Supported body kinds are `agent_dispatch`, `workflow`, `checkpoint`,
 `human_gate` and `format_record`. Configure an agent stage's exact workload
 binding, environment recipe, skills and prompt before dispatch. A nested stage
-uses `kind = "workflow"` and `workflow = "your-definition-slug"`; review its
-resolved definition identity. A native body binding does not translate an
+uses `kind = "workflow"` and a definition reference; review its resolved
+identity using the exact-reference rules below. A native body binding does not translate an
 arbitrary source-framework model/tool configuration automatically.
 
 Each item executes in a separate durable child, with the exact parent execution
@@ -118,6 +118,28 @@ fails the parent and its open stage mirrors with an incomplete collection.
 SDK cancellation settles the parent and open mirrors as cancelled. Both stop
 later items. A control acknowledgement does not establish run closure or
 resource cleanup; inspect the terminal metadata.
+
+## Preserve an explicitly selected target
+
+Use `agent = "guid:<workload-guid>"` or
+`workflow = "guid:<definition-guid>"` to retain the selected target identity.
+The UUID after `guid:` must use canonical lowercase, hyphenated spelling,
+for example `guid:123e4567-e89b-42d3-a456-426614174000`. TOML export/re-import,
+repository reconciliation and frozen reviewed plans preserve that reference.
+An agent slug can exist in two apps; a GUID selects the reviewed workload.
+A nested definition rename preserves its GUID. A malformed, unavailable,
+deleted or foreign GUID target is refused, including when another target now
+uses its former slug. No slug fallback replaces an explicit GUID.
+
+Literal references such as `agent = "author"` and
+`workflow = "your-definition-slug"` remain compatible. They keep their existing
+slug-resolution behavior; they do not establish immutable target identity.
+An agent slug may resolve after import when a matching workload is registered
+in the run's organization. Review the resolved target before dispatch. Nested
+project visibility, current trigger/dispatch permissions and token scope still
+apply to GUID references. Configured stage binding overrides remain explicit
+choices in the reviewed plan; a conflicting default agent mapping is refused.
+A target GUID does not prove an imported framework's model/tool equivalence.
 
 ## Validate, bind, review and observe
 
