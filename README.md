@@ -805,3 +805,22 @@ a replacement key. Scope changes refuse recovery. Known unconfirmed engine
 submission prints its exact identities and returns an error; reconciliation
 can display that uncertainty without writing. Engine acceptance is separate
 from execution completion. Existing app-bound `workflow run` is unchanged.
+
+### Search release-matched guides offline
+
+```sh
+astro docs search 'workflow recovery'
+astro docs search '"request file"' --limit 5 --json
+astro docs search 'environment exec'
+astro docs show reviewed-starts
+```
+
+Search reads this binary's embedded public Markdown guides without network,
+credentials or a configured server. It matches all case-insensitive terms;
+double quotes group a contiguous phrase with normalized whitespace. Results
+follow catalogue order with one source line and a snippet of at most 180
+characters per matching guide. `--limit` defaults to 10, accepts 1–50 and bounds
+output; JSON includes `matches`, `totalMatches` and `truncated`. Queries are
+bounded to 512 UTF-8 bytes and 32 terms/phrases. Use `docs show` for a complete
+guide and command `--help` for the actual executing command tree. These new
+commands require a release containing them; the published v0.7.2 predates them.

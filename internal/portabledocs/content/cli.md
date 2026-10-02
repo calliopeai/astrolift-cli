@@ -221,6 +221,30 @@ man -M "$HOME/.local/share/man" astro
 Release archives include generated man pages. Packagers can also run `astro
 docs export` during packaging without network access.
 
+### Search the offline guides
+
+CLI releases containing `docs search` can find setup and contract guidance
+without a network connection, credential or configured server:
+
+```sh
+astro docs search 'workflow recovery'
+astro docs search '"request file"' --limit 5 --json
+astro docs search 'environment exec'
+astro docs show reviewed-starts
+```
+
+All unquoted terms must occur somewhere in the guide or its topic/title.
+Matching is case-insensitive; double quotes group a contiguous phrase with
+normalized whitespace. Results follow the guide catalogue order, one match per
+guide, and include the source line and a snippet of at most 180 characters.
+`--limit` defaults to 10 and accepts 1 through 50. JSON includes `matches`,
+`totalMatches` and `truncated`; increase the limit or refine the query when
+truncated. Queries accept at most 512 UTF-8 bytes and 32 terms or phrases.
+Search covers the public Markdown snapshot embedded in that binary, not live
+installation data or the separately generated command reference. Use `--help`
+for commands and `docs show <topic>` to read the complete matching guide.
+The published v0.7.2 CLI predates `docs search` and reviewed-start commands.
+
 ## Completion callbacks and setup guides
 
 ```bash

@@ -22,15 +22,9 @@ var (
 )
 
 var docsCmd = &cobra.Command{
-	Use:   "docs [topic]",
-	Short: "Open the platform docs or access the embedded offline reference",
-	Long: `Open the public Astrolift documentation in a browser. A topic may be
-start, client, cli, api, mcp, manifest, agents, workflows, capabilities,
-app-setup, agent-setup, workflow-setup, shared-services, or callbacks.
-
-Use "astro docs show" for release-matched Markdown without a browser,
-"astro docs export" for a portable documentation tree, or "astro docs man"
-to generate section-1 man pages from this binary's live command tree.`,
+	Use:               "docs [topic]",
+	Short:             "Open the platform docs or access the embedded offline reference",
+	Long:              portableDocsHelp(),
 	Args:              cobra.MaximumNArgs(1),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error { return nil },
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -44,6 +38,21 @@ to generate section-1 man pages from this binary's live command tree.`,
 		}
 		return openBrowser(url)
 	},
+}
+
+func portableDocsHelp() string {
+	topics := portabledocs.Topics()
+	slugs := make([]string, 0, len(topics))
+	for _, topic := range topics {
+		slugs = append(slugs, topic.Slug)
+	}
+	return fmt.Sprintf(`Open the public Astrolift documentation in a browser. This binary embeds
+%d release-matched guides: %s.
+
+Use "astro docs show" to print one guide or "astro docs search" to find terms
+and quoted phrases without network access or login. "astro docs export" builds
+a portable documentation tree; "astro docs man" generates section-1 man pages
+from this binary's live command tree.`, len(topics), strings.Join(slugs, ", "))
 }
 
 var docsListCmd = &cobra.Command{
