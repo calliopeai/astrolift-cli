@@ -8,7 +8,7 @@
   {
     "name": "astro-cli",
     "description": "Install and use the astro CLI — authenticate via browser device flow, check platform status, validate manifests, drive CI deploys, and diagnose permissions from the terminal.",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "path": "skills/astro-cli"
   },
   {
@@ -20,8 +20,14 @@
   {
     "name": "astrolift-platform",
     "description": "The capability map of the Astrolift platform an app runs on — workload kinds, delivery, scheduling, secrets, managed services, observability, agents/workflows, tokens, and RBAC. Read before designing anything that touches deployment, infrastructure, scheduling, or integrations, so you build WITH the platform instead of around it.",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "path": "skills/astrolift-platform"
+  },
+  {
+    "name": "astrolift-workflows",
+    "description": "Author and operate Astrolift workflows with finite stage attempts, human-review return edges, serial record collections and exact reviewed starts. Use for Astrolift workflow setup or migration; generic standalone framework execution is outside this skill.",
+    "version": "0.1.0",
+    "path": "skills/astrolift-workflows"
   },
   {
     "name": "csv-process",

@@ -47,7 +47,8 @@ timeout = 900
 
 `slug` and `name` are required. `pattern` defaults to `single` and must be one
 of the patterns advertised by the target server (including `single`, `chained`,
-`fan_out`, `supervisor_worker`, and `review_loop`). `description` is optional.
+`fan_out`, and `review_loop`). Inert `supervisor_worker` and `advisor` labels are
+not supported authoring choices. `description` is optional.
 
 `input_schema_json` is an optional JSON string in `[workflow]`, supported by
 installations advertising `workflows.definition_input_contracts`. It contains
@@ -95,14 +96,18 @@ One `[[stage]]` is one ordered `WorkflowStage`; array index becomes `order`.
 
 | TOML | Runtime meaning |
 |---|---|
-| `kind` | Stage executor such as `agent_dispatch`, `human_gate`, or aggregation |
+| `kind` | `agent_dispatch`, `workflow`, `human_gate`, `checkpoint`, `aggregation`, `collection`, or `format_record` |
 | `role` | Human-readable responsibility used by builders/importers |
 | `agent` | Organization-local agent workload slug; may resolve after import |
+| `workflow` | Nested-workflow definition reference, required for `kind = "workflow"`; review its resolved identity |
 | `environment_spec_slug` | Image/config/secret recipe frozen onto the task |
 | `skills` | Ordered catalogue/local/org-repo overlays using the agent skill grammar |
 | `prompt` | Agent instruction overlay or human-gate question |
 | `output_key` | Unique key in `named_outputs`; defaults to `stage_<order>` |
 | `on_failure` | Server-advertised failure policy; default `fail` |
+| `max_attempts` | Integer 1–20 including the first attempt; default 3 |
+| `back_edge` / `back_edge_json` | Finite earlier-stage return object or JSON string; exactly one representation |
+| `iteration` / `iteration_json` | Bounded collection or record-formatter contract; exactly one representation |
 | `timeout` | Non-negative seconds; default 300 |
 | `fan_out` | `0`, a positive integer, or `"dynamic"` |
 | `approvers` | Human-gate principal selectors |
@@ -114,6 +119,11 @@ single-skill execution/compatibility field, not a pipeline model selector.
 
 Each agent receives the original workflow input, immediate predecessor, all
 named prior outputs, and its stage metadata under `_astrolift_workflow`.
+
+See [bounded workflows](../guides/bounded-workflows.md) for executable finite
+review and serial-collection examples, cap composition, run metadata, and the
+supported source-import subset. `review_loop` requires an explicit bounded
+gate-rejection return; the pattern name alone does not repeat stages.
 
 ## Source reconciliation
 

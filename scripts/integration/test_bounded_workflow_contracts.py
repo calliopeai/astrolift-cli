@@ -132,6 +132,73 @@ def test_actual_bounded_cli_documents_validate_against_paired_app_sdl():
         assert all(not validate(graph, document) for document in documents)
 
 
+def test_compiled_cli_offline_knowledge_and_onboarding_match_canonical_sources(
+    binary, tmp_path
+):
+    docs = Path(os.environ["ASTROLIFT_BOUNDED_DOCS"])
+    skills = Path(os.environ["ASTROLIFT_BOUNDED_SKILLS"])
+    canonical = (docs / "docs/guides/bounded-workflows.md").read_text()
+    shown = invoke(
+        binary,
+        tmp_path,
+        "http://127.0.0.1:1",
+        "OFFLINE_NO_AUTH",
+        "docs",
+        "show",
+        "collections",
+    )
+    assert shown.returncode == 0 and shown.stdout == canonical
+    searched = invoke(
+        binary,
+        tmp_path,
+        "http://127.0.0.1:1",
+        "OFFLINE_NO_AUTH",
+        "docs",
+        "search",
+        '"serial collections"',
+        "--json",
+    )
+    assert searched.returncode == 0
+    assert any(
+        match["topic"]["slug"] == "bounded-workflows"
+        for match in json.loads(searched.stdout)["matches"]
+    )
+    dest = tmp_path / "onboard"
+    installed = invoke(
+        binary,
+        tmp_path,
+        "http://127.0.0.1:1",
+        "OFFLINE_NO_AUTH",
+        "onboard",
+        "--only",
+        "docs,skills",
+        "--target",
+        "codex",
+        "--dir",
+        str(dest),
+        "--json",
+    )
+    assert installed.returncode == 0, installed.stderr
+    actual = (dest / ".codex/skills/astrolift-workflows/SKILL.md").read_bytes()
+    expected = (skills / "skills/astrolift-workflows/SKILL.md").read_bytes()
+    assert actual == expected
+    assert (dest / ".astrolift/docs/bounded-workflows.md").is_file()
+    assert "bounded-workflows.md" in (dest / ".astrolift/docs/index.md").read_text()
+    exported = invoke(
+        binary,
+        tmp_path,
+        "http://127.0.0.1:1",
+        "OFFLINE_NO_AUTH",
+        "docs",
+        "export",
+        str(tmp_path / "export"),
+    )
+    assert exported.returncode == 0, exported.stderr
+    assert (tmp_path / "export/llms.txt").read_bytes() == (
+        docs / "docs/llms.txt"
+    ).read_bytes()
+
+
 def test_actual_cli_templates_canonical_examples_and_server_preview_roundtrip(
     binary, tmp_path, asgi_endpoint
 ):

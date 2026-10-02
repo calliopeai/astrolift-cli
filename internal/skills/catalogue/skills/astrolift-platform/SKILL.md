@@ -1,7 +1,7 @@
 ---
 name: astrolift-platform
 description: The capability map of the Astrolift platform an app runs on — workload kinds, delivery, scheduling, secrets, managed services, observability, agents/workflows, tokens, and RBAC. Read before designing anything that touches deployment, infrastructure, scheduling, or integrations, so you build WITH the platform instead of around it.
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Astrolift platform capabilities
@@ -62,6 +62,12 @@ For setup and scope limits, use `astro docs show workload-signals` in a CLI rele
 ## Agents & workflows
 
 The platform hosts AI agents (one-shot, looping, scheduled, or webhook-triggered) and durable workflows with run history — automation like "act when new data arrives" is an agent/workflow workload, not a bespoke service.
+
+For actual workflow authoring and migration, use `astrolift-workflows`. Check
+the selected install's capabilities, then read `astro docs show bounded-workflows`
+for finite retry attempts, explicit human-review returns and serial collection
+bodies. Keep configured-workflow starts separate from direct reviewed Definition
+starts and retain the original request identity after a lost dispatch reply.
 
 ## Events, webhooks & tokens
 

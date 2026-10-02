@@ -1,7 +1,7 @@
 ---
 name: astro-cli
 description: Install and use the astro CLI — authenticate via browser device flow, check platform status, validate manifests, drive CI deploys, and diagnose permissions from the terminal.
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # The `astro` CLI
@@ -32,6 +32,23 @@ astro docs                     # open platform docs
 ```
 
 `astro ci deploy` is for CI runners (deploy-token driven) — apps using the managed workflow already deploy on merge, so you rarely call it by hand.
+
+For workflow work, use the `astrolift-workflows` skill and the release-matched
+offline guides:
+
+```bash
+astro docs show workflow-setup
+astro docs show bounded-workflows
+astro docs show reviewed-starts
+astro docs search 'serial collection'
+astro workflow validate workflow.toml --server
+astro workflow execution-stages <execution-guid> --json
+```
+
+Local TOML shape checks preserve bounds and nested targets but do not establish
+server execution budgets or permission. Current installed capabilities and
+schema remain authoritative; missing commands or rejected contracts require an
+explicit compatibility decision rather than an inferred alternate target.
 
 ## Honest note on coverage
 

@@ -37,6 +37,7 @@ var topics = []Topic{
 	{Slug: "app-setup", Title: "Set up and deploy an application", Filename: "app-setup.md", OnlinePath: "/guides/app-setup/"},
 	{Slug: "agent-setup", Title: "Package, register, and dispatch an agent", Filename: "agent-setup.md", OnlinePath: "/guides/agent-setup/"},
 	{Slug: "workflow-setup", Title: "Author, bind, and run a workflow", Filename: "workflow-setup.md", OnlinePath: "/guides/workflow-setup/"},
+	{Slug: "bounded-workflows", Title: "Bound workflow retries, review returns and serial collections", Filename: "bounded-workflows.md", OnlinePath: "/guides/bounded-workflows/"},
 	{Slug: "shared-services", Title: "Provision shared services and attach consumers", Filename: "shared-services.md", OnlinePath: "/guides/shared-services/"},
 	{Slug: "callbacks", Title: "Signed task completion callbacks and outage retries", Filename: "callbacks.md", OnlinePath: "/guides/agent-completion-callbacks/"},
 	{Slug: "environment-actions", Title: "Review exact environments for workload controls and exec", Filename: "environment-actions.md", OnlinePath: "/guides/environment-actions/"},
@@ -46,6 +47,8 @@ var topics = []Topic{
 }
 
 var aliases = map[string]string{
+	"loops":                "bounded-workflows",
+	"collections":          "bounded-workflows",
 	"apps":                 "app-setup",
 	"previews":             "preview-targets",
 	"metrics":              "workload-signals",
