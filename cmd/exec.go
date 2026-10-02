@@ -24,8 +24,10 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/gorilla/websocket"
@@ -34,11 +36,12 @@ import (
 )
 
 var (
-	execApp       string
-	execWorkload  string
-	execPod       string
-	execContainer string
-	execNoTTY     bool
+	execApp         string
+	execWorkload    string
+	execPod         string
+	execContainer   string
+	execNoTTY       bool
+	execEnvironment string
 )
 
 // execTerminal is exactly the slice of golang.org/x/term that a session
@@ -97,7 +100,8 @@ var execCmd = &cobra.Command{
 	Short: "Run a command or interactive shell in a running container",
 	Long: `Opens an exec session into a running pod for the app, streaming over
 the control-plane WebSocket relay (the same one the web console uses).
-Requires the app.exec_pod permission; every session is audited.
+Requires the app.exec_pod permission. The current server records best-effort
+audit metadata after opening; this is not durable admission before execution.
 
 With no trailing command, runs an interactive shell ('sh'). With a
 '-- <command...>' suffix, runs that command. A TTY is allocated when
@@ -105,7 +109,12 @@ stdin is a terminal; pass --no-tty to force a non-interactive pipe.
 
 The target pod is auto-resolved (first ready/Running pod for the app);
 narrow it with --workload, or pin an exact pod with --pod. Use
---container for multi-container pods.
+--container for multi-container pods. With --environment <GUID>, all selections
+belong to that exact environment and the API must provide a complete reviewed
+target. The client waits for the server to admit that target before reading stdin.
+Failures never fall back to the primary environment. A lost exit receipt returns
+an error with the last input outcome unknown; reconnect and input replay are not
+supported. Pod UID checking is preflight only, not atomic pod binding.
 
 Interrupts and detaching
   In an interactive session Ctrl-C interrupts the REMOTE process, the
@@ -152,6 +161,16 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 	// `astro exec --app X -- sh` just works.
 	pod := execPod
 	container := execContainer
+	var reviewed *execEnvironmentTarget
+	if execEnvironment != "" {
+		var err error
+		reviewed, err = reviewExecEnvironment(ctx, client)
+		if err != nil {
+			return err
+		}
+		pod, container = reviewed.PodName, reviewed.Container
+		fmt.Fprintf(cmd.ErrOrStderr(), "Exec target: app %s (%s), workload %s, environment %s (%s), cluster %s, namespace %s, pod %s (%s), container %s; UID binding is preflight only; disconnect ends this session.\n", execApp, reviewed.AppID, reviewed.WorkloadID, reviewed.EnvironmentName, reviewed.EnvironmentID, reviewed.ClusterID, reviewed.Namespace, reviewed.PodName, reviewed.PodUID, reviewed.Container)
+	}
 	if pod == "" {
 		rp, rc, err := resolveExecPod(ctx, client)
 		if err != nil {
@@ -169,6 +188,9 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 	wsURL, err := execWSURL(client.BaseURL(), execApp, pod)
 	if err != nil {
 		return err
+	}
+	if reviewed != nil {
+		wsURL += "?environmentId=" + url.QueryEscape(reviewed.EnvironmentID)
 	}
 
 	header := http.Header{}
@@ -201,6 +223,13 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		return fmt.Errorf("connecting exec socket (%s): %w", wsURL, err)
 	}
 	defer func() { _ = conn.Close() }()
+	stopCancel := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancel()
+	if reviewed != nil {
+		if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+			return err
+		}
+	}
 
 	if len(command) == 0 {
 		command = []string{"sh"}
@@ -227,137 +256,188 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		}
 	}
 
+	var sessionID string
 	var writeMu sync.Mutex
 	writeJSON := func(v interface{}) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
+		if frame, ok := v.(map[string]interface{}); ok && sessionID != "" && frame["type"] != "open" {
+			frame["sessionId"] = sessionID
+		}
 		return conn.WriteJSON(v)
 	}
 
-	if err := writeJSON(map[string]interface{}{
+	openFrame := map[string]interface{}{
 		"type":      "open",
 		"command":   command,
 		"container": container,
 		// Ask for a PTY only when we're interactive; piped/non-interactive
 		// runs get a plain pipe so output isn't echo-doubled or CRLF-mangled.
 		"tty": wantTTY,
-	}); err != nil {
+	}
+	if reviewed != nil {
+		openFrame["target"] = reviewed
+	}
+	if err := writeJSON(openFrame); err != nil {
 		return fmt.Errorf("sending open: %w", err)
 	}
 
-	// Window size: send once + on every SIGWINCH.
-	sendResize := func() {
-		if !wantTTY {
+	var stopResize = func() {}
+	var stopInterrupt = func() {}
+	defer func() { stopResize(); stopInterrupt() }()
+	started := false
+	startIO := func() {
+		if started {
 			return
 		}
-		cols, rows, gerr := execTerm.GetSize(stdinFd)
-		if gerr != nil {
-			return
-		}
-		_ = writeJSON(map[string]interface{}{"type": "resize", "rows": rows, "cols": cols})
-	}
-	sendResize()
-	if wantTTY {
-		// SIGWINCH is Unix-only, so the resize watcher lives in
-		// platform-tagged files (no-op on Windows). See exec_resize_*.go.
-		defer watchResize(sendResize)()
-	}
-
-	// Ctrl-C, and anything else that sends us an interrupt.
-	//
-	// With raw mode on, the terminal driver does not raise SIGINT at all and
-	// the 0x03 byte reaches the remote through the normal stdin path. But an
-	// interrupt can arrive by other routes -- an IDE's stop button, a signal
-	// to the process group -- and Go's default disposition is to die. That is
-	// exit 130 with the remote's fate unstated, which is what #72 reported
-	// from the IDE's exec terminal.
-	//
-	// So on an interactive session an interrupt is forwarded as 0x03 and the
-	// client stays up, matching ssh and kubectl exec: Ctrl-C interrupts what
-	// is running remotely, it does not tear down the session. This also makes
-	// the raw-mode failure above degrade gracefully rather than fatally.
-	//
-	// Non-interactive runs keep the default. A piped `astro exec -- cmd` in a
-	// script is expected to die on Ctrl-C like any other command.
-	if wantTTY {
-		interrupts := make(chan os.Signal, 1)
-		signal.Notify(interrupts, os.Interrupt)
-		defer signal.Stop(interrupts)
-		go func() {
-			for range interrupts {
-				_ = writeJSON(map[string]interface{}{"type": "stdin", "data": "\x03"})
+		started = true
+		// Window size: send once + on every SIGWINCH.
+		sendResize := func() {
+			if !wantTTY {
+				return
 			}
-		}()
-	}
+			cols, rows, gerr := execTerm.GetSize(stdinFd)
+			if gerr != nil {
+				return
+			}
+			_ = writeJSON(map[string]interface{}{"type": "resize", "rows": rows, "cols": cols})
+		}
+		sendResize()
+		if wantTTY {
+			// SIGWINCH is Unix-only, so the resize watcher lives in
+			// platform-tagged files (no-op on Windows). See exec_resize_*.go.
+			stopResize = watchResize(sendResize)
+		}
 
-	// stdin → stdin frames (best-effort; ends on EOF/error with a close).
-	//
-	// Bind the source once. Which reader a session pumps from is a property
-	// of the session, not of each read, and re-reading the package var every
-	// iteration means a goroutine that outlives runExec is still touching it.
-	stdinSrc := execStdin
-	go func() {
-		buf := make([]byte, 4096)
-		for {
-			n, rerr := stdinSrc.Read(buf)
-			if n > 0 {
-				if werr := writeJSON(map[string]interface{}{"type": "stdin", "data": string(buf[:n])}); werr != nil {
+		// Ctrl-C, and anything else that sends us an interrupt.
+		//
+		// With raw mode on, the terminal driver does not raise SIGINT at all and
+		// the 0x03 byte reaches the remote through the normal stdin path. But an
+		// interrupt can arrive by other routes -- an IDE's stop button, a signal
+		// to the process group -- and Go's default disposition is to die. That is
+		// exit 130 with the remote's fate unstated, which is what #72 reported
+		// from the IDE's exec terminal.
+		//
+		// So on an interactive session an interrupt is forwarded as 0x03 and the
+		// client stays up, matching ssh and kubectl exec: Ctrl-C interrupts what
+		// is running remotely, it does not tear down the session. This also makes
+		// the raw-mode failure above degrade gracefully rather than fatally.
+		//
+		// Non-interactive runs keep the default. A piped `astro exec -- cmd` in a
+		// script is expected to die on Ctrl-C like any other command.
+		if wantTTY {
+			interrupts := make(chan os.Signal, 1)
+			signal.Notify(interrupts, os.Interrupt)
+			stopInterrupt = func() { signal.Stop(interrupts); close(interrupts) }
+			go func() {
+				for range interrupts {
+					_ = writeJSON(map[string]interface{}{"type": "stdin", "data": "\x03"})
+				}
+			}()
+		}
+
+		// stdin → stdin frames (best-effort; ends on EOF/error with a close).
+		//
+		// Bind the source once. Which reader a session pumps from is a property
+		// of the session, not of each read, and re-reading the package var every
+		// iteration means a goroutine that outlives runExec is still touching it.
+		stdinSrc := execStdin
+		go func() {
+			buf := make([]byte, 4096)
+			for {
+				n, rerr := stdinSrc.Read(buf)
+				if n > 0 {
+					if werr := writeJSON(map[string]interface{}{"type": "stdin", "data": string(buf[:n])}); werr != nil {
+						return
+					}
+				}
+				if rerr != nil {
+					// stdin EOF: signal the remote to half-close its stdin so a
+					// piped read-to-EOF command (cat, psql < script) sees EOF and
+					// finishes — but keep the session open for its output + exit
+					// frame (don't send a full close, which would cut output on
+					// the common non-interactive `astro exec -- cmd`).
+					_ = writeJSON(map[string]interface{}{"type": "stdin_eof"})
 					return
 				}
 			}
-			if rerr != nil {
-				// stdin EOF: signal the remote to half-close its stdin so a
-				// piped read-to-EOF command (cat, psql < script) sees EOF and
-				// finishes — but keep the session open for its output + exit
-				// frame (don't send a full close, which would cut output on
-				// the common non-interactive `astro exec -- cmd`).
-				_ = writeJSON(map[string]interface{}{"type": "stdin_eof"})
-				return
-			}
-		}
-	}()
+		}()
+
+	}
+	if reviewed == nil {
+		startIO()
+	}
 
 	// Read loop → terminal. Returns the container's exit code as the
 	// process exit status so scripts can branch on it.
 	out := cmd.OutOrStdout()
 	errOut := cmd.ErrOrStderr()
+	var pendingExit *int
+	finishExit := func(code int) error {
+		if restore != nil {
+			restore()
+		}
+		if code != 0 {
+			_ = conn.Close()
+			execExit(code)
+		}
+		return nil
+	}
 	for {
 		_, data, rerr := conn.ReadMessage()
 		if rerr != nil {
+			if reviewed != nil {
+				return fmt.Errorf("exec session ended before an exit receipt; last input outcome may be unknown; no reconnect or input replay: %w", rerr)
+			}
 			return nil
 		}
 		var frame struct {
-			Type    string `json:"type"`
-			Data    string `json:"data"`
-			Code    int    `json:"code"`
-			Message string `json:"message"`
+			Type        string                 `json:"type"`
+			Data        string                 `json:"data"`
+			Code        int                    `json:"code"`
+			Message     string                 `json:"message"`
+			SessionID   string                 `json:"sessionId"`
+			Resumable   *bool                  `json:"resumable"`
+			Disconnect  string                 `json:"disconnect"`
+			InputReplay *bool                  `json:"inputReplay"`
+			Target      *execEnvironmentTarget `json:"target"`
 		}
 		if json.Unmarshal(data, &frame) != nil {
 			continue
 		}
 		switch frame.Type {
+		case "ready":
+			if reviewed != nil {
+				if started || frame.SessionID == "" || frame.Resumable == nil || *frame.Resumable || frame.InputReplay == nil || *frame.InputReplay || frame.Disconnect != "END" || frame.Target == nil || !reflect.DeepEqual(*reviewed, *frame.Target) {
+					return fmt.Errorf("server did not admit the reviewed target and connection-scoped session; stdin was refused")
+				}
+				writeMu.Lock()
+				sessionID = frame.SessionID
+				writeMu.Unlock()
+				if err := conn.SetReadDeadline(time.Time{}); err != nil {
+					return err
+				}
+				if pendingExit != nil {
+					return finishExit(*pendingExit)
+				}
+				startIO()
+			}
 		case "stdout":
 			fmt.Fprint(out, frame.Data)
 		case "stderr":
 			fmt.Fprint(errOut, frame.Data)
 		case "error":
+			if reviewed != nil {
+				return fmt.Errorf("exec refused: %s", client.RedactDiagnostic(frame.Message))
+			}
 			fmt.Fprintln(errOut, "exec error: "+frame.Message)
 		case "exit":
-			if restore != nil {
-				restore()
+			if reviewed != nil && !started {
+				code := frame.Code
+				pendingExit = &code
+				continue
 			}
-			// Propagate the remote command's exit code as our own (like
-			// ssh / kubectl exec) instead of collapsing to 1. os.Exit is
-			// the sanctioned exception here (cf. cmd/ci.go configErr) — the
-			// command ran and its output already streamed; only the status
-			// remains to forward. Deferred conn.Close won't run under
-			// os.Exit, so close explicitly first.
-			if frame.Code != 0 {
-				_ = conn.Close()
-				execExit(frame.Code)
-				return nil
-			}
-			return nil
+			return finishExit(frame.Code)
 		}
 	}
 }
@@ -430,6 +510,7 @@ func execWSURL(base, app, pod string) (string, error) {
 
 func init() {
 	execCmd.Flags().StringVar(&execApp, "app", "", "App slug to exec into (required)")
+	execCmd.Flags().StringVar(&execEnvironment, "environment", "", "Exact environment GUID; review and admission required, no primary fallback")
 	execCmd.Flags().StringVar(&execWorkload, "workload", "", "Narrow pod selection to a workload")
 	execCmd.Flags().StringVar(&execPod, "pod", "", "Exact pod name (skips auto-resolution)")
 	execCmd.Flags().StringVarP(&execContainer, "container", "c", "", "Container name (multi-container pods)")

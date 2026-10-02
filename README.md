@@ -753,3 +753,26 @@ An acknowledgement is a request accepted by the engine; inspect `status`,
 Unconfirmed submission or cancellation returns an error and preserves recovery
 identity. Request files and control output contain metadata, without inputs,
 bearer credentials, job results or log bodies.
+
+### Reviewed environment controls
+
+Restart and scale use a saved review bound to the current server, organization
+and actor. Explicit-environment exec waits for the authoritative admitted target
+before forwarding input:
+
+```sh
+astro app workload review web --app api --environment <environment-GUID> > review.json
+astro app workload scale web 2 --app api --environment <environment-GUID> --review review.json --yes
+astro app workload review web --app api --environment <environment-GUID> > review.json
+astro app workload restart web --app api --environment <environment-GUID> --review review.json --yes
+astro exec --app api --environment <environment-GUID> --workload web -- sh
+astro app exec web --app api --environment <environment-GUID> -- sh
+astro docs show environment-actions
+```
+
+Review again after any successful write. Stale, deleted, denied, mismatched or
+unavailable targets fail without primary-environment fallback. Workload receipts
+distinguish patch acceptance from rollout completion. Exec disconnect requires an
+explicit new attach and does not replay input; a lost exit receipt leaves the
+last input's outcome unknown. Pod UID checking is preflight only, and this client
+does not claim mobile-audience, atomic binding or action-admission proof support.
