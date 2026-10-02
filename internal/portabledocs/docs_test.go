@@ -29,6 +29,8 @@ func TestAliasesResolve(t *testing.T) {
 		"agent-packages":       "agents",
 		"workflow":             "workflows",
 		"workflow-toml":        "workflows",
+		"loops":                "bounded-workflows",
+		"collections":          "bounded-workflows",
 		"apps":                 "app-setup",
 		"previews":             "preview-targets",
 		"metrics":              "workload-signals",

@@ -802,6 +802,8 @@ astro workflow init --pattern review_loop -o review.toml
 astro workflow validate review.toml
 astro workflow validate review.toml --server
 astro workflow execution-stages <execution-guid> --json
+astro docs show bounded-workflows
+astro docs search 'serial collection'
 ```
 
 The exact stage reader includes recorded rounds, attempt numbers, return causes,
@@ -810,6 +812,8 @@ prints item/branch labels starting at one; JSON preserves the recorded zero-base
 indexes. Missing metadata stays unavailable. These reads require a matching
 server schema and current workflow-read authority; a schema or authorization
 failure does not select another execution or substitute inferred history.
+The offline bounded-workflow topic and `astrolift-workflows` skill also travel
+with `astro onboard`'s docs/skills components, without a network connection.
 
 ### Exact workflow definition review and recovery
 
