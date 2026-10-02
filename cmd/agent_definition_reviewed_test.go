@@ -165,7 +165,7 @@ func TestReviewedAgentWaitPinsEngineAndEmitsOneMetadataObject(t *testing.T) {
 			if strings.Contains(out.String(), "PRIVATE_FAILURE_BODY") {
 				t.Fatal("failure body disclosed")
 			}
-			if scenario == "completed" || scenario == "failed" {
+			{
 				d := json.NewDecoder(bytes.NewReader(out.Bytes()))
 				var result map[string]interface{}
 				if err := d.Decode(&result); err != nil {
@@ -175,8 +175,12 @@ func TestReviewedAgentWaitPinsEngineAndEmitsOneMetadataObject(t *testing.T) {
 				if err := d.Decode(&extra); err != io.EOF {
 					t.Fatal("wait emitted multiple JSON objects")
 				}
-				if result["execution"].(map[string]interface{})["cleanupStatus"] != "pending" {
-					t.Fatal("closure claimed cleanup complete")
+				if scenario == "completed" || scenario == "failed" {
+					if result["execution"].(map[string]interface{})["cleanupStatus"] != "pending" {
+						t.Fatal("closure claimed cleanup complete")
+					}
+				} else if result["start"].(map[string]interface{})["executionId"] != definitionTestExecution || result["execution"] != nil {
+					t.Fatal("uncertain watch discarded known receipt or claimed closure")
 				}
 			}
 		})

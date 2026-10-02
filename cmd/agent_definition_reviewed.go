@@ -63,7 +63,23 @@ func runReviewedAgentDefinition(cmd *cobra.Command, ctx context.Context, client 
 	if start == nil || start.TemporalRunID == nil || *start.TemporalRunID == "" || start.DispatchStatus != "submitted" {
 		return errors.New("the original engine submission is unconfirmed; reconcile the same request")
 	}
-	return waitAgentDefinition(cmd, ctx, client, start, filename)
+	if !boolFlag(cmd, "json") {
+		return waitAgentDefinition(cmd, ctx, client, start, filename)
+	}
+	var waitOutput bytes.Buffer
+	cmd.SetOut(&waitOutput)
+	err = waitAgentDefinition(cmd, ctx, client, start, filename)
+	cmd.SetOut(out)
+	// A read outage, timeout or identity refusal cannot erase a known receipt.
+	// Terminal failure already emits the one exact terminal metadata object.
+	if waitOutput.Len() == 0 && err != nil {
+		if _, copyErr := io.Copy(out, &receiptOutput); copyErr != nil {
+			return copyErr
+		}
+	} else if _, copyErr := io.Copy(out, &waitOutput); copyErr != nil {
+		return copyErr
+	}
+	return err
 }
 
 const agentDefinitionExecutionQuery = `query ReviewedAgentDefinitionExecution($id: ID!) { workflowExecution(executionId: $id) { guid recordId organizationGuid status temporalWorkflowId temporalRunId isTerminal observationError taskCleanup { status remaining retryable } } }`
