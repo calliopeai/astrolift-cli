@@ -26,6 +26,12 @@ env:
   IMAGE: calliopeai/astrolift-cli
 
 jobs:
+  windows-private-files:
+    name: Native Windows private files
+    uses: ./.github/workflows/windows-private-files.yml
+    permissions:
+      contents: read
+
   verify:
     name: Test and portable docs
     runs-on: ubuntu-latest
@@ -95,7 +101,7 @@ jobs:
 
   release:
     name: GoReleaser (tagged release)
-    needs: verify
+    needs: [verify, windows-private-files]
     if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
     runs-on: ubuntu-latest
     steps:
