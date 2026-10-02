@@ -114,7 +114,7 @@ def create_world():
         registered_app=world.medops_app,
         app_environment=world.extra_env,
         name="private-cache",
-        kind="redis",
+        kind="postgres",
         config={"credential": "PRIVATE_RESOURCE_MARKER"},
     )
     return world
@@ -227,6 +227,27 @@ def test_native_resource_pages_exact_context_and_reviewed_attachment(tmp_path):
         )
         assert owned.returncode == 0, owned.stderr
         assert json.loads(owned.stdout)["registeredAppId"] == str(world.medops_app.guid)
+        owned_revision = json.loads(owned.stdout)["contextRevision"]
+        metrics_query = """query($id:ID!, $revision:String!) {
+          astroliftAppManagedServiceMetrics(managedServiceId:$id, expectedContextRevision:$revision) {
+            managedServiceId kind rangeSeconds series { name }
+          }
+        }"""
+        metrics_args = [
+            "api",
+            "graphql",
+            "--query",
+            metrics_query,
+            "--var",
+            f"id={world.owned.guid}",
+            "--var",
+            f"revision={owned_revision}",
+        ]
+        metric = call(world, proxy, tmp_path, metrics_args)
+        assert metric.returncode == 0, metric.stderr
+        metric_row = json.loads(metric.stdout)["astroliftAppManagedServiceMetrics"]
+        assert metric_row["managedServiceId"] == str(world.owned.guid)
+        assert metric_row["series"] == []  # No collector configured; not healthy zero.
         attached = call(
             world,
             proxy,
@@ -255,14 +276,25 @@ def test_native_resource_pages_exact_context_and_reviewed_attachment(tmp_path):
             if "attachProjectManagedService(input:" in request[0]["query"]
         ][-1]
         assert proof["expectedContextRevision"] == revision
-        detached = call(world, proxy, tmp_path, ["project", "resources", "detach", attachment["id"]])
+        detached = call(
+            world, proxy, tmp_path, ["project", "resources", "detach", attachment["id"]]
+        )
         assert detached.returncode == 0, detached.stderr
-        assert not ManagedServiceAttachment.objects.filter(guid=attachment["id"]).exists()
-        assert any("astroliftProjectManagedServiceAttachmentOwner(" in request[0]["query"] for request in proxy.requests)
-        missing_detach = call(world, proxy, tmp_path, ["project", "resources", "detach", attachment["id"]])
+        assert not ManagedServiceAttachment.objects.filter(
+            guid=attachment["id"]
+        ).exists()
+        assert any(
+            "astroliftProjectManagedServiceAttachmentOwner(" in request[0]["query"]
+            for request in proxy.requests
+        )
+        missing_detach = call(
+            world, proxy, tmp_path, ["project", "resources", "detach", attachment["id"]]
+        )
         assert missing_detach.returncode != 0 and missing_detach.stdout == ""
         world.cluster.region = "changed-region"
         world.cluster.save()
+        stale_metrics = call(world, proxy, tmp_path, metrics_args)
+        assert stale_metrics.returncode != 0 and stale_metrics.stdout == ""
         before = ManagedServiceAttachment.objects.filter(
             managed_service=world.service
         ).count()
