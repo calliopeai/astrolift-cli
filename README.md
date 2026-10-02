@@ -722,3 +722,34 @@ inventory together. The source repository is private: CI checks local integrity,
 not authenticated remote parity. A maintainer must independently verify the
 inventory against that published Git tree before approving a new pin. Offline
 builds do not need source-repository credentials.
+
+### Reviewed pipeline starts and recovery
+
+Pipeline controls use the selected organization and verified current user. List
+one bounded server page with `astro pipeline list --limit 50 --json`; pass the
+returned `nextCursor` as `--after` to continue. Names are resolved across server
+pages and ambiguous names require an exact GUID.
+
+```sh
+astro pipeline run <pipeline-guid> --branch main --request-file ./pipeline-request.json --yes --json
+astro pipeline reconcile --request-file ./pipeline-request.json --json
+astro pipeline show <run-guid> --json
+astro pipeline runs --pipeline <pipeline-guid> --limit 20 --json
+astro pipeline cancel <run-guid> --yes --json
+```
+
+A start saves its UUID and reviewed pipeline/version/branch before dispatch in
+an exclusively created mode-0600 metadata file. Retain that file if the reply is
+lost. Reusing it checks the original actor, server and organization and reads
+the original request before any submission. A read outage does not submit; a
+known reservation is inspected without resubmitting. A successful empty lookup
+can submit only the original key and branch with `--yes`, while the pipeline
+still matches the saved version. Reconciliation never submits. Do not create a
+new request file to retry an uncertain start: a new key means a different run.
+
+Cancellation binds the exact run version and recorded Temporal workflow/run IDs.
+An acknowledgement is a request accepted by the engine; inspect `status`,
+`cancellationStatus` and `cleanupStatus` independently with `pipeline show`.
+Unconfirmed submission or cancellation returns an error and preserves recovery
+identity. Request files and control output contain metadata, without inputs,
+bearer credentials, job results or log bodies.
