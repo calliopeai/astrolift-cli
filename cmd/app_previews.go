@@ -6,20 +6,11 @@
 // CLI. The control-plane surface has been shipped for a while; this is the
 // client half.
 //
-// GraphQL operations (field names per backend/schema.graphql):
-//   - list/show/logs/open/teardown all resolve rows from
-//     astroliftPreviewEnvironmentsPage(appSlug, limit, after)
-//     → Page{ items: [AstroliftPreviewEnvironment], nextCursor, totalCount }.
-//     The unpaged astroliftPreviewEnvironments is deprecated (200-row cap,
-//     and it prices every row on read).
-//   - logs     → astroliftEnvironments(appSlug) to map the preview onto the
-//     AppEnvironment the platform synthesized for it, then reuses runAppLogs
-//     (cmd/app_lifecycle.go) verbatim rather than duplicating the log
-//     pagination / --follow plumbing.
-//   - teardown → tearDownPreview(input: TearDownPreviewInputGql!)
-//   - open     → no call; the URL is https://<hostname> off the row.
-//   - pin/unpin → setPreviewPinned(input: SetPreviewPinnedInput!), one setter
-//     behind two verbs: pin sends pinned: true, unpin sends pinned: false.
+// Detail reads use the exact preview GUID. PR/branch selectors discover a GUID
+// in bounded pages, then reread it. Logs carry the stored environment identity
+// and reviewed versions; hostname and naming conventions never select a target.
+// Catalog/detail metadata does not request live resources or pricing; show --cost
+// explicitly opts into one bounded preview runtime read.
 //
 // The pin is the operator's exemption from garbage collection, and it covers
 // *both* rules the scheduled sweep applies (astrolift_workflows/preview_gc.py):
@@ -38,25 +29,26 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
 // ---- flags -----------------------------------------------------------------
 
-// previewSelector is the --pr / --branch pair every single-preview verb takes.
+// previewSelector chooses an exact GUID or bounded PR/branch discovery.
 //
 // --branch exists because manual previews (created via
 // createPreviewEnvironment rather than a PR webhook) carry pr_number = NULL,
 // which the resolver coerces to prNumber: 0. They appear in `list` but no PR
-// number addresses them, so branch is the only selector that reaches them.
+// number addresses them; use their exact GUID or discover them by branch.
 type previewSelector struct {
 	pr int
+	id string
 	// prSet distinguishes "--pr not given" from an explicit "--pr 0", which
 	// would otherwise silently match every manual preview at once.
 	prSet  bool
@@ -86,9 +78,7 @@ var (
 
 // ---- GraphQL operations -----------------------------------------------------
 
-// previewsPageSize / previewsMaxPages bound the walk. Every returned row costs
-// the server one live pod listing plus a pricing lookup, which is why the
-// deprecated unpaged field capped at 200; the same ceiling is kept here.
+// Bound catalog discovery. Exact --id reads never walk this catalog.
 const (
 	previewsPageSize = 50
 	previewsMaxPages = 4
@@ -99,6 +89,10 @@ const previewEnvironmentsPageQuery = `query($appSlug: String, $limit: Int!, $aft
     items {
       id
       registeredAppSlug
+      version
+      environmentStatus
+      runtimeStatus
+      environment { previewId previewVersion appId appVersion appSlug environmentId environmentVersion environmentName clusterId clusterVersion namespace }
       prNumber
       isManual
       branch
@@ -123,11 +117,14 @@ const previewEnvironmentsPageQuery = `query($appSlug: String, $limit: Int!, $aft
   }
 }`
 
-// previewAppEnvironmentsQuery selects only what environment resolution needs.
-const previewAppEnvironmentsQuery = `query($appSlug: String) {
-  astroliftEnvironments(appSlug: $appSlug) {
-    name
-    url
+const previewEnvironmentQuery = `query($id: GUID!, $includeRuntimeCost: Boolean = false) {
+  astroliftPreviewEnvironment(id: $id, includeRuntimeCost: $includeRuntimeCost) {
+    id version registeredAppSlug prNumber isManual branch commitSha status hostname namespace
+    environmentStatus runtimeStatus
+    environment { previewId previewVersion appId appVersion appSlug environmentId environmentVersion environmentName clusterId clusterVersion namespace }
+    lastDeployedAt tornDownAt ttlUntil isPinned pinnedAt pinnedByEmail pinReason sourceUrl prUrl
+    aggregateResources { cpuCores memoryBytes podCount }
+    estimatedDailyCostUsd
   }
 }`
 
@@ -149,6 +146,10 @@ const setPreviewPinnedMutation = `mutation($input: SetPreviewPinnedInput!) {
     data {
       id
       registeredAppSlug
+      version
+      environmentStatus
+      runtimeStatus
+      environment { previewId previewVersion appId appVersion appSlug environmentId environmentVersion environmentName clusterId clusterVersion namespace }
       prNumber
       isManual
       branch
@@ -184,6 +185,10 @@ type previewAggregateResources struct {
 // This is the shape --json emits.
 type previewEnvironment struct {
 	ID                    string                    `json:"id"`
+	Version               int                       `json:"version"`
+	EnvironmentStatus     string                    `json:"environmentStatus"`
+	RuntimeStatus         string                    `json:"runtimeStatus"`
+	Environment           *previewTarget            `json:"environment"`
 	RegisteredAppSlug     string                    `json:"registeredAppSlug"`
 	PRNumber              int                       `json:"prNumber"`
 	IsManual              bool                      `json:"isManual"`
@@ -205,11 +210,38 @@ type previewEnvironment struct {
 	EstimatedDailyCostUSD *float64                  `json:"estimatedDailyCostUsd"`
 }
 
-// previewAppEnvironment is the AstroliftAppEnvironment subset used to map a
-// preview onto the environment its workloads actually run in.
-type previewAppEnvironment struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+type previewTarget struct {
+	PreviewID          string `json:"previewId"`
+	PreviewVersion     int    `json:"previewVersion"`
+	AppID              string `json:"appId"`
+	AppVersion         int    `json:"appVersion"`
+	AppSlug            string `json:"appSlug"`
+	EnvironmentID      string `json:"environmentId"`
+	EnvironmentVersion int    `json:"environmentVersion"`
+	EnvironmentName    string `json:"environmentName"`
+	ClusterID          string `json:"clusterId"`
+	ClusterVersion     int    `json:"clusterVersion"`
+	Namespace          string `json:"namespace"`
+}
+
+// reviewedPreviewTarget checks the API-owned relation before any routed read.
+func reviewedPreviewTarget(p previewEnvironment) (*previewTarget, error) {
+	t := p.Environment
+	if previewIsTornDown(p) {
+		return nil, errors.New("preview is torn down; its environment is retired")
+	}
+	if p.EnvironmentStatus != "available" || t == nil {
+		return nil, errors.New("preview environment binding is unavailable or retired")
+	}
+	if t.PreviewID != p.ID || t.PreviewVersion != p.Version || t.AppSlug != p.RegisteredAppSlug || t.Namespace != p.Namespace || strings.TrimSpace(t.Namespace) == "" || strings.TrimSpace(t.EnvironmentName) == "" || p.Version < 1 || t.EnvironmentVersion < 1 || t.AppVersion < 1 || t.ClusterVersion < 1 {
+		return nil, errors.New("preview environment binding does not match the reviewed preview")
+	}
+	for _, id := range []string{t.PreviewID, t.EnvironmentID, t.AppID, t.ClusterID} {
+		if _, err := uuid.Parse(id); err != nil {
+			return nil, errors.New("preview environment binding contains an invalid identity")
+		}
+	}
+	return t, nil
 }
 
 // previewOpenInfo is the --json shape for `open`. hostname is reported
@@ -238,6 +270,16 @@ type previewTeardownResult struct {
 // validate rejects selector combinations that cannot name exactly one preview.
 func (s previewSelector) validate() error {
 	branch := strings.TrimSpace(s.branch)
+	id := strings.TrimSpace(s.id)
+	if id != "" {
+		if s.prSet || branch != "" {
+			return errors.New("--id, --pr and --branch are mutually exclusive")
+		}
+		if _, err := uuid.Parse(id); err != nil {
+			return errors.New("--id must be a preview GUID")
+		}
+		return nil
+	}
 	switch {
 	case s.prSet && branch != "":
 		return errors.New("--pr and --branch are mutually exclusive; pass one")
@@ -245,13 +287,16 @@ func (s previewSelector) validate() error {
 		return errors.New(
 			"--pr must be a positive PR number; manual previews have no PR number, select them with --branch")
 	case !s.prSet && branch == "":
-		return errors.New("one of --pr <n> or --branch <name> is required")
+		return errors.New("one of --pr <n>, --branch <name> or --id <GUID> is required")
 	}
 	return nil
 }
 
 // label names what the selector asked for, for error and prompt text.
 func (s previewSelector) label() string {
+	if s.id != "" {
+		return "preview " + s.id
+	}
 	if branch := strings.TrimSpace(s.branch); branch != "" {
 		return fmt.Sprintf("branch %q", branch)
 	}
@@ -260,6 +305,9 @@ func (s previewSelector) label() string {
 
 // matches reports whether one row satisfies the selector.
 func (s previewSelector) matches(p previewEnvironment) bool {
+	if s.id != "" {
+		return p.ID == s.id
+	}
 	if branch := strings.TrimSpace(s.branch); branch != "" {
 		return p.Branch == branch
 	}
@@ -309,25 +357,6 @@ func previewURL(p previewEnvironment) string {
 	return "https://" + host
 }
 
-// hostFromURL extracts the lowercase host from an AppEnvironment.url, which
-// the backend writes as "https://<hostname>". Tolerates a bare hostname.
-func hostFromURL(raw string) string {
-	s := strings.TrimSpace(raw)
-	if s == "" {
-		return ""
-	}
-	if u, err := url.Parse(s); err == nil && u.Host != "" {
-		return strings.ToLower(u.Hostname())
-	}
-	if i := strings.IndexAny(s, "/?#"); i >= 0 {
-		s = s[:i]
-	}
-	if i := strings.LastIndex(s, ":"); i > 0 {
-		s = s[:i]
-	}
-	return strings.ToLower(s)
-}
-
 // resolvePreview picks the single row a selector names.
 //
 // Ambiguity is real for --branch: the unique-active constraint is per
@@ -373,34 +402,6 @@ func previewCandidateHint(items []previewEnvironment) string {
 		return "; the app has no preview environments"
 	}
 	return fmt.Sprintf("; the app has %d: %s", len(items), strings.Join(previewLabels(items), ", "))
-}
-
-// previewEnvironmentName maps a preview onto the AppEnvironment the platform
-// synthesized for it. The GraphQL type does not carry the environment name,
-// but both backend creation paths write AppEnvironment.url as
-// "https://" + preview.hostname, so the host is an exact join key.
-//
-// The name-convention fallback (preview-pr-<n>, per spec 18 §5) is only used
-// when an environment by that name actually exists; guessing a name the
-// platform does not have would turn a resolution failure into an empty log
-// tail.
-func previewEnvironmentName(envs []previewAppEnvironment, p previewEnvironment) string {
-	if host := strings.ToLower(strings.TrimSpace(p.Hostname)); host != "" {
-		for _, e := range envs {
-			if hostFromURL(e.URL) == host {
-				return e.Name
-			}
-		}
-	}
-	if p.PRNumber > 0 {
-		want := fmt.Sprintf("preview-pr-%d", p.PRNumber)
-		for _, e := range envs {
-			if strings.EqualFold(e.Name, want) {
-				return e.Name
-			}
-		}
-	}
-	return ""
 }
 
 // previewMemoryLabel renders aggregate memory in the largest readable unit.
@@ -492,39 +493,48 @@ func fetchAppPreviews(ctx context.Context, client *api.Client, appSlug string) (
 	return all, true, nil
 }
 
-// loadPreview fetches the app's previews and resolves the one a selector names.
 func loadPreview(ctx context.Context, client *api.Client, appSlug string, sel previewSelector) (previewEnvironment, error) {
+	return loadReviewedPreview(ctx, client, appSlug, sel, false)
+}
+
+func loadReviewedPreview(ctx context.Context, client *api.Client, appSlug string, sel previewSelector, cost bool) (previewEnvironment, error) {
 	if err := sel.validate(); err != nil {
 		return previewEnvironment{}, err
 	}
-	rows, truncated, err := fetchAppPreviews(ctx, client, appSlug)
-	if err != nil {
-		return previewEnvironment{}, err
-	}
-	p, err := resolvePreview(rows, sel)
-	if err != nil {
-		if truncated {
-			return previewEnvironment{}, fmt.Errorf(
-				"%w (only the %d most recent previews for %q were scanned)", err, len(rows), appSlug)
+	id := strings.TrimSpace(sel.id)
+	if id == "" {
+		rows, truncated, err := fetchAppPreviews(ctx, client, appSlug)
+		if err != nil {
+			return previewEnvironment{}, err
 		}
-		return previewEnvironment{}, err
+		p, err := resolvePreview(rows, sel)
+		if err != nil {
+			if truncated {
+				return previewEnvironment{}, fmt.Errorf("%w (only the %d most recent previews for %q were scanned; use --id for an exact read)", err, len(rows), appSlug)
+			}
+			return previewEnvironment{}, err
+		}
+		id = p.ID
 	}
-	return p, nil
-}
-
-// fetchAppEnvironments reads the app's environments, previews included.
-func fetchAppEnvironments(ctx context.Context, client *api.Client, appSlug string) ([]previewAppEnvironment, error) {
-	envCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
+	if _, err := uuid.Parse(id); err != nil {
+		return previewEnvironment{}, errors.New("server returned an invalid preview GUID")
+	}
 	var resp struct {
-		Environments []previewAppEnvironment `json:"astroliftEnvironments"`
+		Preview *previewEnvironment `json:"astroliftPreviewEnvironment"`
 	}
-	if err := client.GraphQL(envCtx, previewAppEnvironmentsQuery,
-		map[string]interface{}{"appSlug": appSlug}, &resp); err != nil {
-		return nil, fmt.Errorf("listing environments for %s: %w", appSlug, err)
+	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := client.GraphQL(fetchCtx, previewEnvironmentQuery, map[string]interface{}{"id": id, "includeRuntimeCost": cost}, &resp); err != nil {
+		return previewEnvironment{}, fmt.Errorf("reading exact preview (requires an updated server): %w", err)
 	}
-	return resp.Environments, nil
+	p := resp.Preview
+	if p == nil {
+		return previewEnvironment{}, errors.New("exact preview is missing or unavailable")
+	}
+	if p.ID != id || p.RegisteredAppSlug != appSlug || p.Version < 1 || !sel.matches(*p) {
+		return previewEnvironment{}, errors.New("exact preview identity or selector changed; review it again")
+	}
+	return *p, nil
 }
 
 // ---- astro app previews -----------------------------------------------------
@@ -633,9 +643,10 @@ var appPreviewsShowCmd = &cobra.Command{
 	Long: `Prints one preview environment's full record: its URL, status, branch and
 commit, the namespace it runs in, its TTL, its garbage-collection pin, the
 pull request that created it, and the aggregate resources and estimated
-daily cost it is consuming.
+daily cost with the explicit --cost option. Basic reads never request live pricing.
 
-Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+Select an exact preview with --id <GUID>. --pr <n> and --branch <name> discover
+a preview in the recent catalog, then reread its exact GUID.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sel := readPreviewSelector(cmd, previewsShowSel)
@@ -652,7 +663,7 @@ Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
 }
 
 func runAppPreviewsShow(cmd *cobra.Command, ctx context.Context, client *api.Client, appSlug string, sel previewSelector) error {
-	p, err := loadPreview(ctx, client, appSlug, sel)
+	p, err := loadReviewedPreview(ctx, client, appSlug, sel, boolFlag(cmd, "cost"))
 	if err != nil {
 		return err
 	}
@@ -681,8 +692,16 @@ func runAppPreviewsShow(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	if p.PRURL != "" {
 		fmt.Fprintf(out, "Pull request:     %s\n", p.PRURL)
 	}
-	fmt.Fprintf(out, "Resources:        %s\n", previewResourcesLabel(p.AggregateResources))
-	fmt.Fprintf(out, "Estimated cost:   %s\n", previewCostLabel(p.EstimatedDailyCostUSD))
+	fmt.Fprintf(out, "Environment:      %s\n", p.EnvironmentStatus)
+	if p.Environment != nil {
+		fmt.Fprintf(out, "Environment ID:   %s\nEnvironment name: %s\n", p.Environment.EnvironmentID, p.Environment.EnvironmentName)
+	}
+	if p.RuntimeStatus == "available" {
+		fmt.Fprintf(out, "Resources:        %s\n", previewResourcesLabel(p.AggregateResources))
+		fmt.Fprintf(out, "Estimated cost:   %s\n", previewCostLabel(p.EstimatedDailyCostUSD))
+	} else {
+		fmt.Fprintf(out, "Resources/cost:   %s (use --cost to request a live snapshot)\n", dashIfEmpty(p.RuntimeStatus))
+	}
 	fmt.Fprintf(out, "ID:               %s\n", p.ID)
 	return nil
 }
@@ -699,7 +718,8 @@ for the preview, so every log flag behaves identically: --since bounds the
 window, --tail caps the lines, --follow (-f) polls for new ones, and --level
 / --search filter. Use --workload to narrow to one workload.
 
-Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+Select an exact preview with --id <GUID>. --pr <n> and --branch <name> discover
+a preview in the recent catalog, then reread its exact GUID.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sel := readPreviewSelector(cmd, previewsLogsSel)
@@ -720,26 +740,12 @@ func runAppPreviewsLogs(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	if err != nil {
 		return err
 	}
-	if previewIsTornDown(p) {
-		return fmt.Errorf("%s on app %q is torn down; its workloads and namespace are gone",
-			sel.label(), appSlug)
-	}
-
-	envs, err := fetchAppEnvironments(ctx, client, appSlug)
+	target, err := reviewedPreviewTarget(p)
 	if err != nil {
 		return err
 	}
-	envName := previewEnvironmentName(envs, p)
-	if envName == "" {
-		return fmt.Errorf(
-			"could not resolve the environment for %s on app %q: no environment matches hostname %q (the preview may still be building)",
-			sel.label(), appSlug, dashIfEmpty(p.Hostname))
-	}
-
-	// Reuse the app-logs plumbing verbatim: same query, same pagination, same
-	// --follow loop, just scoped to the preview's environment.
-	appLogsEnv = envName
-	return runAppLogs(cmd, ctx, client, appSlug, previewsLogsWorkload)
+	proof := map[string]interface{}{"previewId": p.ID, "expectedEnvironmentId": target.EnvironmentID, "ifMatchPreviewVersion": p.Version, "ifMatchEnvironmentVersion": target.EnvironmentVersion, "environmentName": target.EnvironmentName}
+	return runAppLogsWithTarget(cmd, ctx, client, appSlug, previewsLogsWorkload, proof)
 }
 
 // ---- astro app previews open ------------------------------------------------
@@ -753,7 +759,8 @@ Pass --url to print the URL instead of opening it, which is what a script or
 an editor integration wants. --json prints the URL alongside the preview's
 status and hostname.
 
-Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+Select an exact preview with --id <GUID>. --pr <n> and --branch <name> discover
+a preview in the recent catalog, then reread its exact GUID.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sel := readPreviewSelector(cmd, previewsOpenSel)
@@ -772,6 +779,9 @@ Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
 func runAppPreviewsOpen(cmd *cobra.Command, ctx context.Context, client *api.Client, appSlug string, sel previewSelector) error {
 	p, err := loadPreview(ctx, client, appSlug, sel)
 	if err != nil {
+		return err
+	}
+	if _, err := reviewedPreviewTarget(p); err != nil {
 		return err
 	}
 	target := previewURL(p)
@@ -821,7 +831,8 @@ Calls the tearDownPreview mutation, which enqueues TeardownPreviewWorkflow:
 the namespace, DNS record and any dedicated managed services go away
 asynchronously. Prompts for confirmation unless --yes is given.
 
-Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+Select an exact preview with --id <GUID>. --pr <n> and --branch <name> discover
+a preview in the recent catalog, then reread its exact GUID.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sel := readPreviewSelector(cmd, previewsTeardownSel)
@@ -915,7 +926,8 @@ means re-pinning without --reason clears the previous one.
 A torn-down preview cannot be pinned: its namespace is already gone, so the
 pin would protect nothing.
 
-Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+Select an exact preview with --id <GUID>. --pr <n> and --branch <name> discover
+a preview in the recent catalog, then reread its exact GUID.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sel := readPreviewSelector(cmd, previewsPinSel)
@@ -948,7 +960,8 @@ be cleared.
 There is no --reason: the platform ignores a reason on an unpin, and a flag
 that silently does nothing is worse than no flag.
 
-Select the preview with --pr <n>, or --branch <name> for a manual preview.`,
+Select an exact preview with --id <GUID>. --pr <n> and --branch <name> discover
+a preview in the recent catalog, then reread its exact GUID.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sel := readPreviewSelector(cmd, previewsUnpinSel)
@@ -1075,6 +1088,7 @@ func readPreviewSelector(cmd *cobra.Command, sel previewSelector) previewSelecto
 // addPreviewSelectorFlags registers the --pr / --branch pair the four
 // single-preview verbs share.
 func addPreviewSelectorFlags(c *cobra.Command, sel *previewSelector) {
+	c.Flags().StringVar(&sel.id, "id", "", "Exact preview GUID (never searches the recent catalog)")
 	c.Flags().IntVar(&sel.pr, "pr", 0, "PR number of the preview")
 	c.Flags().StringVar(&sel.branch, "branch", "", "Branch name (selects manual previews, which have no PR number)")
 }
@@ -1084,6 +1098,7 @@ func init() {
 	appPreviewsListCmd.Flags().IntVar(&previewsListLimit, "limit", 50, "Maximum number of previews to show")
 
 	addPreviewSelectorFlags(appPreviewsShowCmd, &previewsShowSel)
+	appPreviewsShowCmd.Flags().Bool("cost", false, "Explicitly request one live resource and estimated-cost snapshot")
 	addPreviewSelectorFlags(appPreviewsLogsCmd, &previewsLogsSel)
 	addPreviewSelectorFlags(appPreviewsOpenCmd, &previewsOpenSel)
 	addPreviewSelectorFlags(appPreviewsTeardownCmd, &previewsTeardownSel)
