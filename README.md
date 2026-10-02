@@ -507,11 +507,15 @@ The CLI stores its state under `~/.config/astrolift/`:
 ~/.config/astrolift/
   config.yaml                  servers, current server, output prefs
   credentials/
-    <server-slug>.yaml         per-server tokens, mode 0600
+    <server-slug>.yaml         protected per-server tokens
 ```
 
-The CLI **refuses to read credentials files with permissions wider
-than `0600`**. Don't loosen them.
+Credential files use mode `0600` on Linux/macOS. On Windows they use a protected
+ACL owned by the current user, granting access only to that user and SYSTEM.
+The CLI checks the actual opened file before reading and refuses permissive,
+inherited or unrecognized ACLs and symlink/reparse targets. An explicit new
+login can replace a current-user-owned legacy Windows credential file with a
+protected file; reads never silently migrate or accept its old permissions.
 
 Environment variables take precedence over the config file (CI mode):
 
@@ -739,7 +743,8 @@ astro pipeline cancel <run-guid> --yes --json
 ```
 
 A start saves its UUID and reviewed pipeline/version/branch before dispatch in
-an exclusively created mode-0600 metadata file. Retain that file if the reply is
+an exclusively created private metadata file (mode `0600` on Linux/macOS;
+protected current-user/SYSTEM ACL on Windows). Retain that file if the reply is
 lost. Reusing it checks the original actor, server and organization and reads
 the original request before any submission. A read outage does not submit; a
 known reservation is inspected without resubmitting. A successful empty lookup

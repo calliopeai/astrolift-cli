@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/privatefile"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -96,13 +98,11 @@ func TestReviewedPipelineStartPersistsKeyAndExactInput(t *testing.T) {
 	if input["pipelineId"] != reviewedPipelineTestID || input["expectedVersion"] != float64(7) || input["ref"] != "main" || input["confirmed"] != true {
 		t.Fatalf("wrong reviewed input: %v", input)
 	}
-	info, err := os.Stat(file)
+	opened, err := privatefile.Open(file, 16384)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatal("request file permissions")
-	}
+	_ = opened.Close()
 	body, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
@@ -325,11 +325,13 @@ func TestReviewedRequestFileExclusiveAndPrivate(t *testing.T) {
 	if stored.RequestID != r.RequestID {
 		t.Fatal("replaced original identity")
 	}
-	if err := os.Chmod(file, 0644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := readReviewedRequest(file); err == nil {
-		t.Fatal("accepted world-readable request file")
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(file, 0644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := readReviewedRequest(file); err == nil {
+			t.Fatal("accepted world-readable request file")
+		}
 	}
 }
 

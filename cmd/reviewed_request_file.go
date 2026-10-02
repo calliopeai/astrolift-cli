@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
-	"runtime"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/privatefile"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -61,25 +59,11 @@ func (r reviewedStartRequest) checkScope(kind, server, org string, actor int) er
 }
 
 func readReviewedRequest(filename string) (*reviewedStartRequest, error) {
-	info, err := os.Lstat(filename)
-	if err != nil {
-		return nil, err
-	}
-	if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() > 16384 {
-		return nil, errors.New("request file must be a regular file with mode 0600 and at most 16 KiB")
-	}
-	f, err := os.Open(filename)
+	f, err := privatefile.Open(filename, 16384)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
-	opened, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if !os.SameFile(info, opened) || !opened.Mode().IsRegular() || opened.Mode().Perm() != 0600 || opened.Size() > 16384 {
-		return nil, errors.New("request file changed while opening")
-	}
 	var r reviewedStartRequest
 	d := json.NewDecoder(io.LimitReader(f, 16385))
 	d.DisallowUnknownFields()
@@ -101,13 +85,11 @@ func createReviewedRequest(filename string, r reviewedStartRequest) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := privatefile.CreateExclusive(filename)
 	if err != nil {
 		return fmt.Errorf("saving request identity before dispatch: %w", err)
 	}
-	if err = f.Chmod(0600); err == nil {
-		_, err = f.Write(append(b, '\n'))
-	}
+	_, err = f.Write(append(b, '\n'))
 	if err == nil {
 		err = f.Sync()
 	}
@@ -118,19 +100,5 @@ func createReviewedRequest(filename string, r reviewedStartRequest) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	if runtime.GOOS != "windows" {
-		dir, err := os.Open(filepath.Dir(filename))
-		if err != nil {
-			return err
-		}
-		err = dir.Sync()
-		closeErr = dir.Close()
-		if err != nil {
-			return err
-		}
-		if closeErr != nil {
-			return closeErr
-		}
-	}
-	return nil
+	return privatefile.SyncParent(filename)
 }
