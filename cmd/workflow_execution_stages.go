@@ -19,6 +19,9 @@ const workflowExecutionStagesQuery = `query($id: ID!, $limit: Int!, $after: Stri
     stages { nextCursor items {
       guid executionId stageGuid stageOrder stageKind stageRole stageApprovers
       status attemptNumber humanGateState humanGateNote startedAt endedAt errorMessage
+      roundNumber causedBy { edge reason maxRounds edgeRound }
+      collectionIndex collectionStageId collectionParentExecutionGuid
+      fanoutIndex fanoutStageId fanoutParentExecutionGuid
       agentRunGuid childWorkflowRunGuid childWorkflowDefinitionSlug childWorkflowStatus
     } }
   }
@@ -26,13 +29,28 @@ const workflowExecutionStagesQuery = `query($id: ID!, $limit: Int!, $after: Stri
 
 type exactWorkflowStage struct {
 	workflowStageExecutionRow
-	GUID                        string  `json:"guid"`
-	ExecutionID                 string  `json:"executionId"`
-	StageGUID                   string  `json:"stageGuid"`
-	AgentRunGUID                *string `json:"agentRunGuid"`
-	ChildWorkflowRunGUID        *string `json:"childWorkflowRunGuid"`
-	ChildWorkflowDefinitionSlug *string `json:"childWorkflowDefinitionSlug"`
-	ChildWorkflowStatus         *string `json:"childWorkflowStatus"`
+	GUID                          string               `json:"guid"`
+	ExecutionID                   string               `json:"executionId"`
+	StageGUID                     string               `json:"stageGuid"`
+	AgentRunGUID                  *string              `json:"agentRunGuid"`
+	ChildWorkflowRunGUID          *string              `json:"childWorkflowRunGuid"`
+	ChildWorkflowDefinitionSlug   *string              `json:"childWorkflowDefinitionSlug"`
+	ChildWorkflowStatus           *string              `json:"childWorkflowStatus"`
+	RoundNumber                   *int                 `json:"roundNumber"`
+	CausedBy                      *workflowReturnCause `json:"causedBy"`
+	CollectionIndex               *int                 `json:"collectionIndex"`
+	CollectionStageID             *string              `json:"collectionStageId"`
+	CollectionParentExecutionGUID *string              `json:"collectionParentExecutionGuid"`
+	FanoutIndex                   *int                 `json:"fanoutIndex"`
+	FanoutStageID                 *string              `json:"fanoutStageId"`
+	FanoutParentExecutionGUID     *string              `json:"fanoutParentExecutionGuid"`
+}
+
+type workflowReturnCause struct {
+	Edge      string `json:"edge"`
+	Reason    string `json:"reason"`
+	MaxRounds int    `json:"maxRounds"`
+	EdgeRound int    `json:"edgeRound"`
 }
 
 type exactWorkflowStagesPage struct {
@@ -58,12 +76,32 @@ func validateExactStage(stage exactWorkflowStage) error {
 	default:
 		return fmt.Errorf("invalid recorded stage status %q", stage.Status)
 	}
-	for _, guid := range []*string{stage.AgentRunGUID, stage.ChildWorkflowRunGUID} {
+	for _, guid := range []*string{stage.AgentRunGUID, stage.ChildWorkflowRunGUID, stage.CollectionStageID,
+		stage.CollectionParentExecutionGUID, stage.FanoutStageID, stage.FanoutParentExecutionGUID} {
 		if guid != nil && !workflowExecutionGUID.MatchString(*guid) {
 			return fmt.Errorf("invalid linked execution identity")
 		}
 	}
+	if stage.RoundNumber != nil && *stage.RoundNumber < 1 {
+		return fmt.Errorf("invalid recorded review round")
+	}
+	for _, index := range []*int{stage.CollectionIndex, stage.FanoutIndex} {
+		if index != nil && (*index < 0 || *index >= 50) {
+			return fmt.Errorf("invalid recorded item or branch index")
+		}
+	}
+	if cause := stage.CausedBy; cause != nil && (cause.Edge == "" || cause.Reason == "" ||
+		cause.EdgeRound < 1 || cause.MaxRounds < cause.EdgeRound || cause.MaxRounds > 20) {
+		return fmt.Errorf("invalid recorded return cause")
+	}
 	return nil
+}
+
+func workflowRecordedNumber(number *int, offset int) string {
+	if number == nil {
+		return "-"
+	}
+	return fmt.Sprint(*number + offset)
 }
 
 func fetchExactWorkflowStages(ctx context.Context, client *api.Client, execution *workflowExecution) ([]exactWorkflowStage, error) {
@@ -141,6 +179,12 @@ func runWorkflowExecutionStages(cmd *cobra.Command, ctx context.Context, client 
 		text.WriteString("No recorded stages.\n")
 	} else {
 		sort.SliceStable(stages, func(i, j int) bool {
+			if (stages[i].RoundNumber == nil) != (stages[j].RoundNumber == nil) {
+				return stages[i].RoundNumber == nil
+			}
+			if stages[i].RoundNumber != nil && stages[j].RoundNumber != nil && *stages[i].RoundNumber != *stages[j].RoundNumber {
+				return *stages[i].RoundNumber < *stages[j].RoundNumber
+			}
 			if stages[i].StageOrder != stages[j].StageOrder {
 				return stages[i].StageOrder < stages[j].StageOrder
 			}
@@ -150,12 +194,14 @@ func runWorkflowExecutionStages(cmd *cobra.Command, ctx context.Context, client 
 			return stages[i].GUID < stages[j].GUID
 		})
 		w := tabwriter.NewWriter(&text, 0, 0, 2, ' ', 0)
-		if _, err := fmt.Fprintln(w, "STAGE\tKIND\tROLE\tSTATUS\tATTEMPT\tGATE\tSTARTED\tFINISHED\tEXECUTION"); err != nil {
+		if _, err := fmt.Fprintln(w, "STAGE\tKIND\tROLE\tSTATUS\tROUND\tATTEMPT\tITEM\tBRANCH\tGATE\tSTARTED\tFINISHED\tEXECUTION"); err != nil {
 			return err
 		}
 		for _, stage := range stages {
-			if _, err := fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n",
-				stage.StageOrder, stage.StageKind, dashIfEmpty(stage.StageRole), stage.Status, stage.AttemptNumber,
+			if _, err := fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				stage.StageOrder, stage.StageKind, dashIfEmpty(stage.StageRole), stage.Status,
+				workflowRecordedNumber(stage.RoundNumber, 0), stage.AttemptNumber,
+				workflowRecordedNumber(stage.CollectionIndex, 1), workflowRecordedNumber(stage.FanoutIndex, 1),
 				dashIfEmpty(stage.HumanGateState), shortTime(stage.StartedAt), shortTime(stage.EndedAt), stage.ExecutionID); err != nil {
 				return err
 			}
@@ -165,6 +211,15 @@ func runWorkflowExecutionStages(cmd *cobra.Command, ctx context.Context, client 
 		}
 		for _, stage := range stages {
 			fmt.Fprintf(&text, "\n  [%d attempt %d] %s\n", stage.StageOrder, stage.AttemptNumber, stage.GUID)
+			if cause := stage.CausedBy; cause != nil {
+				fmt.Fprintf(&text, "    return: %s (%s, edge round %d/%d)\n", cause.Edge, cause.Reason, cause.EdgeRound, cause.MaxRounds)
+			}
+			if stage.CollectionParentExecutionGUID != nil {
+				fmt.Fprintf(&text, "    collection parent: %s; item %s\n", *stage.CollectionParentExecutionGUID, workflowRecordedNumber(stage.CollectionIndex, 1))
+			}
+			if stage.FanoutParentExecutionGUID != nil {
+				fmt.Fprintf(&text, "    fan-out parent: %s; branch %s\n", *stage.FanoutParentExecutionGUID, workflowRecordedNumber(stage.FanoutIndex, 1))
+			}
 			if note := gateDetail(stage.workflowStageExecutionRow); note != "" {
 				fmt.Fprintf(&text, "    %s\n", note)
 			}
