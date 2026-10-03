@@ -193,6 +193,9 @@ func printClusterAgentInstall(cmd *cobra.Command, install *clusterAgentInstall) 
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "Agent installation %s: %s (heartbeat confirmed: %t).\n", install.ID, install.Status, install.HeartbeatConfirmed)
 		fmt.Fprintf(cmd.OutOrStdout(), "Read status: astro operator cluster agent-install-status --install-id %s\n", install.ID)
+		if install.ErrorCode != "" || install.ErrorMessage != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "Installation note (%s): %s\n", install.ErrorCode, install.ErrorMessage)
+		}
 	}
 	if install.Status == "REFUSED" || install.Status == "UNCERTAIN" {
 		return fmt.Errorf("agent installation is %s (%s); preserve the original request file", install.Status, install.ErrorCode)

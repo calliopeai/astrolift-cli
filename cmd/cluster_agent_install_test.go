@@ -330,3 +330,25 @@ func TestClusterAgentInstallRejectsUnconfirmedSuccessOrMismatchedReply(t *testin
 		})
 	}
 }
+
+func TestClusterAgentInstallSuccessfulStatusShowsUnconfirmedRetirement(t *testing.T) {
+	c, out, _ := agentInstallCommand(t)
+	result := agentInstallResult(uuid.NewString(), "SUCCEEDED")
+	result["errorCode"] = "RETIREMENT_UNCONFIRMED"
+	result["errorMessage"] = "Replacement is active; retirement of the previous deployment is unconfirmed."
+	srv := agentInstallServer(t, func(q gqlRequest, w http.ResponseWriter) {
+		if strings.Contains(q.Query, "mutation") {
+			t.Fatal("status attempted retirement or another mutation")
+		}
+		writePipelineTestResponse(t, w, map[string]interface{}{"astroliftClusterAgentInstall": result})
+	})
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "fixture", false)
+	client.SetOrg(reviewedPipelineTestOrg)
+	if err := runClusterAgentInstallStatus(c, context.Background(), client, agentInstallTestID); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "heartbeat confirmed: true") || !strings.Contains(out.String(), "RETIREMENT_UNCONFIRMED") || !strings.Contains(out.String(), result["errorMessage"].(string)) {
+		t.Fatalf("confirmed replacement hid pending retirement: %s", out.String())
+	}
+}
