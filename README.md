@@ -347,7 +347,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `project resources` discovers the selected cluster's full provider catalogue and manages project-owned shared services and their app/agent attachments. |
 | `astro operator` | Cluster, provider, and federation management, plus `domains list/create/update/verify` for organization-owned and visible platform-shared managed DNS zones. Shared writes require platform-operator permission. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
-| `astro operator cluster install-agent` | Install the keep-alive agent through the control plane's private network. `--slug` and `--request-file` are required; the private metadata file retains the original cluster/version/provider source proof and request UUID before dispatch. Keep that exact tuple for recovery after lost replies; a missing source proof refuses without replacement. No local kubeconfig or raw agent key is transferred. `agent-install-status --install-id <UUID>` reads the exact operation; queued acceptance is distinct from authenticated heartbeat confirmation. Requires the server's `installClusterAgent` API; older servers refuse rather than falling back to local key rotation. |
+| `astro operator cluster install-agent` | Install the keep-alive agent through the control plane's private network. Exactly one of `--cluster-id <GUID>` or `--slug` plus `--request-file` is required; a known GUID skips operator inventory discovery, while slug discovery requires `cluster.register`; the private metadata file retains the original cluster/version/provider source proof and request UUID before dispatch. Keep that exact tuple for recovery after lost replies; a missing source proof refuses without replacement. No local kubeconfig or raw agent key is transferred. `agent-install-status --install-id <UUID>` reads the exact operation; optional `--cluster-id` refuses a receipt for another cluster; queued acceptance is distinct from authenticated heartbeat confirmation. Requires the server's `installClusterAgent` API; older servers refuse rather than falling back to local key rotation. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
 | `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
@@ -952,9 +952,9 @@ This prepared source adds three remote commands and an offline
 documentation patch do not contain them.
 
 ```sh
-astro operator cluster log-collector-review --slug production --retention-days 30 --json
-astro operator cluster install-log-collector --slug production --request-file collector-install.json --json
-astro operator cluster log-collector-status --operation-id OPERATION_GUID --json
+astro operator cluster log-collector-review --cluster-id CLUSTER_GUID --retention-days 30 --json
+astro operator cluster install-log-collector --cluster-id CLUSTER_GUID --request-file collector-install.json --json
+astro operator cluster log-collector-status --operation-id OPERATION_GUID --cluster-id CLUSTER_GUID --json
 astro docs show cluster-log-collector
 ```
 
@@ -964,11 +964,21 @@ now similarly requires `clusters.reviewed_agent_install`. API markers grant no
 permission, provider support, node coverage or health. No local kubeconfig or
 credential fallback is used.
 
+Review and installation require exactly one of `--cluster-id` or `--slug`. A known
+canonical nonzero GUID goes directly to the scoped `cluster.manage` API without
+an inventory request. Current membership and credential ceilings still apply;
+shared platform clusters also require the platform-operator gate. Slug discovery retains its `cluster.register` requirement;
+a narrow cluster-scoped credential should use the known GUID. Knowing a GUID
+grants no access. Optional `--cluster-id` on either status command verifies the
+returned target before printing a receipt.
+
 The private request file is exclusively created and flushed before dispatch.
 After lost replies, the same file preserves original server/org/actor, cluster
 GUID/version/source, retention and request UUID. Omitted retention uses the
 stored value; explicit changes and missing source refuse without refreshing or
-replacing the request. Files require POSIX `0600` or Windows protected current-user/
+replacing the request. An existing slug-selected file can also be recovered with
+its exact stored cluster GUID; its original bytes and tuple remain unchanged.
+Files require POSIX `0600` or Windows protected current-user/
 SYSTEM ACL.
 
 Only ACTIVATED with post-loss proof timestamps confirms collector installation

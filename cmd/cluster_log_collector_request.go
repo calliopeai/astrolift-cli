@@ -38,13 +38,17 @@ func (r collectorInstallRequest) validateTuple() error {
 }
 
 func (r collectorInstallRequest) checkRecovery(server, organization string, actor int, slug string, retention int, retentionChanged bool) error {
+	return r.checkRecoverySelector(server, organization, actor, reviewedClusterSelector{slug: slug}, retention, retentionChanged)
+}
+
+func (r collectorInstallRequest) checkRecoverySelector(server, organization string, actor int, selector reviewedClusterSelector, retention int, retentionChanged bool) error {
 	if err := r.validateTuple(); err != nil {
 		return err
 	}
 	if err := r.checkScope(collectorRequestKind, server, organization, actor); err != nil {
 		return err
 	}
-	if r.TargetName != slug || retentionChanged && r.RetentionDays != retention {
+	if !selector.matches(r.TargetID, r.TargetName) || retentionChanged && r.RetentionDays != retention {
 		return errors.New("collector selector or retention differs from the original request; preserve the file")
 	}
 	return nil

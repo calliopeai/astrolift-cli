@@ -33,6 +33,12 @@ current authority and the reviewed cluster/provider binding before effects and
 before credential activation; a new credential does not bypass an original
 operation's revoked or expired authority.
 
+Use exactly one of `--cluster-id` or `--slug` for installation. A known canonical
+nonzero cluster GUID goes directly to the scoped API without an inventory query.
+Slug discovery requires separate `cluster.register` inventory authority; narrow
+cluster-scoped credentials should use the known GUID. Knowing the GUID grants no
+permission and does not change the credential ceiling.
+
 The control-plane worker performs Kubernetes operations from its own network
 using the registered cluster connection. No local kubeconfig or raw agent key is
 required or returned to the CLI. The registered connection still needs actual
@@ -45,13 +51,13 @@ Use the matching CLI to review the exact registered cluster and create the
 private metadata request file before dispatch:
 
 ```sh
-astro operator cluster install-agent --slug production \
+astro operator cluster install-agent --cluster-id CLUSTER_GUID \
   --request-file ./agent-install.json --json
 ```
 
 An optional `--interval-seconds` is recorded with the original request. The
-private file contains server, organization, caller, cluster GUID/slug, reviewed
-version/source proof, request UUID and interval metadata. It contains no agent
+private file contains server, organization, caller, cluster GUID and selected
+slug or GUID, reviewed version/source proof, request UUID and interval metadata. It contains no agent
 key, kubeconfig or copied provider credential. Files use POSIX `0600` or a
 protected Windows current-user/SYSTEM ACL and are exclusively created and flushed before dispatch.
 
@@ -62,8 +68,10 @@ and sent unchanged on recovery; a newer review never replaces it under the same
 request UUID. A saved file missing its original source proof is refused; the CLI
 does not rereview or replace it automatically. Existing files never mint a new
 request UUID or select a replacement cluster by name. Server, organization,
-actor or selector changes refuse recovery. Keep the original authentication
-context: the server also binds the operation to its original credential ceiling.
+actor or target changes refuse recovery. An existing slug-selected file can
+also be recovered with `--cluster-id` equal to its stored cluster GUID, retaining
+the original file bytes and tuple without new discovery. Keep the original
+authentication context: the server also binds the operation to its original credential ceiling.
 
 Unlike read-only workflow-definition recovery, installation recovery may submit
 the same original reviewed tuple to `installClusterAgent`. The server identifies
@@ -82,8 +90,11 @@ legacy implementation and do not implement this recovery contract.
 The operation response returns an installation GUID. Read that exact operation:
 
 ```sh
-astro operator cluster agent-install-status --install-id INSTALL_GUID --json
+astro operator cluster agent-install-status --install-id INSTALL_GUID --cluster-id CLUSTER_GUID --json
 ```
+
+Optional `--cluster-id` verifies the returned operation belongs to that exact
+cluster before any receipt is printed. It performs no inventory discovery.
 
 | Status | Meaning |
 |---|---|

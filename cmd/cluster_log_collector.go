@@ -62,41 +62,39 @@ func collectorExactUUID(value string) bool {
 	return err == nil && id != uuid.Nil && id.String() == value
 }
 
-func fetchClusterCollectorReview(ctx context.Context, client *api.Client, slug string, days int) (*clusterCollectorReview, error) {
-	if strings.TrimSpace(slug) == "" {
-		return nil, errors.New("--slug is required")
-	}
+func fetchClusterCollectorReview(ctx context.Context, client *api.Client, selector reviewedClusterSelector, days int) (*clusterCollectorReview, error) {
 	if !collectorRetentionSupported(days) {
 		return nil, errors.New("--retention-days must be a supported CloudWatch retention period")
 	}
-	cluster, err := fetchClusterBySlug(ctx, client, strings.TrimSpace(slug))
+	clusterID, err := selector.resolve(ctx, client)
 	if err != nil {
-		return nil, errors.New("exact cluster discovery is unavailable; no installation was submitted")
-	}
-	if !collectorExactUUID(cluster.ID) {
-		return nil, errors.New("cluster discovery returned an invalid identity")
+		return nil, err
 	}
 	var response struct {
 		Data *clusterCollectorReview `json:"astroliftClusterLogCollectorReview"`
 	}
 	query := `query ClusterLogCollectorReview($clusterId: GUID!, $retentionDays: Int!) { astroliftClusterLogCollectorReview(clusterId: $clusterId, retentionDays: $retentionDays) { ` + clusterCollectorReviewFields + ` } }`
-	if client.GraphQL(ctx, query, map[string]interface{}{"clusterId": cluster.ID, "retentionDays": days}, &response) != nil {
+	if client.GraphQL(ctx, query, map[string]interface{}{"clusterId": clusterID, "retentionDays": days}, &response) != nil {
 		return nil, errors.New("exact collector review is unavailable; no installation was submitted")
 	}
 	review := response.Data
-	if review == nil || review.ClusterID != cluster.ID || review.Version < 1 || review.RetentionDays != days || (review.Supported && !collectorSourcePattern.MatchString(review.Source)) {
+	if review == nil || review.ClusterID != clusterID || review.Version < 1 || review.RetentionDays != days || (review.Supported && !collectorSourcePattern.MatchString(review.Source)) {
 		return nil, errors.New("server returned an unavailable or mismatched collector review")
 	}
 	return review, nil
 }
 
 func runClusterCollectorReview(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string, days int) error {
+	selector, err := parseReviewedClusterSelector(cmd, slug)
+	if err != nil {
+		return err
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := requireClusterInstallCapability(requestCtx, client, clusterCollectorCapability); err != nil {
 		return err
 	}
-	review, err := fetchClusterCollectorReview(requestCtx, client, slug, days)
+	review, err := fetchClusterCollectorReview(requestCtx, client, selector, days)
 	if err != nil {
 		return err
 	}
@@ -117,9 +115,9 @@ func runClusterCollectorReview(cmd *cobra.Command, ctx context.Context, client *
 }
 
 func runClusterInstallLogCollector(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string, days int) error {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return errors.New("--slug is required")
+	selector, err := parseReviewedClusterSelector(cmd, slug)
+	if err != nil {
+		return err
 	}
 	filename, _ := cmd.Flags().GetString("request-file")
 	if strings.TrimSpace(filename) == "" {
@@ -139,13 +137,13 @@ func runClusterInstallLogCollector(cmd *cobra.Command, ctx context.Context, clie
 	}
 	request, err := readCollectorInstallRequest(filename)
 	if err == nil {
-		if err := request.checkRecovery(server, client.Org(), actor, slug, days, cmd.Flags().Changed("retention-days")); err != nil {
+		if err := request.checkRecoverySelector(server, client.Org(), actor, selector, days, cmd.Flags().Changed("retention-days")); err != nil {
 			return err
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	} else {
-		review, err := fetchClusterCollectorReview(requestCtx, client, slug, days)
+		review, err := fetchClusterCollectorReview(requestCtx, client, selector, days)
 		if err != nil {
 			return err
 		}
@@ -154,7 +152,7 @@ func runClusterInstallLogCollector(cmd *cobra.Command, ctx context.Context, clie
 		}
 		request = &collectorInstallRequest{reviewedStartRequest: reviewedStartRequest{
 			Format: 1, Kind: collectorRequestKind, Server: server, OrganizationID: client.Org(), ActorUserID: actor,
-			TargetID: review.ClusterID, TargetName: slug, RequestID: uuid.NewString(), Version: review.Version, ExpectedSource: review.Source,
+			TargetID: review.ClusterID, TargetName: selector.targetName(), RequestID: uuid.NewString(), Version: review.Version, ExpectedSource: review.Source,
 		}, RetentionDays: days}
 		if err := createCollectorInstallRequest(filename, *request); err != nil {
 			return err
@@ -240,6 +238,10 @@ func printClusterCollectorOperation(cmd *cobra.Command, op *clusterCollectorOper
 }
 
 func runClusterLogCollectorStatus(cmd *cobra.Command, ctx context.Context, client *api.Client, id string) error {
+	clusterID, err := optionalReviewedClusterID(cmd)
+	if err != nil {
+		return err
+	}
 	if !collectorExactUUID(id) {
 		return errors.New("--operation-id must be a canonical nonzero UUID")
 	}
@@ -261,6 +263,9 @@ func runClusterLogCollectorStatus(cmd *cobra.Command, ctx context.Context, clien
 	if response.Data.ID != id {
 		return errors.New("server returned another collector operation")
 	}
+	if clusterID != "" && response.Data.ClusterID != clusterID {
+		return errors.New("collector operation belongs to another cluster than --cluster-id")
+	}
 	return printClusterCollectorOperation(cmd, response.Data, true)
 }
 
@@ -276,8 +281,11 @@ The original private request file is durable before dispatch. Retry the same fil
 selector and scope after a lost reply; no chart, image or role overrides are accepted.
 Pending reader grants need an operator grant; the workflow never attaches external
 reader policies. Only ACTIVATED confirms post-pod-loss verification and reader
-activation, not ongoing health or tracing. Requires cluster.manage.`,
-	Args: cobra.NoArgs,
+activation, not ongoing health or tracing. Requires cluster.manage.
+Use exactly one of --cluster-id or --slug. Known GUIDs skip inventory discovery;
+slug discovery additionally requires cluster.register. Shared platform clusters
+also require the platform-operator gate; a known GUID grants no authority.`,
+	Args: reviewedClusterSelectorArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, err := collectorClient(cmd)
 		if err != nil {
@@ -289,7 +297,12 @@ activation, not ongoing health or tracing. Requires cluster.manage.`,
 	},
 }
 var clusterLogCollectorReviewCmd = &cobra.Command{
-	Use: "log-collector-review", Short: "Read exact collector support and an unattached candidate reader policy", Args: cobra.NoArgs,
+	Use: "log-collector-review", Short: "Read exact collector support and an unattached candidate reader policy",
+	Long: `Review a known cluster GUID with --cluster-id, requiring scoped cluster.manage.
+Alternatively use --slug with cluster.register inventory access. Choose exactly one
+selector. Shared platform clusters also require the platform-operator gate.
+Review grants no permission and performs no installation or reader grant.`,
+	Args: reviewedClusterSelectorArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, err := collectorClient(cmd)
 		if err != nil {
@@ -301,7 +314,7 @@ var clusterLogCollectorReviewCmd = &cobra.Command{
 	},
 }
 var clusterLogCollectorStatusCmd = &cobra.Command{
-	Use: "log-collector-status", Short: "Read an exact original collector operation and activation receipt", Args: cobra.NoArgs,
+	Use: "log-collector-status", Short: "Read an exact original collector operation and activation receipt", Args: reviewedClusterStatusArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, err := collectorClient(cmd)
 		if err != nil {
@@ -314,13 +327,14 @@ var clusterLogCollectorStatusCmd = &cobra.Command{
 
 func init() {
 	for _, command := range []*cobra.Command{clusterInstallLogCollectorCmd, clusterLogCollectorReviewCmd} {
-		command.Flags().String("slug", "", "Exact cluster slug to discover then review by GUID (required)")
-		_ = command.MarkFlagRequired("slug")
+		command.Flags().String("slug", "", "Exact cluster slug; discovery requires cluster.register inventory access")
+		addReviewedClusterSelectorFlags(command)
 		command.Flags().Int("retention-days", 30, "Supported CloudWatch retention period")
 	}
 	clusterInstallLogCollectorCmd.Flags().String("request-file", "", "Private original collector operation metadata file (required)")
 	_ = clusterInstallLogCollectorCmd.MarkFlagRequired("request-file")
 	clusterLogCollectorStatusCmd.Flags().String("operation-id", "", "Exact original collector operation UUID (required)")
+	clusterLogCollectorStatusCmd.Flags().String("cluster-id", "", "Optional canonical cluster UUID; refuse a status receipt for another target")
 	_ = clusterLogCollectorStatusCmd.MarkFlagRequired("operation-id")
 	operatorClusterCmd.AddCommand(clusterInstallLogCollectorCmd, clusterLogCollectorReviewCmd, clusterLogCollectorStatusCmd)
 }

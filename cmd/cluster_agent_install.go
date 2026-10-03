@@ -45,9 +45,12 @@ retry with the same file after a lost reply to recover the original operation.
 Never replace it while the outcome is uncertain. Acceptance of the request does
 not mean the agent is healthy; agent-install-status reports heartbeat confirmation.
 
-Requires cluster.manage (enforced server-side). Example:
-  astro operator cluster install-agent --slug production --request-file agent-install.json`,
-	Args: cobra.NoArgs,
+Requires cluster.manage (enforced server-side). Use --cluster-id with a known
+cluster GUID for a scoped credential; --slug discovery additionally requires
+cluster.register inventory access. Shared platform clusters also require the
+platform-operator gate; a known GUID grants no authority. Example:
+  astro operator cluster install-agent --cluster-id CLUSTER_GUID --request-file agent-install.json`,
+	Args: reviewedClusterSelectorArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
@@ -58,9 +61,9 @@ Requires cluster.manage (enforced server-side). Example:
 }
 
 func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, kubeconfigOverride string, interval int) error {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return errors.New("--slug is required")
+	selector, err := parseReviewedClusterSelector(cmd, slug)
+	if err != nil {
+		return err
 	}
 	if kubeconfigOverride != "" {
 		return errors.New("install-agent now runs server-side; remove --kubeconfig")
@@ -86,7 +89,7 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 		if err := r.checkScope(clusterAgentInstallKind, server, client.Org(), actor); err != nil {
 			return err
 		}
-		if r.TargetName != slug || r.Version < 1 || r.IntervalSeconds < 0 {
+		if !selector.matches(r.TargetID, r.TargetName) || r.Version < 1 || r.IntervalSeconds < 0 {
 			return errors.New("cluster selector or reviewed version differs from the saved installation request")
 		}
 		if strings.TrimSpace(r.ExpectedSource) == "" {
@@ -106,15 +109,9 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	} else {
-		cluster, err := fetchClusterBySlug(requestCtx, client, slug)
+		clusterID, err := selector.resolve(requestCtx, client)
 		if err != nil {
 			return err
-		}
-		if cluster.ID == uuid.Nil.String() {
-			return errors.New("cluster returned an invalid GUID")
-		}
-		if _, err := uuid.Parse(cluster.ID); err != nil {
-			return errors.New("cluster returned an invalid GUID")
 		}
 		var review struct {
 			Data *struct {
@@ -124,16 +121,16 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 			} `json:"astroliftClusterAgentInstallReview"`
 		}
 		query := `query ClusterAgentInstallReview($clusterId: GUID!) { astroliftClusterAgentInstallReview(clusterId: $clusterId) { clusterId version source } }`
-		if err := client.GraphQL(requestCtx, query, map[string]interface{}{"clusterId": cluster.ID}, &review); err != nil {
+		if err := client.GraphQL(requestCtx, query, map[string]interface{}{"clusterId": clusterID}, &review); err != nil {
 			return fmt.Errorf("reviewing cluster agent installation: %w", err)
 		}
-		if review.Data == nil || review.Data.ClusterID != cluster.ID || review.Data.Version < 1 || strings.TrimSpace(review.Data.Source) == "" {
+		if review.Data == nil || review.Data.ClusterID != clusterID || review.Data.Version < 1 || strings.TrimSpace(review.Data.Source) == "" {
 			return errors.New("the exact cluster installation review is unavailable")
 		}
 		r = &reviewedStartRequest{
 			Format: 1, Kind: clusterAgentInstallKind, Server: server,
 			OrganizationID: client.Org(), ActorUserID: actor,
-			TargetID: cluster.ID, TargetName: slug,
+			TargetID: clusterID, TargetName: selector.targetName(),
 			RequestID: uuid.NewString(), Version: review.Data.Version, IntervalSeconds: interval,
 			ExpectedSource: review.Data.Source,
 		}
@@ -208,7 +205,7 @@ func printClusterAgentInstall(cmd *cobra.Command, install *clusterAgentInstall) 
 
 var clusterAgentInstallStatusCmd = &cobra.Command{
 	Use: "agent-install-status", Short: "Read an exact server-side agent installation and heartbeat confirmation",
-	Args: cobra.NoArgs,
+	Args: reviewedClusterStatusArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		id, _ := cmd.Flags().GetString("install-id")
 		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
@@ -220,6 +217,10 @@ var clusterAgentInstallStatusCmd = &cobra.Command{
 }
 
 func runClusterAgentInstallStatus(cmd *cobra.Command, ctx context.Context, client *api.Client, id string) error {
+	clusterID, err := optionalReviewedClusterID(cmd)
+	if err != nil {
+		return err
+	}
 	parsed, err := uuid.Parse(id)
 	if err != nil || parsed == uuid.Nil {
 		return errors.New("--install-id must be a nonzero UUID")
@@ -237,6 +238,9 @@ func runClusterAgentInstallStatus(cmd *cobra.Command, ctx context.Context, clien
 	if response.Data == nil || response.Data.ID != id {
 		return errors.New("the exact agent installation is unavailable")
 	}
+	if clusterID != "" && response.Data.ClusterID != clusterID {
+		return errors.New("agent installation belongs to another cluster than --cluster-id")
+	}
 	if err := checkClusterAgentInstall(response.Data, response.Data.ClusterID, response.Data.RequestID); err != nil {
 		return err
 	}
@@ -247,6 +251,7 @@ func init() {
 	clusterInstallAgentCmd.Flags().String("request-file", "", "Private metadata file retaining the original installation request (required)")
 	_ = clusterInstallAgentCmd.MarkFlagRequired("request-file")
 	clusterAgentInstallStatusCmd.Flags().String("install-id", "", "Exact installation UUID (required)")
+	clusterAgentInstallStatusCmd.Flags().String("cluster-id", "", "Optional canonical cluster UUID; refuse a status receipt for another target")
 	_ = clusterAgentInstallStatusCmd.MarkFlagRequired("install-id")
 	operatorClusterCmd.AddCommand(clusterAgentInstallStatusCmd)
 }

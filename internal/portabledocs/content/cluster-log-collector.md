@@ -26,12 +26,16 @@ report limited coverage. It does not install tracing or application instrumentat
 ## Review the exact target and reader grant
 
 ```sh
-astro operator cluster log-collector-review --slug production \
+astro operator cluster log-collector-review --cluster-id CLUSTER_GUID \
   --retention-days 30 --json
 ```
 
-The CLI discovers the visible cluster, then reviews its exact GUID, version and
-source. The review returns `supported`, `refusalCode`, policy metadata and an
+Review and installation require exactly one of `--cluster-id` or `--slug`. A
+known canonical nonzero GUID skips inventory discovery and reviews that exact
+GUID, version and source. Slug discovery requires separate `cluster.register`
+inventory authority; narrow cluster-scoped credentials should use the known GUID.
+Knowing a GUID grants no access and does not change the credential ceiling.
+The review returns `supported`, `refusalCode`, policy metadata and an
 **unattached candidate** `readerPolicy`. Unsupported provider, missing declared
 AWS account, conflicting registered credentials, unavailable transport or an
 existing external historical backend refuse preparation. Review performs no
@@ -56,13 +60,13 @@ for role/external-ID threading and the action-specific `:*` group-policy suffix.
 ## Dispatch with a private original request
 
 ```sh
-astro operator cluster install-log-collector --slug production \
+astro operator cluster install-log-collector --cluster-id CLUSTER_GUID \
   --retention-days 30 --request-file ./collector-install.json --json
 ```
 
 Before dispatch, the CLI exclusively creates and flushes a private metadata file:
-server, organization, actor, cluster GUID/slug, reviewed version/source, retention
-and a canonical nonzero request UUID. It contains no provider credential, log body,
+server, organization, actor, cluster GUID and selected slug or GUID, reviewed
+version/source, retention and a canonical nonzero request UUID. It contains no provider credential, log body,
 chart values or agent key. POSIX files require mode `0600`; Windows files require
 a protected current-user/SYSTEM ACL. Preserve the file until the outcome is known.
 
@@ -72,7 +76,9 @@ or resume the original operation. It does not refresh the review, pick a same-na
 replacement or mint another UUID. Omitting `--retention-days` on replay uses the
 persisted original retention; explicitly changing it is refused. Missing original
 source or other required tuple fields, actor/server/org changes and malformed
-files fail without replacing the file or dispatching another operation.
+files fail without replacing the file or dispatching another operation. An
+existing slug-selected file can also be recovered with `--cluster-id` equal to
+its stored cluster GUID, preserving its bytes and tuple without new discovery.
 
 Supported retention values are 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365,
 400, 545, 731, 1827 and 3653 days. This is the prepared API's bounded selection,
@@ -82,8 +88,11 @@ log group or role overrides are accepted.
 ## Read the exact operation
 
 ```sh
-astro operator cluster log-collector-status --operation-id OPERATION_GUID --json
+astro operator cluster log-collector-status --operation-id OPERATION_GUID --cluster-id CLUSTER_GUID --json
 ```
+
+Optional `--cluster-id` verifies the returned operation belongs to that exact
+cluster before any receipt is printed. It performs no inventory discovery.
 
 | Status | Meaning |
 |---|---|
