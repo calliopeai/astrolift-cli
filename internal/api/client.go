@@ -90,7 +90,13 @@ func (c *Client) graphQL(ctx context.Context, path string, public bool, query st
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	requestClient := c.httpClient
+	if public {
+		clone := *c.httpClient
+		clone.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+		requestClient = &clone
+	}
+	resp, err := requestClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("graphql request: %w", err)
 	}

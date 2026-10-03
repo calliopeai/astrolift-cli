@@ -16,7 +16,7 @@ func requireClusterInstallCapability(ctx context.Context, client *api.Client, ca
 	}
 	query := `query ClusterInstallCapabilities { astroliftServerInfo { capabilities } }`
 	if client.PublicGraphQL(ctx, query, nil, &response) != nil {
-		return errors.New("installation capability discovery is unavailable; no installation was submitted")
+		return errors.New("public installation discovery at /app/gql/config/public/ is unavailable; ask the operator to expose that route; no installation was submitted")
 	}
 	if response.Info != nil {
 		for _, value := range response.Info.Capabilities {
