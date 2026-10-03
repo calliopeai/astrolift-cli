@@ -87,6 +87,44 @@ A live-log link is a separate choice, not a successful historical result.
 Provider errors and unavailable placement must remain distinguishable from a
 successful empty query; inspect `reason` and `scope` as well as `items`.
 
+## CloudWatch collector metadata and existing records
+
+CloudWatch scoped history requires a server containing the collector-identity
+admission correction. On that server, reads require a JSON record from a
+trustworthy Kubernetes collector. The collector metadata must match the requested
+environment namespace and app; a workload-filtered request also requires matching
+workload metadata.
+Application log text, service names or log-stream names do not establish those
+bindings. The reader never supplies a missing record namespace from the request.
+
+| Collector field | Required match |
+|---|---|
+| `kubernetes.namespace_name` | Exact nonempty recorded environment namespace |
+| `kubernetes.labels["astrolift.io/app"]` | Exact selected app slug |
+| `kubernetes.labels["astrolift.io/workload"]` | Exact selected workload slug when a workload filter is supplied |
+
+Operators must ensure the collector or writer owns this Kubernetes metadata and
+stamps it from verified runtime placement. Application-provided fields must not
+supply or override that metadata. A matching JSON field is not cryptographic
+proof of its producer: the collector and log-writing permissions establish this
+trust boundary. Installing a CloudWatch backend alone does not establish it.
+
+Plaintext records and records without the required metadata are not admitted.
+Foreign or malformed required identity metadata does not become an owned log line.
+Duplicate JSON
+keys anywhere in the record cause the entire record to be excluded, even if
+one of the duplicate values would match the requested identity. This is a
+migration and compatibility boundary for existing log groups:
+older unattributed records cannot gain authority from an environment selection
+or a newly configured collector. New trusted records can become readable after
+the collector is correctly configured; this contract does not backfill or
+retroactively prove older records.
+
+The Loki driver retains its existing namespace/app/workload selector contract.
+These CloudWatch requirements do not change Loki's record format or install a
+collector for either backend. Local SDK and database tests establish admission
+behavior, not production collector trust or successful ingestion.
+
 ## Bounded trace search and detail
 
 Traces require `APP_READ` with current app visibility and token scope. Trace
