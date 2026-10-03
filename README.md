@@ -924,3 +924,23 @@ attribution, shared-cluster placement and explicit unavailable states. Existing
 CLI app/preview logs remain historical polling; no live WebSocket or export command
 is added. The paired preview guide documents compatible API live/export proof and
 original-requester/credential downloads, including limits of old name-only artifacts.
+
+### Server-owned cluster keep-alive installation reference
+
+This source snapshot adds the offline `cluster-agent-install` guide for the
+prepared server-owned installation API. Released v0.10.0 lacks this topic and
+the matching remote installation commands. Check actual server schema and CLI
+help before using them.
+
+```sh
+astro docs show cluster-agent-install
+astro docs search 'heartbeat confirmation'
+```
+
+The guide covers exact cluster review, a private original request file,
+credential-bound recovery and metadata-only status. Only `SUCCEEDED` with
+`heartbeatConfirmed: true` establishes installation success. The separate
+`logs-traces` guide explains registered CloudWatch role/external-ID threading,
+collector/read-policy handoff and the future live ingestion/post-pod-loss checks
+required before accepting that setup. Neither guide certifies an installed
+collector, a production heartbeat or tracing activation.

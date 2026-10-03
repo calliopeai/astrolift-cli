@@ -330,3 +330,19 @@ operation using `astro api graphql --file query.graphql --vars-file vars.json --
 against a compatible server. Existing CLI app/preview logs remain historical
 polling. The `logs-traces` offline topic requires the CLI documentation snapshot
 containing this guide; released v0.10.0 does not contain it.
+
+## Server-owned cluster keep-alive installation
+
+The prepared matching CLI implements remote installation with the
+[server-owned installation contract](../guides/cluster-agent-install.md):
+
+```sh
+astro operator cluster install-agent --slug production --request-file ./agent-install.json --json
+astro operator cluster agent-install-status --install-id INSTALL_GUID --json
+astro docs show cluster-agent-install
+```
+
+These semantics and the offline topic are absent from released v0.10.0. Retain
+the same private request file and original tuple after a lost reply. The matching
+CLI refuses local kubeconfig fallback; status reads distinguish queued acceptance
+from authenticated heartbeat confirmation.

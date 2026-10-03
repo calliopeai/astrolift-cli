@@ -200,3 +200,19 @@ and scope as well as items. Trusted collector attribution is required before
 trace exposure; a missing collector is not a zero-traffic or successful empty
 response. These read-only queries can be submitted through `astro api graphql`;
 their fields require a compatible server and do not add CLI live/export commands.
+
+## Server-owned cluster keep-alive installation
+
+The prepared `astroliftClusterAgentInstallReview(clusterId)`,
+`installClusterAgent(input)` and `astroliftClusterAgentInstall(installId)` APIs
+review an exact registered cluster, reserve an original request UUID and return
+metadata-only installation status. They require `cluster.manage`, current
+organization authority and the credential ceiling; shared platform clusters
+retain their platform-operator gate. No new discovery capability is assumed.
+Check the actual installation schema before use.
+
+Read the [server-owned installation guide](../guides/cluster-agent-install.md)
+for private original-request recovery and heartbeat confirmation. Only
+`SUCCEEDED` with `heartbeatConfirmed: true` establishes installation success;
+queue acceptance and resource writes do not. This prepared API does not install
+log collectors or activate tracing.
