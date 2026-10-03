@@ -205,8 +205,9 @@ their fields require a compatible server and do not add CLI live/export commands
 
 The prepared `astroliftClusterAgentInstallReview(clusterId)`,
 `installClusterAgent(input)` and `astroliftClusterAgentInstall(installId)` APIs
-review an exact registered cluster, reserve an original request UUID and return
-metadata-only installation status. They require `cluster.manage`, current
+review an exact registered cluster and return version/source proof. Installation
+requires unchanged `expectedVersion` and `expectedSource`, reserves an original
+request UUID and returns metadata-only installation status. They require `cluster.manage`, current
 organization authority and the credential ceiling; shared platform clusters
 retain their platform-operator gate. No new discovery capability is assumed.
 Check the actual installation schema before use.
