@@ -18,6 +18,7 @@ import (
 )
 
 const agentInstallTestID = "00000000-0000-4000-8000-000000000091"
+const agentInstallTestSource = "reviewed-cluster-provider-source"
 
 func agentInstallServer(t *testing.T, fn func(gqlRequest, http.ResponseWriter)) *httptest.Server {
 	t.Helper()
@@ -52,7 +53,7 @@ func agentInstallData() map[string]interface{} {
 		"astroliftClusters": []interface{}{
 			map[string]interface{}{"id": reviewedPipelineTestID, "slug": "production", "authMethod": "exec_plugin", "endpoint": "https://private-kubernetes.invalid"},
 		},
-		"astroliftClusterAgentInstallReview": map[string]interface{}{"clusterId": reviewedPipelineTestID, "version": 7},
+		"astroliftClusterAgentInstallReview": map[string]interface{}{"clusterId": reviewedPipelineTestID, "version": 7, "source": agentInstallTestSource},
 	}
 }
 
@@ -82,7 +83,7 @@ func TestClusterAgentInstallPersistsMetadataBeforeRemoteDispatch(t *testing.T) {
 		if strings.Contains(q.Query, "mutation InstallClusterAgent") {
 			mutationInput = q.Variables["input"].(map[string]interface{})
 			r, err := readReviewedRequest(file)
-			if err != nil || r.RequestID != mutationInput["requestId"] || r.IntervalSeconds != 17 {
+			if err != nil || r.RequestID != mutationInput["requestId"] || r.IntervalSeconds != 17 || r.ExpectedSource != agentInstallTestSource {
 				t.Errorf("request not durable before dispatch: %+v %v", r, err)
 			}
 			data["installClusterAgent"] = map[string]interface{}{"ok": true, "data": agentInstallResult(mutationInput["requestId"].(string), "QUEUED")}
@@ -95,7 +96,7 @@ func TestClusterAgentInstallPersistsMetadataBeforeRemoteDispatch(t *testing.T) {
 	if err := runClusterInstallAgent(c, context.Background(), client, "production", "", 17); err != nil {
 		t.Fatal(err)
 	}
-	if mutationInput["clusterId"] != reviewedPipelineTestID || mutationInput["expectedVersion"] != float64(7) || mutationInput["intervalSeconds"] != float64(17) {
+	if mutationInput["clusterId"] != reviewedPipelineTestID || mutationInput["expectedVersion"] != float64(7) || mutationInput["expectedSource"] != agentInstallTestSource || mutationInput["intervalSeconds"] != float64(17) {
 		t.Fatalf("incorrect reviewed tuple: %+v", mutationInput)
 	}
 	f, err := privatefile.Open(file, 16384)
@@ -121,6 +122,11 @@ func TestClusterAgentInstallLostReplyRecoversSameTupleWithoutNewReview(t *testin
 	reviews := 0
 	srv := agentInstallServer(t, func(q gqlRequest, w http.ResponseWriter) {
 		data := agentInstallData()
+		if len(inputs) > 0 {
+			// A provider-source change after dispatch must not refresh the
+			// original review or replace its recovery identity on replay.
+			data["astroliftClusterAgentInstallReview"] = map[string]interface{}{"clusterId": reviewedPipelineTestID, "version": 7, "source": "changed-provider-source"}
+		}
 		if strings.Contains(q.Query, "query ClusterAgentInstallReview") {
 			reviews++
 		}
@@ -156,13 +162,13 @@ func TestClusterAgentInstallLostReplyRecoversSameTupleWithoutNewReview(t *testin
 	}
 	a, _ := json.Marshal(inputs[0])
 	b, _ := json.Marshal(inputs[1])
-	if reviews != 1 || !bytes.Equal(a, b) || !bytes.Equal(before, after) {
+	if reviews != 1 || inputs[0]["expectedSource"] != agentInstallTestSource || !bytes.Equal(a, b) || !bytes.Equal(before, after) {
 		t.Fatalf("recovery replaced the reviewed identity: reviews=%d inputs=%s / %s", reviews, a, b)
 	}
 }
 
 func TestClusterAgentInstallSavedScopeMismatchNeverDispatches(t *testing.T) {
-	for _, change := range []string{"server", "org", "actor", "cluster", "interval", "version"} {
+	for _, change := range []string{"server", "org", "actor", "cluster", "interval", "version", "source"} {
 		t.Run(change, func(t *testing.T) {
 			c, _, file := agentInstallCommand(t)
 			mutations := 0
@@ -173,7 +179,7 @@ func TestClusterAgentInstallSavedScopeMismatchNeverDispatches(t *testing.T) {
 				writePipelineTestResponse(t, w, agentInstallData())
 			})
 			defer srv.Close()
-			r := reviewedStartRequest{Format: 1, Kind: clusterAgentInstallKind, Server: srv.URL, OrganizationID: reviewedPipelineTestOrg, ActorUserID: 42, TargetID: reviewedPipelineTestID, TargetName: "production", Version: 7, RequestID: uuid.NewString(), IntervalSeconds: 10}
+			r := reviewedStartRequest{Format: 1, Kind: clusterAgentInstallKind, Server: srv.URL, OrganizationID: reviewedPipelineTestOrg, ActorUserID: 42, TargetID: reviewedPipelineTestID, TargetName: "production", Version: 7, RequestID: uuid.NewString(), IntervalSeconds: 10, ExpectedSource: agentInstallTestSource}
 			switch change {
 			case "server":
 				r.Server = "https://other.invalid"
@@ -187,6 +193,8 @@ func TestClusterAgentInstallSavedScopeMismatchNeverDispatches(t *testing.T) {
 				r.IntervalSeconds = 12
 			case "version":
 				r.Version = 0
+			case "source":
+				r.ExpectedSource = ""
 			}
 			if err := createReviewedRequest(file, r); err != nil {
 				t.Fatal(err)
@@ -206,7 +214,7 @@ func TestClusterAgentInstallSavedScopeMismatchNeverDispatches(t *testing.T) {
 }
 
 func TestClusterAgentInstallBadReviewCannotCreateRecoveryFileOrDispatch(t *testing.T) {
-	for _, bad := range []interface{}{nil, map[string]interface{}{"clusterId": uuid.NewString(), "version": 7}, map[string]interface{}{"clusterId": reviewedPipelineTestID, "version": 0}} {
+	for _, bad := range []interface{}{nil, map[string]interface{}{"clusterId": uuid.NewString(), "version": 7, "source": agentInstallTestSource}, map[string]interface{}{"clusterId": reviewedPipelineTestID, "version": 0, "source": agentInstallTestSource}, map[string]interface{}{"clusterId": reviewedPipelineTestID, "version": 7}, map[string]interface{}{"clusterId": reviewedPipelineTestID, "version": 7, "source": " "}} {
 		c, _, file := agentInstallCommand(t)
 		mutations := 0
 		srv := agentInstallServer(t, func(q gqlRequest, w http.ResponseWriter) {
@@ -320,5 +328,27 @@ func TestClusterAgentInstallRejectsUnconfirmedSuccessOrMismatchedReply(t *testin
 				t.Fatal("invalid completion/identity accepted")
 			}
 		})
+	}
+}
+
+func TestClusterAgentInstallSuccessfulStatusShowsUnconfirmedRetirement(t *testing.T) {
+	c, out, _ := agentInstallCommand(t)
+	result := agentInstallResult(uuid.NewString(), "SUCCEEDED")
+	result["errorCode"] = "RETIREMENT_UNCONFIRMED"
+	result["errorMessage"] = "Replacement is active; retirement of the previous deployment is unconfirmed."
+	srv := agentInstallServer(t, func(q gqlRequest, w http.ResponseWriter) {
+		if strings.Contains(q.Query, "mutation") {
+			t.Fatal("status attempted retirement or another mutation")
+		}
+		writePipelineTestResponse(t, w, map[string]interface{}{"astroliftClusterAgentInstall": result})
+	})
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "fixture", false)
+	client.SetOrg(reviewedPipelineTestOrg)
+	if err := runClusterAgentInstallStatus(c, context.Background(), client, agentInstallTestID); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "heartbeat confirmed: true") || !strings.Contains(out.String(), "RETIREMENT_UNCONFIRMED") || !strings.Contains(out.String(), result["errorMessage"].(string)) {
+		t.Fatalf("confirmed replacement hid pending retirement: %s", out.String())
 	}
 }
