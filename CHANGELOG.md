@@ -2,12 +2,6 @@
 
 ## Unreleased
 
-## 0.10.1 — 2026-10-03
-
-- Embed an exact-environment logs/traces guide with scoped availability and trusted
-  collector attribution; document additive preview live/export source proof and
-  original-requester/credential downloads. Existing CLI log polling is unchanged
-  (platform #2257, #2260).
 - Install cluster agents through the server's private network using a durable
   reviewed request file. Recover the original operation after lost replies and
   expose exact installation status with authenticated heartbeat confirmation.
@@ -16,6 +10,21 @@
   Show incomplete previous-deployment retirement even after the replacement's
   heartbeat is confirmed.
   Refuse local kubeconfig/key-rotation fallback on older servers (#1696).
+
+- Review, install and inspect the exact server-owned CloudWatch collector using
+  a private original request tuple; preserve UUID/version/source/retention after
+  lost replies. Expose post-pod-loss activation separately from ongoing health.
+  Require credential-free public capability discovery before collector or agent
+  installation, with no local or broader-credential fallback (#1706, #1696).
+- Embed reviewed collector setup, reader-policy handoff, recovery and bounded
+  Linux EC2 coverage guidance in the offline documentation.
+
+## 0.10.1 — 2026-10-03
+
+- Embed an exact-environment logs/traces guide with scoped availability and trusted
+  collector attribution; document additive preview live/export source proof and
+  original-requester/credential downloads. Existing CLI log polling is unchanged
+  (platform #2257, #2260).
 
 ## 0.10.0 — 2026-10-02
 
