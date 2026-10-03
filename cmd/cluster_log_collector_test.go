@@ -324,3 +324,24 @@ func TestCollectorMutationRefusesMissingAndMismatchedReceiptWithoutBodyDiagnosti
 		})
 	}
 }
+
+func TestPublicInstallDiscoveryDoesNotFollowLoginGatewayRedirect(t *testing.T) {
+	gatewayCalls := 0
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { gatewayCalls++; w.WriteHeader(http.StatusUnauthorized) }))
+	defer gateway.Close()
+	sourceCalls := 0
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sourceCalls++
+		if r.Header.Get("Authorization") != "" || r.Header.Get("X-Astrolift-Organization") != "" {
+			t.Error("public discovery exposed credentials")
+		}
+		http.Redirect(w, r, gateway.URL+"/login?private=PRIVATE_GATEWAY_MARKER", http.StatusFound)
+	}))
+	defer source.Close()
+	client := api.NewClient(source.URL, "PRIVATE_BEARER", false)
+	client.SetOrg(reviewedPipelineTestOrg)
+	err := requireClusterInstallCapability(context.Background(), client, clusterCollectorCapability)
+	if err == nil || !strings.Contains(err.Error(), "ask the operator to expose") || strings.Contains(err.Error(), "PRIVATE_GATEWAY_MARKER") || sourceCalls != 1 || gatewayCalls != 0 {
+		t.Fatalf("redirect was followed or unhelpfully reported: %v, %d/%d", err, sourceCalls, gatewayCalls)
+	}
+}
