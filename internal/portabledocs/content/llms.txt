@@ -31,6 +31,7 @@ Use these plain-Markdown references as the current public contract. The target i
 - [Bounded workflows](https://astrolift.dev/guides/bounded-workflows/): finite attempts, review return edges, serial collection bodies, exact identities and source-import limits
 - [Reviewed starts](https://astrolift.dev/guides/reviewed-starts/): exact workflow definitions and pipeline runs, typed JSON inputs, durable request identity, read-only recovery and cancellation state
 - [Shared services](https://astrolift.dev/guides/shared-services/): catalogue discovery, provision once, attach apps and agents, and inspect readiness
+- [Model hosting](https://astrolift.dev/guides/model-hosting/): admin-gated Hugging Face or immutable local sources, separate access/license/runtime/hardware checks, readiness and app subscriptions
 - [Agent completion callbacks](https://astrolift.dev/guides/agent-completion-callbacks/): signed final events, retries for 24 hours, replay, key rotation, and Python verification
 
 ## Operational guides
@@ -46,5 +47,8 @@ Use these plain-Markdown references as the current public contract. The target i
 The astro CLI embeds a release-matched Markdown snapshot. Run `astro docs list`, `astro docs show <topic>`, or `astro docs export <directory>`. Generated CLI Markdown and man pages come from the executing command tree.
 
 - [Exact preview targets](https://astrolift.dev/guides/preview-targets/): Exact preview and environment GUID/version bindings, explicit runtime cost, historical polling, reviewed live streams and credential-bound exports.
+- [Cluster keep-alive installation](https://astrolift.dev/guides/cluster-agent-install/): Server-owned private-network installation, original reviewed request recovery and authenticated heartbeat confirmation; separate from application agent dispatch.
 - [Environment logs and traces](https://astrolift.dev/guides/logs-traces/): Persisted app/environment placement, bounded historical logs and scoped trace envelopes, trusted collector attribution and explicit availability.
 - [Workload signals](https://astrolift.dev/guides/workload-signals/): Per-signal scope, runtime membership, instrumentation, collectors, limits and unavailable states.
+
+- [Reviewed CloudWatch collector installation](https://astrolift.dev/guides/cluster-log-collector/): Exact server-owned installation, private original request recovery, unattached reader policy and post-pod-loss activation receipt; Linux EC2 only, not health or tracing.

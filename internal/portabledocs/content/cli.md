@@ -330,3 +330,58 @@ operation using `astro api graphql --file query.graphql --vars-file vars.json --
 against a compatible server. Existing CLI app/preview logs remain historical
 polling. The `logs-traces` offline topic requires the CLI documentation snapshot
 containing this guide; released v0.10.0 does not contain it.
+
+## Server-owned cluster keep-alive installation
+
+The prepared matching CLI implements remote installation with the
+[server-owned installation contract](../guides/cluster-agent-install.md):
+
+```sh
+astro operator cluster install-agent --cluster-id CLUSTER_GUID --request-file ./agent-install.json --json
+astro operator cluster agent-install-status --install-id INSTALL_GUID --cluster-id CLUSTER_GUID --json
+astro docs show cluster-agent-install
+```
+
+Installation requires exactly one of `--cluster-id` or `--slug`. A known canonical
+nonzero GUID skips inventory discovery and still requires scoped `cluster.manage`
+authority, current organization membership and the credential ceiling. Shared
+platform clusters also require the platform-operator gate. Slug discovery
+additionally requires `cluster.register`; use the known GUID with narrow cluster-scoped credentials. Optional `--cluster-id` on status
+commands refuses a different returned target before printing a receipt. An
+existing slug-selected request file can be recovered using its exact stored GUID
+without changing the original file bytes or tuple.
+
+These semantics and the offline topic are absent from released v0.10.0. Retain
+the same private request file and original tuple after a lost reply. The matching
+CLI refuses local kubeconfig fallback; status reads distinguish queued acceptance
+from authenticated heartbeat confirmation.
+
+### Prepared reviewed CloudWatch collector commands
+
+A matching future CLI/server pair exposes these server-owned operations:
+
+```sh
+astro operator cluster log-collector-review --cluster-id CLUSTER_GUID --retention-days 30 --json
+astro operator cluster install-log-collector --cluster-id CLUSTER_GUID --request-file ./collector-install.json --json
+astro operator cluster log-collector-status --operation-id OPERATION_GUID --cluster-id CLUSTER_GUID --json
+astro docs show cluster-log-collector
+```
+
+These commands are not in released v0.10.0 or the separate v0.10.1 patch. The CLI
+requires `clusters.reviewed_log_collector_install` from public discovery, then
+current authenticated target authority. The same exclusive GUID/slug selection
+and optional status target check apply. Preserve the private original actor,
+server, organization, cluster GUID/version/source, retention and request UUID on
+replay. Only `ACTIVATED` with post-loss timestamps establishes installation; it
+is not ongoing health or tracing. See the [collector guide](../guides/cluster-log-collector.md).
+
+## Shared model hosting knowledge
+
+`astro docs show model-hosting` describes admin-gated hosting from Hugging Face
+or immutable local artifacts, pinned vLLM 0.15.1 checks, prerequisites and app
+subscriptions. This offline topic requires a release containing the guide;
+`astro docs list` reflects the executing binary. There are no native model
+management commands. Submit bounded metadata reads through existing
+`astro api graphql --file query.graphql --vars-file vars.json --org YOUR_ORG --json`.
+See [model hosting](../guides/model-hosting.md) for tested document shapes and
+secret-free selections; do not print connection tokens or upload capabilities.

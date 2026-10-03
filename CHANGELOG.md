@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- Add release-matched model-hosting knowledge for admin Hugging Face connections,
+  immutable local imports, pinned vLLM 0.15.1 admission, readiness and app
+  subscriptions. Document safe metadata reads through the existing GraphQL CLI
+  and explain the required authority, configured storage and observed launch.
+
+- Select reviewed agent and collector installations directly with `--cluster-id`
+  for scoped credentials, without operator inventory discovery. Preserve original
+  request tuples on recovery and optionally verify status receipts against the
+  selected cluster. Slug discovery still requires `cluster.register`.
+
+## 0.11.0 — 2026-10-03
+
+- Install cluster agents through the server's private network using a durable
+  reviewed request file. Recover the original operation after lost replies and
+  expose exact installation status with authenticated heartbeat confirmation.
+  Preserve the original cluster and provider source proof on every replay;
+  refuse a missing source proof without replacing an uncertain request.
+  Show incomplete previous-deployment retirement even after the replacement's
+  heartbeat is confirmed.
+  Refuse local kubeconfig/key-rotation fallback on older servers (#1696).
+
+- Review, install and inspect the exact server-owned CloudWatch collector using
+  a private original request tuple; preserve UUID/version/source/retention after
+  lost replies. Expose post-pod-loss activation separately from ongoing health.
+  Require credential-free public capability discovery before collector or agent
+  installation, with no local or broader-credential fallback (#1706, #1696).
+- Embed reviewed collector setup, reader-policy handoff, recovery and bounded
+  Linux EC2 coverage guidance in the offline documentation.
+
 ## 0.10.1 — 2026-10-03
 
 - Embed an exact-environment logs/traces guide with scoped availability and trusted

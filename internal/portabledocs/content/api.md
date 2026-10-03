@@ -37,10 +37,17 @@ The organization header selects one organization when the identity belongs to
 more than one. Never use a slug where the API requires a GUID. The token's
 scopes narrow the user's RBAC grants; requests must pass both checks.
 
-Current API-token scopes are `read:apps`, `write:apps`, `read:clusters`,
-`agent-env-spec:write`, `secret:read`, `secret:write`, `mcp:read`,
-`mcp:dispatch`, `mcp:write`, and `admin`. Use the smallest set that supports
-the integration.
+The reviewed server scope catalogue includes `read:apps`, `write:apps`,
+`read:clusters`, `write:clusters`, `manage:clusters`, `manage:auth-users`,
+`write:app-access`, `agent-env-spec:write`, `project:write`, `team:write`,
+`app:onboard`, `secret:read`, `secret:write`, `workflow:write`,
+`workflow:trigger`, `mcp:read`, `mcp:dispatch`, `mcp:write`, and `admin`.
+The selected installation's token catalogue is authoritative; a listed scope
+is not necessarily part of the default device-flow credential. Use the smallest
+set that supports the integration. `astro auth login --scope` selects documented
+CLI profiles (currently `clusters`), not an arbitrary comma-separated scope list.
+Account grants from `astro whoami --permissions --json` are informational and
+cannot establish this credential's ceiling or exact target authority.
 
 ## GraphQL request
 
@@ -98,6 +105,20 @@ OpenAPI will be generated as those endpoints adopt shared typed contracts.
 There is no single catch-all REST/OpenAPI surface for control-plane CRUD. Use
 GraphQL unless a documented workflow explicitly names a REST, SSE, or WebSocket
 route. This avoids depending on internal Django paths.
+
+## Browser elevation and bearer admission
+
+A compatible server can require recent authentication for sensitive browser
+mutations. Handle `STEP_UP_REQUIRED` using its `supportedMethods` and
+`requiresAttestation` fields; a CLI confirmation, account permission list or
+successful metadata read is not that proof. The existing browser-recency gate
+does not apply to API-token calls, which retain their bearer and scoped-grant
+gates. Reviewed workflow reservation, dispatch and recovery additionally refresh
+identity, membership, token ceiling, policy and ownership after lock waits. See the
+[reviewed-start SSO setup](../guides/reviewed-starts.md#browser-sso-setup-for-sensitive-operations)
+for exact callback registration, identity-link and session requirements, time
+limits and refusal recovery. No new capability key or CLI elevation verb is
+assumed for this admission repair.
 
 ## Secrets
 
@@ -200,3 +221,47 @@ and scope as well as items. Trusted collector attribution is required before
 trace exposure; a missing collector is not a zero-traffic or successful empty
 response. These read-only queries can be submitted through `astro api graphql`;
 their fields require a compatible server and do not add CLI live/export commands.
+
+## Server-owned cluster keep-alive installation
+
+The prepared `astroliftClusterAgentInstallReview(clusterId)`,
+`installClusterAgent(input)` and `astroliftClusterAgentInstall(installId)` APIs
+review an exact registered cluster and return version/source proof. Installation
+requires unchanged `expectedVersion` and `expectedSource`, reserves an original
+request UUID and returns metadata-only installation status. They require `cluster.manage`, current
+organization authority and the credential ceiling; shared platform clusters
+retain their platform-operator gate. No new discovery capability is assumed.
+Check the actual installation schema before use.
+
+Read the [server-owned installation guide](../guides/cluster-agent-install.md)
+for private original-request recovery and heartbeat confirmation. Only
+`SUCCEEDED` with `heartbeatConfirmed: true` establishes installation success;
+queue acceptance and resource writes do not. This prepared API does not install
+log collectors or activate tracing.
+
+### Prepared reviewed log collector API
+
+Compatible future servers expose `astroliftClusterLogCollectorReview`,
+`astroliftInstallClusterLogCollector` and
+`astroliftClusterLogCollectorOperation`. Public capability
+`clusters.reviewed_log_collector_install` describes API presence, not grants or
+health. All target operations require scoped `cluster.manage`. Review returns an
+unattached candidate reader policy; original private request recovery and
+post-pod-loss activation are described in the
+[collector installation guide](../guides/cluster-log-collector.md).
+
+## Admin model hosting and source metadata
+
+[Model hosting](../guides/model-hosting.md) separates catalogue discovery,
+organization hosting authority, exact repository access, license review,
+operator-certified CPU/GPU runtime admission and recorded readiness. Compatible
+servers expose `modelHostingAction`, bounded `huggingFaceConnectionsPage`,
+`clusterModelSourceAccess` and independent local-artifact metadata/import APIs.
+Connection reads are metadata-only; the UI submits an HF token through a
+write-only field and the server stores it encrypted. Local upload authorizations
+are private capabilities, distinct from immutable manifest metadata. Hosting
+requires current `org.update` and `cluster.update` authority for an organization-
+owned model in its isolated namespace. Eligible shared physical placement is
+separate from platform operation of whole-cluster resources and runtime setup.
+API availability proves neither source access nor a configured object
+store/hydrator or successful model launch.
