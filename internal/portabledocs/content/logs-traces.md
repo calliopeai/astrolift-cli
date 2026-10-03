@@ -194,7 +194,10 @@ namespace and `serviceAccount.name` must match `collector_contract` and the
 IRSA trust subject. Existing defaults remain `kube-system/fluent-bit`; a future
 worker-managed `astrolift-system` collector must be explicitly provisioned for
 that namespace, rather than moving an existing collector implicitly. This
-source handoff does not provide that worker installation operation.
+Terraform source handoff does not itself provide that worker installation
+operation. A separate compatible server API can perform
+[reviewed collector installation](cluster-log-collector.md); it does not migrate
+an existing Terraform collector or external backend implicitly.
 
 The reviewed AWS profile exports the complete collector JSON record. It keeps
 `Merge_Log Off`, `K8S-Logging.Parser Off`, `K8S-Logging.Exclude Off` and `Keep_Log On`

@@ -346,3 +346,21 @@ These semantics and the offline topic are absent from released v0.10.0. Retain
 the same private request file and original tuple after a lost reply. The matching
 CLI refuses local kubeconfig fallback; status reads distinguish queued acceptance
 from authenticated heartbeat confirmation.
+
+### Prepared reviewed CloudWatch collector commands
+
+A matching future CLI/server pair exposes these server-owned operations:
+
+```sh
+astro operator cluster log-collector-review --slug production --retention-days 30 --json
+astro operator cluster install-log-collector --slug production --request-file ./collector-install.json --json
+astro operator cluster log-collector-status --operation-id OPERATION_GUID --json
+astro docs show cluster-log-collector
+```
+
+These commands are not in released v0.10.0 or the separate v0.10.1 patch. The CLI
+requires `clusters.reviewed_log_collector_install` from public discovery, then
+current authenticated target authority. Preserve the private original actor,
+server, organization, cluster GUID/version/source, retention and request UUID on
+replay. Only `ACTIVATED` with post-loss timestamps establishes installation; it
+is not ongoing health or tracing. See the [collector guide](../guides/cluster-log-collector.md).
