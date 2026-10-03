@@ -86,6 +86,14 @@ status --json` before using newly added API fields against an older server.
 Refresh authentication after a newly required token scope is added. A token
 scope narrows RBAC; it cannot grant access the identity does not already have.
 
+`astro perms list --json` reads the permission catalogue bundled with the
+executing CLI, without a server connection or login. Its `source` records the
+backend repository, immutable revision, source path and SHA-256; `permissions`
+remains the array of names. This snapshot does not enumerate the selected
+server's current definitions or prove any account or credential has a grant.
+`requiresTargetCheck: true` means the actual target's current permission, token
+ceiling and approval requirements still apply before an action.
+
 Server-owned cluster-agent installation requires the actual `installClusterAgent`,
 `astroliftClusterAgentInstallReview` and `astroliftClusterAgentInstall` fields plus
 the matching CLI. No new capability key is assumed; see
