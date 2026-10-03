@@ -7,6 +7,8 @@
   expose exact installation status with authenticated heartbeat confirmation.
   Preserve the original cluster and provider source proof on every replay;
   refuse a missing source proof without replacing an uncertain request.
+  Show incomplete previous-deployment retirement even after the replacement's
+  heartbeat is confirmed.
   Refuse local kubeconfig/key-rotation fallback on older servers (#1696).
 
 ## 0.10.0 — 2026-10-02
