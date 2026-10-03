@@ -6,6 +6,10 @@
   collector attribution; document additive preview live/export source proof and
   original-requester/credential downloads. Existing CLI log polling is unchanged
   (platform #2257, #2260).
+- Install cluster agents through the server's private network using a durable
+  reviewed request file. Recover the original operation after lost replies and
+  expose exact installation status with authenticated heartbeat confirmation.
+  Refuse local kubeconfig/key-rotation fallback on older servers (#1696).
 
 ## 0.10.0 — 2026-10-02
 
