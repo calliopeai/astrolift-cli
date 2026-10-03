@@ -149,12 +149,14 @@ They retain no token value or copied log body in the receipt. Their opaque downl
 URL and TTL are necessary but insufficient:
 
 - A same-origin browser must use the original requester's authenticated session.
-- A bearer client must send the same original API credential; a different token,
-  even owned by the same user, cannot widen access to the old artifact.
+- For an export created with a bearer credential, a bearer client must send that
+  same original credential. A different token, even owned by the same user, cannot
+  widen access. A bearer cannot substitute for a session-created export.
 - Both paths recheck the requester, present grants, original credential scopes and
   team ceiling, live token validity when one created the export, exact source
   lifecycle and versions, artifact status and TTL. Browser use never bypasses the
-  original token's revocation or scope ceiling.
+  original token's revocation or scope ceiling. Any selected organization must
+  match the artifact's original organization.
 
 Preview downloads use `Cache-Control: private, no-store` so shared caches do not
 serve a previous authenticated response as fresh authorization. The download

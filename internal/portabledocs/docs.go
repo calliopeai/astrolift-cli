@@ -43,6 +43,7 @@ var topics = []Topic{
 	{Slug: "environment-actions", Title: "Review exact environments for workload controls and exec", Filename: "environment-actions.md", OnlinePath: "/guides/environment-actions/"},
 	{Slug: "reviewed-starts", Title: "Review exact workflow and pipeline starts and recover original requests", Filename: "reviewed-starts.md", OnlinePath: "/guides/reviewed-starts/"},
 	{Slug: "preview-targets", Title: "Review exact preview identities and pinned environment actions", Filename: "preview-targets.md", OnlinePath: "/guides/preview-targets/"},
+	{Slug: "logs-traces", Title: "Read exact environment logs and scoped trace envelopes", Filename: "logs-traces.md", OnlinePath: "/guides/logs-traces/"},
 	{Slug: "workload-signals", Title: "Observe workload metrics with explicit scope and instrumentation", Filename: "workload-signals.md", OnlinePath: "/guides/workload-signals/"},
 }
 
@@ -51,6 +52,8 @@ var aliases = map[string]string{
 	"collections":          "bounded-workflows",
 	"apps":                 "app-setup",
 	"previews":             "preview-targets",
+	"logs":                 "logs-traces",
+	"traces":               "logs-traces",
 	"metrics":              "workload-signals",
 	"services":             "shared-services",
 	"resources":            "shared-services",
