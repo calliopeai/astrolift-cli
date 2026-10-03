@@ -29,6 +29,9 @@ Preview live streams and exports require `previews.reviewed_live_logs` and
 for all-or-nothing source proof, idle checks and credential-bound downloads.
 CLI preview logs remain historical polling; these API capabilities add no CLI
 WebSocket or export command.
+Environment log and trace explorers require `observability.exact_environment_logs`
+and `observability.scoped_trace_envelopes`. See [logs and traces](logs-traces.md)
+for persisted placement, bounded reads and trusted trace attribution.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
@@ -52,6 +55,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |
 | Review a preview environment by GUID | `preview-targets` | [Exact preview targets](preview-targets.md) |
+| Read environment logs and traces | `logs-traces` | [Logs and traces](logs-traces.md) |
 | Interpret workload measurements | `workload-signals` | [Workload signals](workload-signals.md) |
 | Receive a final task event | `callbacks` | [Agent completion callbacks](agent-completion-callbacks.md) |
 

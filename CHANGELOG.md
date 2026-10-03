@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Embed an exact-environment logs/traces guide with scoped availability and trusted
+  collector attribution; document additive preview live/export source proof and
+  original-requester/credential downloads. Existing CLI log polling is unchanged
+  (platform #2257, #2260).
+
 ## 0.10.0 — 2026-10-02
 
 ### Added
