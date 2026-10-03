@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/privatefile"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -80,7 +81,7 @@ func TestCollectorInstallDurableBeforeDispatchAndLostReplyReusesOriginalTuple(t 
 	}
 }
 func TestCollectorRecoveryRefusesChangedTupleAndMissingSourceBeforeMutation(t *testing.T) {
-	for _, change := range []string{"actor", "organization", "server", "slug", "retention", "source", "deleted"} {
+	for _, change := range []string{"actor", "organization", "server", "slug", "retention", "source", "missingtarget"} {
 		t.Run(change, func(t *testing.T) {
 			c, _, file := collectorCommand(t)
 			mutations, reviews := 0, 0
@@ -109,15 +110,24 @@ func TestCollectorRecoveryRefusesChangedTupleAndMissingSourceBeforeMutation(t *t
 			if err := createCollectorInstallRequest(file, r); err != nil {
 				t.Fatal(err)
 			}
-			if change == "source" || change == "deleted" {
+			if change == "source" || change == "missingtarget" {
 				raw, _ := os.ReadFile(file)
 				var body map[string]interface{}
 				_ = json.Unmarshal(raw, &body)
-				delete(body, "expectedSource")
+				if change == "source" {
+					delete(body, "expectedSource")
+				} else {
+					delete(body, "targetId")
+				}
 				raw, _ = json.Marshal(body)
 				if err := os.WriteFile(file, raw, 0600); err != nil {
 					t.Fatal(err)
 				}
+				f, err := privatefile.Open(file, 16384)
+				if err != nil {
+					t.Fatal("fixture lost its private access controls before tuple validation:", err)
+				}
+				_ = f.Close()
 			}
 			slug, days := "production", 30
 			if change == "slug" {
