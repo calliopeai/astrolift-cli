@@ -2,7 +2,7 @@ name: Build and Publish
 
 # astrolift-cli release pipeline.
 #   - Tag v*       -> goreleaser builds binaries (Linux/macOS/Win, amd64/arm64),
-#                     authenticated GitHub release assets, and Docker images on
+#                     public GitHub release assets, and Docker images on
 #                     docker.io/calliopeai/astrolift-cli + ghcr.io/calliopeai/astrolift-cli
 #                     (multi-arch manifest, :version + :latest).
 #   - main push    -> from-source multi-arch image tagged

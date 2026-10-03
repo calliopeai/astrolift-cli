@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.11.0 — 2026-10-03
+
 - Install cluster agents through the server's private network using a durable
   reviewed request file. Recover the original operation after lost replies and
   expose exact installation status with authenticated heartbeat confirmation.
