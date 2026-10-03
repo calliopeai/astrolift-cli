@@ -10,6 +10,13 @@ support, node coverage or collector health. The CLI checks the public installati
 handshake at `/app/gql/config/public/` without sending credentials, then uses the
 current authenticated organization for target review and operations.
 
+If an upstream login gateway blocks or redirects `/app/gql/config/public/`,
+capability discovery is unavailable and installation stops before submission.
+Ask the installation operator to expose that public metadata route. The CLI
+does not follow login redirects or send bearer/organization credentials to
+discovery; authenticated target operations are a separate path. Preserve any
+existing original request file while the route is corrected.
+
 The server installs only its fixed chart, image and collector profile. It uses
 the registered cluster GUID, AWS credentials, endpoint and CA from the control
 plane's network; the CLI does not need a local kubeconfig. The profile supports
