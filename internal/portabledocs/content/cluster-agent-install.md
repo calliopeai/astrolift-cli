@@ -4,8 +4,13 @@ This guide describes the prepared server-owned installation contract and matchin
 CLI source. It is not available in released CLI v0.10.0 and does not establish
 that your server exposes it. Check the installation's actual GraphQL schema and
 the executing CLI's `operator cluster install-agent --help` and
-`agent-install-status --help` before using the examples. No new discovery
-capability is assumed here.
+`agent-install-status --help` before using the examples. The CLI requires the
+public handshake capability `clusters.reviewed_agent_install` before review or
+dispatch. It discovers that metadata at `/app/gql/config/public/` without sending
+credentials. The marker describes API availability only; it grants no permission,
+provider support, private-network reachability or cluster health. Recovery keeps
+the original tuple when that capability is unavailable; it does not fall back to
+local installation.
 
 The cluster keep-alive agent reports cluster heartbeat; it is separate from an
 application agent task dispatched with `astro agent dispatch`. Installing this
@@ -165,3 +170,7 @@ request identity and confirmation behavior; they do not prove a production
 private-network install or a live authenticated heartbeat. For the separate
 collector/read-policy handoff and post-pod-loss history acceptance, see
 [logs and traces](logs-traces.md#cloudwatch-reader-identity-and-collector-handoff).
+
+For the separate reviewed collector workflow, see
+[CloudWatch log collector installation](cluster-log-collector.md). Its activation
+receipt requires post-pod-loss verification and is separate from agent heartbeat.

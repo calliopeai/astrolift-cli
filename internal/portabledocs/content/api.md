@@ -217,3 +217,14 @@ for private original-request recovery and heartbeat confirmation. Only
 `SUCCEEDED` with `heartbeatConfirmed: true` establishes installation success;
 queue acceptance and resource writes do not. This prepared API does not install
 log collectors or activate tracing.
+
+### Prepared reviewed log collector API
+
+Compatible future servers expose `astroliftClusterLogCollectorReview`,
+`astroliftInstallClusterLogCollector` and
+`astroliftClusterLogCollectorOperation`. Public capability
+`clusters.reviewed_log_collector_install` describes API presence, not grants or
+health. All target operations require scoped `cluster.manage`. Review returns an
+unattached candidate reader policy; original private request recovery and
+post-pod-loss activation are described in the
+[collector installation guide](../guides/cluster-log-collector.md).

@@ -49,3 +49,5 @@ The astro CLI embeds a release-matched Markdown snapshot. Run `astro docs list`,
 - [Cluster keep-alive installation](https://astrolift.dev/guides/cluster-agent-install/): Server-owned private-network installation, original reviewed request recovery and authenticated heartbeat confirmation; separate from application agent dispatch.
 - [Environment logs and traces](https://astrolift.dev/guides/logs-traces/): Persisted app/environment placement, bounded historical logs and scoped trace envelopes, trusted collector attribution and explicit availability.
 - [Workload signals](https://astrolift.dev/guides/workload-signals/): Per-signal scope, runtime membership, instrumentation, collectors, limits and unavailable states.
+
+- [Reviewed CloudWatch collector installation](https://astrolift.dev/guides/cluster-log-collector/): Exact server-owned installation, private original request recovery, unattached reader policy and post-pod-loss activation receipt; Linux EC2 only, not health or tracing.

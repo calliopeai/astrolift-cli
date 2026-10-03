@@ -85,3 +85,17 @@ the matching CLI. No new capability key is assumed; see
 [cluster-agent installation](cluster-agent-install.md) for recovery and the
 heartbeat-confirmed success boundary. Registration and API acceptance alone
 do not prove an installed healthy agent.
+
+## Reviewed cluster installation APIs
+
+Compatible prepared server releases advertise `clusters.reviewed_agent_install`
+and `clusters.reviewed_log_collector_install` through the public installation
+handshake. They mean API availability only: target permission, provider support,
+node coverage and ongoing health remain independently checked. These new commands
+are not part of released CLI v0.10.0 or the separate v0.10.1 documentation patch.
+
+Read `astro docs show cluster-agent-install` for original agent-install request
+recovery and heartbeat confirmation, and `astro docs show cluster-log-collector`
+for original collector tuple recovery, reader grants and post-loss activation. See
+[agent installation](cluster-agent-install.md) and
+[collector installation](cluster-log-collector.md).
