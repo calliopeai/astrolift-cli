@@ -39,13 +39,16 @@ astro operator cluster install-agent --slug production \
 
 An optional `--interval-seconds` is recorded with the original request. The
 private file contains server, organization, caller, cluster GUID/slug, reviewed
-version, request UUID and interval metadata. It contains no agent key, kubeconfig
-or copied provider credential. Files use POSIX `0600` or a protected Windows
-current-user/SYSTEM ACL and are exclusively created and flushed before dispatch.
+version/source proof, request UUID and interval metadata. It contains no agent
+key, kubeconfig or copied provider credential. Files use POSIX `0600` or a
+protected Windows current-user/SYSTEM ACL and are exclusively created and flushed before dispatch.
 
 After a lost reply, run the same command with the **same file and original
 flags**. Omitting the interval on replay uses its persisted original value;
-supplying a different interval is refused. Existing files never mint a new
+supplying a different interval is refused. The original source proof is retained
+and sent unchanged on recovery; a newer review never replaces it under the same
+request UUID. A saved file missing its original source proof is refused; the CLI
+does not rereview or replace it automatically. Existing files never mint a new
 request UUID or select a replacement cluster by name. Server, organization,
 actor or selector changes refuse recovery. Keep the original authentication
 context: the server also binds the operation to its original credential ceiling.
@@ -81,11 +84,29 @@ astro operator cluster agent-install-status --install-id INSTALL_GUID --json
 
 `secretConfirmed` and `deploymentConfirmed` describe the recorded resources;
 they do not independently mean that the agent is healthy. Only `SUCCEEDED` with
-`heartbeatConfirmed: true` establishes installation success. The current key
-remains accepted until the replacement's authenticated heartbeat confirms the
-recorded Secret/Deployment identity and activation. A later deployment failure
-or missing heartbeat must remain visible as such, rather than be inferred from
-queue acceptance or a resource-write acknowledgement.
+`heartbeatConfirmed: true` establishes installation success. The candidate uses
+its own `astrolift-agent-<install-guid>` Deployment while the previous agent remains in
+place. The current key remains accepted until the replacement's authenticated
+heartbeat confirms the recorded Secret/Deployment identity and activation. The
+server then persists the newly active Deployment's exact name and UID. Queue
+acceptance or a resource-write acknowledgement cannot substitute for that
+heartbeat. The receipt records installation confirmation; continued cluster
+health is monitored separately.
+
+Retiring the previously observed Deployment is a separate conditional cleanup
+step after activation. It checks the recorded old UID and refuses a replacement;
+it does not delete whichever object happens to occupy the old name. A
+`SUCCEEDED` receipt can carry `errorCode: RETIREMENT_UNCONFIRMED`: the new agent's
+heartbeat is confirmed, but previous Deployment cleanup may need review. Read
+`errorCode` and `errorMessage` even on success, and retain the same request file.
+Recovery of that original installation can retry its guarded retirement without
+creating another credential. The CLI preserves those fields in JSON and prints
+an installation note in text; this cleanup diagnostic does not undo success.
+
+Before activation, `HEARTBEAT_UNCONFIRMED` means installation proof could not be
+confirmed at that time; the operation remains awaiting heartbeat and the current
+agent stays active. Withdrawn source, resource identity or original authority
+refuses the candidate. Neither outcome establishes candidate activation.
 
 The CLI emits operation metadata as JSON, including pending states. `REFUSED`
 and `UNCERTAIN` still return an operational error after printing that metadata.
@@ -95,14 +116,14 @@ and the original operation's credential ceiling.
 
 ## API contract
 
-Review the exact GUID/version, persist a nonzero canonical request UUID, then
-retain that tuple for replay. API clients must implement private durable metadata
-storage before dispatch themselves; submitting these fields does not create a
+Review the exact GUID/version/source proof, persist a nonzero canonical request
+UUID, then retain that tuple for replay. API clients must implement private
+durable metadata storage before dispatch themselves; submitting these fields does not create a
 CLI request file.
 
 ```graphql
 query ClusterAgentReview($cluster: GUID!) {
-  astroliftClusterAgentInstallReview(clusterId: $cluster) { clusterId version }
+  astroliftClusterAgentInstallReview(clusterId: $cluster) { clusterId version source }
 }
 ```
 
@@ -120,10 +141,12 @@ mutation InstallClusterAgent($input: InstallClusterAgentInput!) {
 ```
 
 `InstallClusterAgentInput` contains required `clusterId: GUID!`,
-`expectedVersion: Int!` and `requestId: String!`, plus optional
-`intervalSeconds: Int`. Use the current review's version on the first dispatch;
-retain the original requested interval representation on replay. Do not substitute
-a newly read version under an existing UUID. Check both GraphQL errors and
+`expectedVersion: Int!`, `expectedSource: String!` and `requestId: String!`, plus
+optional `intervalSeconds: Int`. Copy the current review's opaque `source` value
+into `expectedSource` alongside its version on the first dispatch. Do not
+recompute that proof or infer it from a cluster name. Retain the original source
+and requested interval representation on replay. Do not substitute a newly read
+version or source proof under an existing UUID. Check both GraphQL errors and
 mutation `ok` before treating the returned receipt as accepted.
 
 ```graphql
