@@ -37,10 +37,17 @@ The organization header selects one organization when the identity belongs to
 more than one. Never use a slug where the API requires a GUID. The token's
 scopes narrow the user's RBAC grants; requests must pass both checks.
 
-Current API-token scopes are `read:apps`, `write:apps`, `read:clusters`,
-`agent-env-spec:write`, `secret:read`, `secret:write`, `mcp:read`,
-`mcp:dispatch`, `mcp:write`, and `admin`. Use the smallest set that supports
-the integration.
+The reviewed server scope catalogue includes `read:apps`, `write:apps`,
+`read:clusters`, `write:clusters`, `manage:clusters`, `manage:auth-users`,
+`write:app-access`, `agent-env-spec:write`, `project:write`, `team:write`,
+`app:onboard`, `secret:read`, `secret:write`, `workflow:write`,
+`workflow:trigger`, `mcp:read`, `mcp:dispatch`, `mcp:write`, and `admin`.
+The selected installation's token catalogue is authoritative; a listed scope
+is not necessarily part of the default device-flow credential. Use the smallest
+set that supports the integration. `astro auth login --scope` selects documented
+CLI profiles (currently `clusters`), not an arbitrary comma-separated scope list.
+Account grants from `astro whoami --permissions --json` are informational and
+cannot establish this credential's ceiling or exact target authority.
 
 ## GraphQL request
 
@@ -98,6 +105,19 @@ OpenAPI will be generated as those endpoints adopt shared typed contracts.
 There is no single catch-all REST/OpenAPI surface for control-plane CRUD. Use
 GraphQL unless a documented workflow explicitly names a REST, SSE, or WebSocket
 route. This avoids depending on internal Django paths.
+
+## Browser elevation and bearer admission
+
+A compatible server can require recent authentication for sensitive browser
+mutations. Handle `STEP_UP_REQUIRED` using its `supportedMethods` and
+`requiresAttestation` fields; a CLI confirmation, account permission list or
+successful metadata read is not that proof. The existing browser-recency gate
+does not apply to API-token calls, which still require current active identity,
+membership, token ceiling and scoped policy/grants. See the
+[reviewed-start SSO setup](../guides/reviewed-starts.md#browser-sso-setup-for-sensitive-operations)
+for exact callback registration, identity-link and session requirements, time
+limits and refusal recovery. No new capability key or CLI elevation verb is
+assumed for this admission repair.
 
 ## Secrets
 
