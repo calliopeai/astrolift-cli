@@ -168,6 +168,11 @@ placement before sending telemetry to the backend:
 | `astrolift.cluster.id` | Recorded cluster GUID |
 | `k8s.namespace.name` | Recorded environment namespace |
 
+The server uses quoted resource keys such as `resource."astrolift.app.id"`
+and intrinsics such as `trace:id`. See
+[Grafana's official TraceQL syntax](https://grafana.com/docs/tempo/latest/traceql/construct-traceql-queries/)
+for the distinction between resource attributes and intrinsic fields.
+
 Application-supplied tags alone are insufficient. The search applies all five
 attributes and verifies them again on returned spans. Logs use their separately
 configured historical log driver and namespace query; this trace attribution
