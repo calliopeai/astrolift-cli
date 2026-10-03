@@ -13,6 +13,13 @@ executing binary's actual topics. There are no native `astro model` commands.
 
 ## Choose the source, then the cluster
 
+The admin hosting screen shows three setup steps: choose a model, choose a
+cluster and compute, then review the checks. Hugging Face and local files have
+separate source cards. A catalogue **Host model** action reveals revision
+selection; **Host a model** on the shared-model list opens the setup flow.
+“Ready for review” permits confirmation, and “Request accepted” means queued
+hosting. Neither status establishes a ready model server.
+
 1. Open **Models** and choose **Host a model**, or start from a Hugging Face
    catalogue entry. Catalogue metadata alone proves neither download access nor
    deployment compatibility.
