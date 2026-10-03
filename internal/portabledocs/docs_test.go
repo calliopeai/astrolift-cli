@@ -72,3 +72,36 @@ func TestPortableGuideLinks(t *testing.T) {
 		}
 	}
 }
+
+func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
+	topics := Topics()
+	if len(topics) != 23 {
+		t.Fatalf("release snapshot has %d topics, want 23", len(topics))
+	}
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := content.ReadDir("content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 24 || len(entries) != len(files) {
+		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
+	}
+	for _, entry := range entries {
+		if _, ok := files[entry.Name()]; !ok {
+			t.Fatalf("unregistered embedded source: %s", entry.Name())
+		}
+	}
+	body, topic, err := Read("models")
+	if err != nil || topic.Slug != "model-hosting" || topic.OnlinePath != "/guides/model-hosting/" {
+		t.Fatalf("model-hosting resolution: %#v %v", topic, err)
+	}
+	portable := PortableMarkdown(topic, body)
+	for _, href := range []string{"(start.md)", "(capabilities.md)", "(api.md)", "https://docs.vllm.ai/en/v0.15.1/models/supported_models/"} {
+		if !strings.Contains(portable, href) {
+			t.Fatalf("portable hosting guide lacks %s", href)
+		}
+	}
+}

@@ -32,6 +32,12 @@ WebSocket or export command.
 Environment log and trace explorers require `observability.exact_environment_logs`
 and `observability.scoped_trace_envelopes`. See [logs and traces](logs-traces.md)
 for persisted placement, bounded reads and trusted trace attribution.
+Model hosting discovery uses `models.admin_hosting`; connection discovery uses
+`models.huggingface_connections`, and local import uses `models.local_artifacts`.
+Using these flows also requires the installed source schema and independently
+configured runtime/storage. These markers grant no repository, license or cluster
+authority. See [model hosting](model-hosting.md) for setup, immutable sources,
+separate checks and safe metadata reads through the existing GraphQL CLI.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
@@ -53,6 +59,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Bound revisions, retries and record bodies | `bounded-workflows` | [Bounded workflows](bounded-workflows.md) |
 | Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |
 | Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
+| Host a shared model and review app subscriptions | `model-hosting` | [Model hosting](model-hosting.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |
 | Review a preview environment by GUID | `preview-targets` | [Exact preview targets](preview-targets.md) |
 | Install the cluster keep-alive agent | `cluster-agent-install` | [Server-owned installation](cluster-agent-install.md) |

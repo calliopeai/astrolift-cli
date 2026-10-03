@@ -374,3 +374,14 @@ and optional status target check apply. Preserve the private original actor,
 server, organization, cluster GUID/version/source, retention and request UUID on
 replay. Only `ACTIVATED` with post-loss timestamps establishes installation; it
 is not ongoing health or tracing. See the [collector guide](../guides/cluster-log-collector.md).
+
+## Shared model hosting knowledge
+
+`astro docs show model-hosting` describes admin-gated hosting from Hugging Face
+or immutable local artifacts, pinned vLLM 0.15.1 checks, prerequisites and app
+subscriptions. This offline topic requires a release containing the guide;
+`astro docs list` reflects the executing binary. There are no native model
+management commands. Submit bounded metadata reads through existing
+`astro api graphql --file query.graphql --vars-file vars.json --org YOUR_ORG --json`.
+See [model hosting](../guides/model-hosting.md) for tested document shapes and
+secret-free selections; do not print connection tokens or upload capabilities.

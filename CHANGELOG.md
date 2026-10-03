@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add release-matched model-hosting knowledge for admin Hugging Face connections,
+  immutable local imports, pinned vLLM 0.15.1 admission, readiness and app
+  subscriptions. Document safe metadata reads through the existing GraphQL CLI
+  and explain the required authority, configured storage and observed launch.
+
 - Select reviewed agent and collector installations directly with `--cluster-id`
   for scoped credentials, without operator inventory discovery. Preserve original
   request tuples on recovery and optionally verify status receipts against the

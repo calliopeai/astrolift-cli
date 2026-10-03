@@ -116,3 +116,16 @@ func TestDocsSearchGeneratedCommandReferences(t *testing.T) {
 		}
 	}
 }
+
+func TestModelHostingKnowledgeIsSearchableOffline(t *testing.T) {
+	result, err := searchPortableDocs(`"immutable manifest"`, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, match := range result.Matches {
+		if match.Topic.Slug == "model-hosting" {
+			return
+		}
+	}
+	t.Fatal("offline search omitted the model-hosting guide")
+}
