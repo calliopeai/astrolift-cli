@@ -228,3 +228,19 @@ health. All target operations require scoped `cluster.manage`. Review returns an
 unattached candidate reader policy; original private request recovery and
 post-pod-loss activation are described in the
 [collector installation guide](../guides/cluster-log-collector.md).
+
+## Admin model hosting and source metadata
+
+[Model hosting](../guides/model-hosting.md) separates catalogue discovery,
+organization hosting authority, exact repository access, license review,
+operator-certified CPU/GPU runtime admission and recorded readiness. Compatible
+servers expose `modelHostingAction`, bounded `huggingFaceConnectionsPage`,
+`clusterModelSourceAccess` and independent local-artifact metadata/import APIs.
+Connection reads are metadata-only; the UI submits an HF token through a
+write-only field and the server stores it encrypted. Local upload authorizations
+are private capabilities, distinct from immutable manifest metadata. Hosting
+requires current `org.update` and `cluster.update` authority for an organization-
+owned model in its isolated namespace. Eligible shared physical placement is
+separate from platform operation of whole-cluster resources and runtime setup.
+API availability proves neither source access nor a configured object
+store/hydrator or successful model launch.

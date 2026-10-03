@@ -986,3 +986,23 @@ and reader activation, not ongoing health or tracing. Reader-policy output is
 unattached; external grants require the connection owner's action. The server
 supports Linux EC2 EKS nodes, not Fargate/Windows collection. Native fixtures
 prove transport/recovery behavior; no production install or ingestion is claimed.
+
+### Shared model hosting knowledge
+
+This source adds the release-matched `model-hosting` offline topic: admin-gated
+Hugging Face connections or immutable local sources, separate access/license/
+CPU-GPU/vLLM 0.15.1 checks, storage and runtime prerequisites, recorded model-server
+readiness and subsequent app subscriptions. Known source IDs grant no authority.
+The CLI has no native model-management verbs; use the guide’s bounded metadata
+queries with existing `astro api graphql`. Token writes use the write-only UI,
+and private upload URLs must remain outside logs and metadata output.
+
+```bash
+astro docs show model-hosting
+astro docs search '"immutable manifest"' --json
+```
+
+The source snapshot now contains 23 topics and 24 canonical mirrored files,
+including `llms.txt`. `astro docs list` and generated help reflect the executing
+binary; this addition does not change the release version or establish a live
+installation’s capability, storage setup or model health.
