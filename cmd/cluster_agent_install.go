@@ -39,7 +39,7 @@ var clusterInstallAgentCmd = &cobra.Command{
 workflow. No local kubeconfig or raw agent key is required. The control plane keeps
 the current key working until an authenticated heartbeat confirms the replacement.
 
---request-file stores only the reviewed cluster identity, version, request UUID,
+--request-file stores only the reviewed cluster identity, version, source, request UUID,
 server, organization and caller identity, before dispatch. Keep this private file;
 retry with the same file after a lost reply to recover the original operation.
 Never replace it while the outcome is uncertain. Acceptance of the request does
@@ -86,6 +86,9 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 		if r.TargetName != slug || r.Version < 1 || r.IntervalSeconds < 0 {
 			return errors.New("cluster selector or reviewed version differs from the saved installation request")
 		}
+		if strings.TrimSpace(r.ExpectedSource) == "" {
+			return errors.New("saved installation request has no original reviewed source; preserve it while the outcome is uncertain")
+		}
 		if (interval != 0 || cmd.Flags().Changed("interval-seconds")) && interval != r.IntervalSeconds {
 			return errors.New("heartbeat interval differs from the saved installation request")
 		}
@@ -114,13 +117,14 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 			Data *struct {
 				ClusterID string `json:"clusterId"`
 				Version   int    `json:"version"`
+				Source    string `json:"source"`
 			} `json:"astroliftClusterAgentInstallReview"`
 		}
-		query := `query ClusterAgentInstallReview($clusterId: GUID!) { astroliftClusterAgentInstallReview(clusterId: $clusterId) { clusterId version } }`
+		query := `query ClusterAgentInstallReview($clusterId: GUID!) { astroliftClusterAgentInstallReview(clusterId: $clusterId) { clusterId version source } }`
 		if err := client.GraphQL(requestCtx, query, map[string]interface{}{"clusterId": cluster.ID}, &review); err != nil {
 			return fmt.Errorf("reviewing cluster agent installation: %w", err)
 		}
-		if review.Data == nil || review.Data.ClusterID != cluster.ID || review.Data.Version < 1 {
+		if review.Data == nil || review.Data.ClusterID != cluster.ID || review.Data.Version < 1 || strings.TrimSpace(review.Data.Source) == "" {
 			return errors.New("the exact cluster installation review is unavailable")
 		}
 		r = &reviewedStartRequest{
@@ -128,12 +132,13 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 			OrganizationID: client.Org(), ActorUserID: actor,
 			TargetID: cluster.ID, TargetName: slug,
 			RequestID: uuid.NewString(), Version: review.Data.Version, IntervalSeconds: interval,
+			ExpectedSource: review.Data.Source,
 		}
 		if err := createReviewedRequest(filename, *r); err != nil {
 			return err
 		}
 	}
-	input := map[string]interface{}{"clusterId": r.TargetID, "expectedVersion": r.Version, "requestId": r.RequestID}
+	input := map[string]interface{}{"clusterId": r.TargetID, "expectedVersion": r.Version, "expectedSource": r.ExpectedSource, "requestId": r.RequestID}
 	if r.IntervalSeconds > 0 {
 		input["intervalSeconds"] = r.IntervalSeconds
 	}
