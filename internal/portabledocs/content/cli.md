@@ -279,6 +279,7 @@ astro docs show workflow-setup
 astro docs show shared-services
 astro docs show preview-targets
 astro docs show workload-signals
+astro docs show logs-traces
 ```
 
 Callback commands require a compatible server and CLI release. See the
@@ -319,3 +320,13 @@ parsing their values. `--wait` reads metadata for the
 exact execution and pinned engine identity and preserves one JSON receipt.
 See the [migration guide](../guides/agent-setup.md#migrate-a-legacy-workflow-definition-run).
 Direct agent-task dispatch and app-bound configured workflow runs are separate.
+
+
+## Read environment telemetry through the API
+
+The [logs and traces guide](../guides/logs-traces.md) contains read-only GraphQL
+queries for exact environment history and scoped trace envelopes. Submit one
+operation using `astro api graphql --file query.graphql --vars-file vars.json --json`
+against a compatible server. Existing CLI app/preview logs remain historical
+polling. The `logs-traces` offline topic requires the CLI documentation snapshot
+containing this guide; released v0.10.0 does not contain it.

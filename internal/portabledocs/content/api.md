@@ -182,7 +182,21 @@ Use [shared services](../guides/shared-services.md) for bounded project resource
 pages, exact managed-service GUID metadata and separately paged visible consumers.
 Reviewed writes carry `expectedContextRevision`; an enqueue acknowledgement is
 separate from provider completion. [Exact preview targets](../guides/preview-targets.md)
-explains persisted environment ownership and versions required on logs/deployments.
+explains persisted environment ownership, versions required on historical and live
+logs, and preview-export downloads bound to the original requester and credential.
+Live/export selectors require their advertised additive server capabilities;
+ordinary legacy exports retain their separate capability-link contract.
 [Workload signals](../guides/workload-signals.md) documents each signal's scope,
 identity basis, physical container membership and instrumentation prerequisites.
 Check the selected installation's SDL before requesting additive fields.
+
+
+## Environment logs and scoped trace envelopes
+
+[Logs and traces](../guides/logs-traces.md) describes exact environment selection,
+shared-cluster placement, paged historical logs and bounded trace/detail reads.
+Use `astroliftAppTracePage` and `astroliftTraceSpansResult` to inspect availability
+and scope as well as items. Trusted collector attribution is required before
+trace exposure; a missing collector is not a zero-traffic or successful empty
+response. These read-only queries can be submitted through `astro api graphql`;
+their fields require a compatible server and do not add CLI live/export commands.
