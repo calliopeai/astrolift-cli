@@ -112,8 +112,9 @@ A compatible server can require recent authentication for sensitive browser
 mutations. Handle `STEP_UP_REQUIRED` using its `supportedMethods` and
 `requiresAttestation` fields; a CLI confirmation, account permission list or
 successful metadata read is not that proof. The existing browser-recency gate
-does not apply to API-token calls, which still require current active identity,
-membership, token ceiling and scoped policy/grants. See the
+does not apply to API-token calls, which retain their bearer and scoped-grant
+gates. Reviewed workflow reservation, dispatch and recovery additionally refresh
+identity, membership, token ceiling, policy and ownership after lock waits. See the
 [reviewed-start SSO setup](../guides/reviewed-starts.md#browser-sso-setup-for-sensitive-operations)
 for exact callback registration, identity-link and session requirements, time
 limits and refusal recovery. No new capability key or CLI elevation verb is
