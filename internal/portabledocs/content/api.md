@@ -182,7 +182,10 @@ Use [shared services](../guides/shared-services.md) for bounded project resource
 pages, exact managed-service GUID metadata and separately paged visible consumers.
 Reviewed writes carry `expectedContextRevision`; an enqueue acknowledgement is
 separate from provider completion. [Exact preview targets](../guides/preview-targets.md)
-explains persisted environment ownership and versions required on logs/deployments.
+explains persisted environment ownership, versions required on historical and live
+logs, and preview-export downloads bound to the original requester and credential.
+Live/export selectors require their advertised additive server capabilities;
+ordinary legacy exports retain their separate capability-link contract.
 [Workload signals](../guides/workload-signals.md) documents each signal's scope,
 identity basis, physical container membership and instrumentation prerequisites.
 Check the selected installation's SDL before requesting additive fields.

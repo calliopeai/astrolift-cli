@@ -24,6 +24,11 @@ Reviewed starts require `workflows.reviewed_definition_starts`,
 `pipelines.versioned_start_requests` and `pipelines.start_request_recovery` as
 appropriate. See [reviewed starts](reviewed-starts.md) for the exact GUID/revision/
 schema and recovery contracts. The executing CLI must also contain those commands.
+Preview live streams and exports require `previews.reviewed_live_logs` and
+`previews.reviewed_log_exports`. See [exact preview targets](preview-targets.md)
+for all-or-nothing source proof, idle checks and credential-bound downloads.
+CLI preview logs remain historical polling; these API capabilities add no CLI
+WebSocket or export command.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
