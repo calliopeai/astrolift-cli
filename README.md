@@ -903,3 +903,23 @@ are refused without a resource scan or name fallback.
 Attachments must share the owning project and cluster. An asynchronous operation
 receipt proves acceptance/enqueue only; read its operation identity and status
 separately. A lost response is unconfirmed and is never automatically retried.
+
+
+### Exact environment logs and traces reference
+
+This source snapshot adds an offline `logs-traces` topic for persisted environment
+placement, historical log pagination and bounded trace envelopes. It requires the
+compatible server capabilities `observability.exact_environment_logs` and
+`observability.scoped_trace_envelopes`; released CLI v0.10.0 lacks this new topic.
+
+```sh
+astro docs show logs-traces
+astro docs search 'collector attribution'
+astro api graphql --file environment-logs.graphql --vars-file log-vars.json --json
+```
+
+The guide includes read-only query documents and explains trusted trace resource
+attribution, shared-cluster placement and explicit unavailable states. Existing
+CLI app/preview logs remain historical polling; no live WebSocket or export command
+is added. The paired preview guide documents compatible API live/export proof and
+original-requester/credential downloads, including limits of old name-only artifacts.
