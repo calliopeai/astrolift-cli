@@ -291,6 +291,40 @@ most 200 visible zones without pagination; a full-sized result emits a warning
 on stderr, and cannot establish a complete install-wide audit. Deletion and
 provisioning repair commands are not exposed here.
 
+## Inspect bundled permission definitions
+
+```bash
+astro perms list
+astro perms list --json
+```
+
+This command works offline without login. It lists a bundled snapshot of
+`core.permissions.Permission` from published backend commit
+`20cfdf2f4a8df9f4a3546f2d4a09b61f4d4e3ee4`, not a query of the selected server.
+JSON preserves the existing `permissions` array of strings and adds
+`catalogueKind: "bundled"`, immutable `source` provenance, `interpretation`, and
+`requiresTargetCheck: true`. Resource names in permission slugs are categories,
+not the ORG/TEAM/PROJECT/APP instance scopes of a grant.
+
+Use the selected server's role editor and actual supported contract when authoring
+roles; a newer, older or extended installation can define different permissions.
+The snapshot is not an account-grant list, bearer-token scope list or action
+preflight. Missing definitions do not authorize a fallback, and listed definitions
+grant nothing. Existing account inspection and diagnostics remain below.
+
+Maintainers refresh the snapshot from an explicitly reviewed immutable backend
+Git tree without importing backend code or contacting an installation:
+
+```bash
+python3 scripts/vendor-permissions.py refresh --source /path/to/astrolift-app \
+  --revision <full-reviewed-backend-commit>
+python3 scripts/vendor-permissions.py check --source /path/to/astrolift-app \
+  --revision <same-full-reviewed-backend-commit>
+```
+
+Commit the generated snapshot with the source-provenance review. A moving `main`
+or `HEAD` is refused; dirty checkout files cannot change the selected Git tree.
+
 ## Inspect identity and account grants
 
 ```bash
