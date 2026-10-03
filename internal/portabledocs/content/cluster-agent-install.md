@@ -12,6 +12,13 @@ provider support, private-network reachability or cluster health. Recovery keeps
 the original tuple when that capability is unavailable; it does not fall back to
 local installation.
 
+If an upstream login gateway blocks or redirects `/app/gql/config/public/`,
+capability discovery is unavailable and installation stops before submission.
+Ask the installation operator to expose that public metadata route. The CLI
+does not follow login redirects or send bearer/organization credentials to
+discovery; authenticated target operations are a separate path. Preserve any
+existing original request file while the route is corrected.
+
 The cluster keep-alive agent reports cluster heartbeat; it is separate from an
 application agent task dispatched with `astro agent dispatch`. Installing this
 agent does not install log collectors, activate CloudWatch history, configure
