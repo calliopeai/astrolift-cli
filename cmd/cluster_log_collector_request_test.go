@@ -19,7 +19,7 @@ func collectorRequestFixture() collectorInstallRequest {
 		Format: 1, Kind: collectorRequestKind, Server: "https://platform.invalid",
 		OrganizationID: reviewedPipelineTestOrg, ActorUserID: 42,
 		TargetID: reviewedPipelineTestID, TargetName: "production",
-		RequestID: uuid.NewString(), Version: 7, ExpectedSource: "original-reviewed-source",
+		RequestID: uuid.NewString(), Version: 7, ExpectedSource: strings.Repeat("a", 64),
 	}, RetentionDays: 30}
 }
 

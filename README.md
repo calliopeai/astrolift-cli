@@ -944,3 +944,35 @@ credential-bound recovery and metadata-only status. Only `SUCCEEDED` with
 collector/read-policy handoff and the future live ingestion/post-pod-loss checks
 required before accepting that setup. Neither guide certifies an installed
 collector, a production heartbeat or tracing activation.
+
+### Reviewed server-owned log collector installation
+
+This prepared source adds three remote commands and an offline
+`cluster-log-collector` guide; released v0.10.0 and the separate v0.10.1
+documentation patch do not contain them.
+
+```sh
+astro operator cluster log-collector-review --slug production --retention-days 30 --json
+astro operator cluster install-log-collector --slug production --request-file collector-install.json --json
+astro operator cluster log-collector-status --operation-id OPERATION_GUID --json
+astro docs show cluster-log-collector
+```
+
+The CLI requires public handshake `clusters.reviewed_log_collector_install`,
+then authenticated exact target authority. Existing server-owned install-agent
+now similarly requires `clusters.reviewed_agent_install`. API markers grant no
+permission, provider support, node coverage or health. No local kubeconfig or
+credential fallback is used.
+
+The private request file is exclusively created and flushed before dispatch.
+After lost replies, the same file preserves original server/org/actor, cluster
+GUID/version/source, retention and request UUID. Omitted retention uses the
+stored value; explicit changes and missing source refuse without refreshing or
+replacing the request. Files require POSIX `0600` or Windows protected current-user/
+SYSTEM ACL.
+
+Only ACTIVATED with post-loss proof timestamps confirms collector installation
+and reader activation, not ongoing health or tracing. Reader-policy output is
+unattached; external grants require the connection owner's action. The server
+supports Linux EC2 EKS nodes, not Fargate/Windows collection. Native fixtures
+prove transport/recovery behavior; no production install or ingestion is claimed.
