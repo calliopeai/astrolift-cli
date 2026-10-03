@@ -30,6 +30,13 @@ func agentInstallServer(t *testing.T, fn func(gqlRequest, http.ResponseWriter)) 
 			return
 		}
 		request.Organization = r.Header.Get("X-Astrolift-Organization")
+		if r.URL.Path == "/app/gql/config/public/" {
+			if r.Header.Get("Authorization") != "" || request.Organization != "" {
+				t.Error("public discovery carried credentials")
+			}
+			writePipelineTestResponse(t, w, map[string]interface{}{"astroliftServerInfo": map[string]interface{}{"capabilities": []string{"clusters.reviewed_agent_install", "clusters.reviewed_log_collector_install"}}})
+			return
+		}
 		fn(request, w)
 	}))
 }

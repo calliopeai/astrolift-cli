@@ -74,6 +74,9 @@ func runClusterInstallAgent(cmd *cobra.Command, ctx context.Context, client *api
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	if err := requireClusterInstallCapability(requestCtx, client, "clusters.reviewed_agent_install"); err != nil {
+		return err
+	}
 	server, actor, err := reviewedRequestScope(cmd, client)
 	if err != nil {
 		return err

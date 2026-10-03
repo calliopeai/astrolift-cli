@@ -22,7 +22,7 @@ type collectorInstallRequest struct {
 func (r collectorInstallRequest) validateTuple() error {
 	if r.Format != 1 || r.Kind != collectorRequestKind || r.Server == "" ||
 		r.OrganizationID == "" || r.ActorUserID < 1 || strings.TrimSpace(r.TargetName) == "" ||
-		r.Version < 1 || strings.TrimSpace(r.ExpectedSource) == "" {
+		r.Version < 1 || !collectorSourcePattern.MatchString(r.ExpectedSource) {
 		return errors.New("collector request lacks its original reviewed tuple; preserve the file")
 	}
 	for _, value := range []string{r.TargetID, r.RequestID} {
