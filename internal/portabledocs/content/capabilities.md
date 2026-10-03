@@ -106,3 +106,33 @@ recovery and heartbeat confirmation, and `astro docs show cluster-log-collector`
 for original collector tuple recovery, reader grants and post-loss activation. See
 [agent installation](cluster-agent-install.md) and
 [collector installation](cluster-log-collector.md).
+
+## Prepare authenticated admission, not just discovery
+
+Before a write, confirm `astro whoami --json`, the selected organization,
+active membership and exact target authority. `astro whoami --permissions --json`
+is an informational account-grant list, not this credential's limits or an action
+matrix. Installation `authMethods` advertises available families; it does not
+prove an OIDC callback/client is configured or a session is elevated. See
+[reviewed-start admission and SSO setup](reviewed-starts.md#current-authority-and-safe-refusal-recovery)
+for fresh post-lock checks, browser setup and keeping original request identity
+after a refusal or uncertain reply. These fixes introduce no new capability key.
+
+For offline setup context, use the existing embedded guides directly:
+
+```bash
+astro docs show app-setup
+astro docs show agent-setup
+astro docs show workflow-setup
+astro docs show shared-services
+astro docs show model-hosting
+astro docs search '"Browser SSO setup"' --json
+astro onboard --only docs --dry-run --json
+astro onboard --only docs
+```
+
+`onboard --only docs` installs release-matched Markdown under `.astrolift/docs`;
+it neither authenticates nor provisions anything. Dry-run reports proposed files,
+and existing files are preserved unless explicitly replaced with `--force`.
+Installing knowledge does not establish connectivity, permissions, source access,
+worker readiness or a completed runtime acceptance test.
