@@ -55,6 +55,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |
 | Review a preview environment by GUID | `preview-targets` | [Exact preview targets](preview-targets.md) |
+| Install the cluster keep-alive agent | `cluster-agent-install` | [Server-owned installation](cluster-agent-install.md) |
 | Read environment logs and traces | `logs-traces` | [Logs and traces](logs-traces.md) |
 | Interpret workload measurements | `workload-signals` | [Workload signals](workload-signals.md) |
 | Receive a final task event | `callbacks` | [Agent completion callbacks](agent-completion-callbacks.md) |
@@ -77,3 +78,10 @@ current public documentation release. Compare `astro version` and `astro
 status --json` before using newly added API fields against an older server.
 Refresh authentication after a newly required token scope is added. A token
 scope narrows RBAC; it cannot grant access the identity does not already have.
+
+Server-owned cluster-agent installation requires the actual `installClusterAgent`,
+`astroliftClusterAgentInstallReview` and `astroliftClusterAgentInstall` fields plus
+the matching CLI. No new capability key is assumed; see
+[cluster-agent installation](cluster-agent-install.md) for recovery and the
+heartbeat-confirmed success boundary. Registration and API acceptance alone
+do not prove an installed healthy agent.
