@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Select reviewed agent and collector installations directly with `--cluster-id`
+  for scoped credentials, without operator inventory discovery. Preserve original
+  request tuples on recovery and optionally verify status receipts against the
+  selected cluster. Slug discovery still requires `cluster.register`.
+
 ## 0.11.0 — 2026-10-03
 
 - Install cluster agents through the server's private network using a durable

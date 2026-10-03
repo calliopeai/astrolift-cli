@@ -116,10 +116,10 @@ func init() {
 	_ = clusterDeployAgentCmd.MarkFlagRequired("slug")
 	operatorClusterCmd.AddCommand(clusterDeployAgentCmd)
 
-	clusterInstallAgentCmd.Flags().StringVar(&installAgentClusterSlug, "slug", "", "TenantCluster slug (required)")
+	clusterInstallAgentCmd.Flags().StringVar(&installAgentClusterSlug, "slug", "", "Exact cluster slug; discovery requires cluster.register inventory access")
 	clusterInstallAgentCmd.Flags().StringVar(&installAgentKubeconfig, "kubeconfig", "", "Deprecated for install-agent; installations use the server network")
 	clusterInstallAgentCmd.Flags().IntVar(&installAgentInterval, "interval-seconds", 0, "Heartbeat interval to set on the cluster (0 = leave unchanged)")
-	_ = clusterInstallAgentCmd.MarkFlagRequired("slug")
+	addReviewedClusterSelectorFlags(clusterInstallAgentCmd)
 	operatorClusterCmd.AddCommand(clusterInstallAgentCmd)
 }
 
