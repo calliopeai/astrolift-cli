@@ -171,6 +171,22 @@ or update a trust policy. Optional `DescribeLogGroups` metadata inspection uses
 account-wide `Resource: "*"`; that separate grant is not needed for ordinary
 historical queries. See the [CloudWatch Logs IAM action/resource reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_logs.html).
 
+Use the action's ARN form when reviewing either policy. For a canonical group
+such as
+`arn:aws:logs:us-west-2:123456789012:log-group:/astrolift/clusters/00000000-0000-4000-8000-000000000170/pods`:
+
+| Purpose | ARN form |
+|---|---|
+| Physical group identity, `logGroupIdentifier`, and tagging `resourceArn` | The plain group ARN above |
+| IAM `logs:DescribeLogStreams` for the writer and `logs:FilterLogEvents` for the reader | The same group ARN with `:*` appended |
+| IAM `logs:CreateLogStream` and `logs:PutLogEvents` | The plain group ARN with `:log-stream:*` appended |
+| IAM `logs:TagResource`, `logs:UntagResource`, and `logs:ListTagsForResource` | The plain group ARN |
+
+Keep the account, region and cluster GUID exact when adding the suffix. Compare
+the physical group ARN and its creation identity separately from the IAM policy
+resource. AWS documents these distinct forms in the
+[CloudWatch Logs LogGroup API reference](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html).
+
 Terraform's `enable_fluent_bit` creates the group and write role, not the
 DaemonSet. The pinned chart installation is a separate operation requiring
 Kubernetes API reachability from its authorized installer. The actual chart
