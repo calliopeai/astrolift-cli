@@ -39,6 +39,11 @@ configured runtime/storage. Hosting and source/configuration writes require an
 active installation Super-admin with freshly admitted credentials. These markers
 grant no repository, license or cluster authority. See [model hosting](model-hosting.md) for setup, immutable sources,
 separate checks and safe metadata reads through the existing GraphQL CLI.
+Per-app model traffic uses `models.authenticated_subscription_metrics` and
+current app-metrics authority. The runtime must provide its version 2 credential
+mapping and authenticated scrape. Missing data is distinct from measured zero;
+token counts and cost remain unsupported. The hosting guide includes a bounded
+read-only query for one exact app connection.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
