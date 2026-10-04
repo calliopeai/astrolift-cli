@@ -6,7 +6,7 @@ The dashboard's Admin module holds organization identity, infrastructure, govern
 
 `/dashboard` summarizes the current install and organization. The workspace tree in the sidebar is the durable map from teams to projects and their apps, agents, and workflows.
 
-Astrolift currently treats one organization as the tenant attached to an install's dashboard. The CLI can store multiple Astrolift servers and select between them with `astro server use`; it does not use the dashboard brand chip as an organization switcher.
+The dashboard operates in one active organization at a time. The CLI can store multiple Astrolift servers and select between them with `astro server use`; it does not use the dashboard brand chip as an organization switcher.
 
 ## Organization structure
 
@@ -57,6 +57,11 @@ an action. Existing bearer scopes are unchanged: `team:write` does not currently
 include `team.manage_members`. Use the authenticated browser or a credential
 whose existing scope ceiling actually permits the operation; account permission
 diagnosis alone is insufficient.
+
+Role definitions must belong to the current organization or be installation/global
+roles. A role owned by another organization cannot authorize a user or group
+binding in this organization. Current organization and global roles retain their
+existing scope, inheritance and expiry checks.
 
 After a change, refresh the roster. A committed receipt records the original
 change; its remaining-source metadata is not a fresh effective-access decision.
