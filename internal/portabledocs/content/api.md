@@ -277,3 +277,14 @@ and subscription identities must match. It exposes measured traffic, accepted
 ASGI response bytes and request duration; token use and cost are unsupported.
 Use `models.authenticated_subscription_metrics` for API discovery and the hosting
 guide's exact read-only query. A capability marker does not grant app access.
+
+`models.connection_approvals` advertises policy-governed connection intake.
+`modelConnectionTargetsPage` and `modelConnectionAction` return the current
+`AUTO`, `REQUEST` or `DENY` action. `requestModelConnection` stores an idempotent
+reviewed request without connecting the app; reviewers with current `org.update`
+and scoped `app.approve_deploy` can approve or reject. The current requester
+explicitly invokes `finalizeModelConnectionRequest` after approval. It rechecks
+the policy, target versions and distinct live quorum before the subscription is
+created. Organization policy writes use `org.update`; model restrictions retain
+the installation Super-admin hosting gate and only tighten effective policy.
+See the hosting guide for recovery, request versions and stale outcomes.
