@@ -260,8 +260,9 @@ servers expose `modelHostingAction`, bounded `huggingFaceConnectionsPage`,
 Connection reads are metadata-only; the UI submits an HF token through a
 write-only field and the server stores it encrypted. Local upload authorizations
 are private capabilities, distinct from immutable manifest metadata. Hosting
-requires current `org.update` and `cluster.update` authority for an organization-
-owned model in its isolated namespace. Eligible shared physical placement is
-separate from platform operation of whole-cluster resources and runtime setup.
+requires an active installation Super-admin and freshly admitted credentials;
+organization or team administration alone does not grant hosting authority.
+Model source/configuration and cluster runtime writes keep that same operator
+gate. App connections use separate scoped app authority and organization policy.
 API availability proves neither source access nor a configured object
 store/hydrator or successful model launch.

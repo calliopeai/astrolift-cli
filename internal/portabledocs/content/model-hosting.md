@@ -13,8 +13,9 @@ executing binary's actual topics. There are no native `astro model` commands.
 
 ## Choose the source, then the cluster
 
-The admin hosting screen shows three setup steps: choose a model, choose a
-cluster and compute, then review the checks. Hugging Face and local files have
+The admin hosting wizard shows one active step at a time: choose a model, choose
+placement and resources, then review the deployment. Back and Next preserve the
+draft; changing reviewed inputs invalidates the old review. Hugging Face and local files have
 separate source cards. A catalogue **Host model** action reveals revision
 selection; **Host a model** on the shared-model list opens the setup flow.
 “Ready for review” permits confirmation, and “Request accepted” means queued
@@ -42,25 +43,73 @@ hosting. Neither status establishes a ready model server.
    temporarily lose access. Wait for the requested subscription revision to be
    applied before treating the access change as complete.
 
-## Hosting authority is separate from platform operation
+## Find and edit a hosted model
 
-Catalogue browsing requires current organization read access. Hosting requires
-organization configuration (`org.update`) and cluster update (`cluster.update`)
-authority, current membership and the credential's ceiling. The hosting action
-read is an administrative eligibility hint; it is not authorization for an
-arbitrary target cluster. Request admission checks the actual target and current
-policy before accepting hosting work. Reconciliation checks the live source,
-connection version, placement and runtime before applying the deployment;
-request acceptance is not a guarantee that later reconciliation will succeed.
+Open **Models** to find organization-hosted deployments, including pending and
+failed ones. Search and page through the inventory, then open a deployment to
+inspect its immutable source, placement, requested and applied resources,
+readiness, operation and app connections. A visible deployment is not proof of
+authority to change it or readiness to serve requests.
 
-An organization administrator is not automatically a platform operator. An
-eligible shared physical cluster can host organization-owned models in isolated
-tenant namespaces using the explicit organization/cluster permissions above.
-That is separate from operating whole-cluster resources, installing agents or
-collectors, or configuring the installation's runtime and storage. Those operator
-responsibilities keep their own authority gates. A narrow token, known GUID,
-visible catalogue entry or successful capability read grants no extra permission.
-Ask the operator for configured, admitted placement when a runtime is unavailable.
+An installation Super-admin can choose **Edit settings** to review the name,
+resource requests and sharing settings. Updates preserve the existing source
+identity and private source credential; changing displayed text cannot silently
+replace that source. The review binds the exact deployment, cluster, provider
+and record version. After an unconfirmed write, refresh that deployment before
+submitting again. An accepted change remains pending until reconciliation and
+the corresponding ready generation are observed.
+
+Choose **Shared** to permit independent app subscriptions, or **Dedicated** to
+restrict subscriptions to the selected app's eligible environments. A dedicated
+model still belongs to the organization and cluster; it does not reserve a
+separate physical machine. Existing subscriptions from other apps must finish
+revocation before the mode can change. Revocation requested or queued is not
+enough. Each app connection retains its own alias, credential and lifecycle.
+
+## Inspect traffic for one app connection
+
+Select a connection on the hosted model's detail page to inspect its recent
+traffic. Refresh the selected connection's 15-minute window explicitly. The
+request binds the organization, deployment, cluster, provider and subscription;
+switching context clears the old observation. Aggregate model observations are
+separate from an individual app's authenticated traffic.
+
+The attributed measures are requests per second, errors per second, accepted
+response bytes per second and p95 request duration in seconds. Error rate here
+is an absolute count per second, not an error percentage. Bytes cover the ASGI
+application's accepted sends, not proof of receipt by the caller. Token counts
+and cost are **unsupported** until a real attributable usage source exists.
+Missing, unconfigured, unavailable and stale measurements remain distinct from
+measured zero.
+
+The runtime's version 2 credential mapping supplies the authenticated
+subscription identity; callers cannot choose it through headers. Operator and
+unauthorized traffic are excluded. Older version 1 deployments need a completed
+reconciliation to install this attribution. The installation must scrape the
+model's authenticated ServiceMonitor and retain the canonical service, namespace
+and pod labels. No prompt or response body is parsed for these measurements.
+
+## Only installation Super-admins configure and host models
+
+Catalogue browsing requires current organization read access. Adding a model,
+changing its hosting configuration, managing model sources and declaring a
+cluster runtime require an active installation **Super-admin**. An organization
+administrator or team manager cannot obtain that installation authority by
+assigning an organization role. A bearer credential must also retain its current
+administrative scope, active organization membership and organization/team
+ceiling; account authority does not widen a token.
+
+The hosting action read is an eligibility hint, not authorization for an arbitrary
+cluster. Request admission checks the actual target and freshly checks the actor
+and credential after relevant database waits. Reconciliation checks the live
+source, connection version, placement and runtime before applying the deployment.
+An accepted request is not a guarantee that later reconciliation will succeed.
+
+App owners can connect eligible app environments using their scoped app authority
+and the organization's connection policy. Connecting to a hosted model does not
+permit editing its runtime, source or deployment. A known GUID, visible catalogue
+entry or successful capability read grants no extra permission. Ask an installation
+Super-admin for configured, admitted placement when a runtime is unavailable.
 
 ## Connect Hugging Face without exposing the token
 
@@ -210,8 +259,10 @@ write replay for this hosting flow.
 | `clusterModelSourceAccess` | Independent pinned-revision download check, using the selected connection GUID/version or anonymous access. |
 | `clusterModelRuntimeAdmission` | Declared target/provider/resource eligibility without deployment effects. |
 | `provisionClusterModel` | Reviewed source and placement input; an accepted deployment remains asynchronous. |
+| `clusterModelUpdateAdmission`, `updateClusterModel` | Exact stored source and reviewed version; Super-admin configuration authority, asynchronous reconciliation. |
 | Local artifact lifecycle | Independent manifest reservation, private uploads and immutable finalization; metadata reads never include grants. |
 | `subscribeClusterModel` | Subsequent exact deployment/app-environment/alias review; request acceptance is separate from applied access. |
+| `astroliftModelSubscriptionMetrics` | One authenticated subscription's bounded observations under current `app.read_metrics` and organization visibility. |
 
 These APIs return current facts or mutation envelopes, not a durable CLI
 request-file protocol. Check both GraphQL `errors` and mutation `ok`, retain exact
@@ -325,6 +376,7 @@ query HostedModel($organization: GUID!, $id: GUID!) {
   clusterModelDeployment(organizationId: $organization, id: $id) {
     id version organizationId clusterId providerId modelRepo revisionSha
     sourceKind localArtifactId localArtifactVersion localManifestSha256
+    sharingMode dedicatedAppId dedicatedAppVersion dedicatedAppName dedicatedAppSlug
     status reason ready readinessObservedAt readinessGeneration
     desiredSubscriptionRevision appliedSubscriptionRevision
     operationId operationStartedAt operationCompletedAt
@@ -341,6 +393,32 @@ served identifier `local-<artifact GUID>` and `revisionSha` is null, not a
 Hugging Face repository or commit. Hugging Face sources use `huggingface` as their
 source kind and the pinned repository/revision. An `unknown` source kind does
 not establish a valid source identity.
+
+Read one app connection's observations with current app-metrics authority:
+
+```graphql
+query AppModelTraffic(
+  $organization: GUID!, $model: GUID!, $subscription: GUID!,
+  $cluster: GUID!, $provider: GUID!, $start: DateTime!, $end: DateTime!
+) {
+  astroliftModelSubscriptionMetrics(
+    organizationId: $organization, serviceId: $model,
+    subscriptionId: $subscription, expectedClusterId: $cluster,
+    expectedProviderId: $provider, start: $start, end: $end
+  ) {
+    serviceId clusterId subscriptionId scope start end retrievedAt stepSeconds
+    metrics {
+      key unit source state observedAt value aggregationWindowSeconds
+      samples { timestamp value }
+    }
+  }
+}
+```
+
+Use the subscription's actual immutable GUID and placement, and a UTC interval
+from one minute to 24 hours. Results contain at most 120 samples per measure and
+use a five-minute rate window. The `models.authenticated_subscription_metrics`
+capability advertises this API; it grants no access to another app's traffic.
 
 Use the same `astro api graphql --file ... --vars-file ... --org ... --json`
 shape for each document. Review the installed SDL before requesting fields; an
