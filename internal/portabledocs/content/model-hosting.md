@@ -226,6 +226,66 @@ An architecture label alone does not establish CPU/GPU capability. Unsupported
 or unconfigured declarations refuse admission rather than choosing a default
 runtime. Arbitrary remote-code execution is not enabled by hosting.
 
+### Configure a cluster runtime
+
+An installation Super-admin can open runtime setup from the wizard's Placement
+step. Read the selected cluster/provider and their current versions before
+editing. Declare a digest-pinned image, supported package and architecture,
+explicit hardware selectors, supported data types, context/concurrency defaults
+and ceilings, and CPU/memory/GPU request ceilings. Saving changes only the
+selected CPU or GPU declaration and preserves the other mode and unrelated
+provider settings. The API never returns the raw provider or authentication
+configuration.
+
+Certification requires an explicit operator acknowledgement and a bounded
+evidence reference. Inspect the actual selected nodes and smoke-test the image
+before certifying them. An uncertified declaration can be saved, but remains
+ineligible for hosting. Saving a declaration does not build an image, label a
+node, download a model, install a runtime or prove scheduling/inference.
+
+Hosting accepts optional data type, maximum context and concurrent-sequence
+requests within the declaration's supported values and ceilings. Context limits
+are 256–131072 tokens; concurrency limits are 1–4096 sequences. Omitted controls
+use declared defaults for new models and preserve stored values on updates.
+The worker checks current declarations again before applying a queued model.
+Existing declarations without these controls keep their previous contract and
+cannot admit a request claiming the new controls.
+
+The small CPU preset requests 1 CPU, 4 GiB memory, 1 GiB KV cache, float32,
+256-token context and one concurrent sequence. These are request values, not
+proof that the model fits or that the selected nodes support the image.
+Require `models.runtime_settings` and inspect this metadata through the CLI:
+
+```graphql
+query RuntimeSetup(
+  $organization: GUID!, $cluster: GUID!, $provider: GUID!
+) {
+  clusterModelRuntimeSettings(
+    organizationId: $organization, clusterId: $cluster,
+    expectedProviderId: $provider
+  ) {
+    organizationId clusterId providerId clusterVersion providerVersion observedAt
+    modes {
+      computeMode configured reason hardwareAdmission
+      declaration {
+        image version packageVersion architecture
+        nodeSelector { key value }
+        supportedDtypes defaultDtype
+        defaultMaxModelLen maxModelLenCeiling
+        defaultMaxNumSeqs maxNumSeqsCeiling
+        cpuRequestCeiling memoryRequestCeiling gpuCountCeiling hardwareCertified
+      }
+    }
+  }
+}
+```
+
+`updateClusterModelRuntime` requires that exact reviewed placement and the
+cluster/provider versions. A changed target, version or authority refuses the
+write. After an unconfirmed save, refresh this exact metadata before another
+submission. A saved declaration with a failed follow-up read remains saved; a
+refresh error does not justify repeating the mutation.
+
 | Check | Evidence and next action |
 |---|---|
 | Repository access | Verify the exact revision and selected connection. Request gated access on Hugging Face when needed. |
@@ -258,6 +318,7 @@ write replay for this hosting flow.
 | `disconnectHuggingFace` | Exact organization, connection GUID and expected version; live model users prevent removal. |
 | `clusterModelSourceAccess` | Independent pinned-revision download check, using the selected connection GUID/version or anonymous access. |
 | `clusterModelRuntimeAdmission` | Declared target/provider/resource eligibility without deployment effects. |
+| `clusterModelRuntimeSettings`, `updateClusterModelRuntime` | Typed, versioned Super-admin declarations for one compute mode; no raw provider configuration or deployment effects. |
 | `provisionClusterModel` | Reviewed source and placement input; an accepted deployment remains asynchronous. |
 | `clusterModelUpdateAdmission`, `updateClusterModel` | Exact stored source and reviewed version; Super-admin configuration authority, asynchronous reconciliation. |
 | Local artifact lifecycle | Independent manifest reservation, private uploads and immutable finalization; metadata reads never include grants. |
@@ -381,8 +442,12 @@ query HostedModel($organization: GUID!, $id: GUID!) {
     desiredSubscriptionRevision appliedSubscriptionRevision
     operationId operationStartedAt operationCompletedAt
     runtimeSupported runtimeReason
-    desiredResources { cpuRequest memoryRequest gpuCount replicas cpuKvCacheGiB }
-    appliedResources { cpuRequest memoryRequest gpuCount replicas cpuKvCacheGiB }
+    desiredResources {
+      cpuRequest memoryRequest gpuCount replicas cpuKvCacheGiB dtype maxModelLen maxNumSeqs
+    }
+    appliedResources {
+      cpuRequest memoryRequest gpuCount replicas cpuKvCacheGiB dtype maxModelLen maxNumSeqs
+    }
   }
 }
 ```
