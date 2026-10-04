@@ -64,6 +64,14 @@ setting, grant operator/app authority or prove inference. Check
 action before discovery/registration. See [native model connections](native-model-connections.md)
 for bounded metadata, immutable sources, workload identity and app policy.
 
+`models.native_connection_metadata` adds the typed `nativeConnection` field to
+the existing model inventory/detail reads. It distinguishes native family,
+source kind, configuration availability and invocation access, with a nullable
+typed source. Local hosted records return null. Unavailable native metadata
+does not become local runtime metadata. Vertex and Foundry source types do not
+enable those providers' connection flows; require their actual operations before
+offering setup. This capability grants no authority or inference guarantee.
+
 The server GraphQL explorer at `/app/gql/config/` exposes the exact supported
 schema. Download the [published SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
 from an immutable backend tag or commit when generating clients. Check both

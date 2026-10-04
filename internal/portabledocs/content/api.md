@@ -106,6 +106,21 @@ reviewed target versions/source identity; registration has no generic GraphQL
 idempotency guarantee. See [native model connections](../guides/native-model-connections.md)
 for the read-only CLI documents, binding and reconciliation boundaries.
 
+`models.native_connection_metadata` adds `ClusterModelDeployment.nativeConnection`
+to inventory and detail reads under their existing permissions. Its family and
+source-kind enums distinguish Bedrock foundation models/inference profiles,
+Vertex Endpoints, Foundry deployments and unknown native records. The
+`NativeConnectionSource` union carries provider-specific metadata; a null source
+with `UNAVAILABLE` preserves the native distinction. Local hosted records return
+null for `nativeConnection`.
+
+Existing Bedrock records populate this projection. The Vertex/Foundry union
+types do not implement adoption or app connection operations. Invocation access
+remains `UNKNOWN`; resource and reviewed-source fingerprints are metadata hashes,
+not ownership or inference proofs. This marker is independent of the Bedrock
+implementation marker and default-off runtime flag. See the native connection
+guide's typed query for the exact fields.
+
 ## Compatibility
 
 - Query server capabilities before assuming an optional module exists.
