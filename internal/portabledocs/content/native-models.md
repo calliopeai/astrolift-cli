@@ -68,6 +68,21 @@ fields; the API marker alone does not prove that UI is installed. Native
 connections have no local CPU/GPU, pod, vLLM runtime or model-server readiness claim.
 `invokeAccess` remains `unknown` until independently established.
 
+Servers advertising `models.native_connection_metadata` also expose the typed
+`nativeConnection` field on inventory and detail records. It reports `family`,
+`sourceKind`, `configurationState`, `invokeAccess`, a reason and a typed `source`.
+Local hosted records return null for this field. A native record whose metadata
+is unavailable keeps its family and reports `UNAVAILABLE` with a null source;
+it must not be interpreted as a local hosted model.
+
+The source union includes Bedrock, Vertex Endpoint and Foundry deployment types.
+This release populates existing Bedrock connection metadata. Vertex/Foundry
+types alone do not enable registration, app connections or inference for those
+providers. Check each operation and capability on the selected installation.
+`resourceIdentityFingerprint` hashes the recorded native resource identity;
+`reviewedSourceFingerprint` covers its reviewed configuration. Neither proves
+resource ownership, an immutable cloud incarnation or successful invocation.
+
 If installation enablement or the credential declaration changes, the record
 remains identifiable as a native Bedrock connection while `nativeSource` can be
 unavailable. Refresh configuration and operator admission; absent metadata does
@@ -210,3 +225,28 @@ query BedrockSource($source: BedrockModelSourceInput!) {
 nothing and perform no paid allocation or IAM changes. See the
 [control API contract](../reference/api.md) for credential, tenancy and error
 handling, and [capability discovery](capabilities.md) for release matching.
+
+On a server advertising `models.native_connection_metadata`, read the registered
+connection's common metadata with its actual organization and record GUIDs:
+
+```graphql
+query NativeConnection($organization: GUID!, $model: GUID!) {
+  clusterModelDeployment(organizationId: $organization, id: $model) {
+    id name
+    nativeConnection {
+      family sourceKind configurationState invokeAccess reason
+      resourceIdentityFingerprint reviewedSourceFingerprint metadataObservedAt
+      source {
+        __typename
+        ... on NativeModelConnectionSource {
+          accountId region partition sourceId sourceArn destinationModelArns
+        }
+      }
+    }
+  }
+}
+```
+
+This read uses the existing model permissions and token scope ceilings. A null
+record can indicate that it is inaccessible; it does not prove deletion. The
+common metadata capability grants no additional read or hosting authority.
