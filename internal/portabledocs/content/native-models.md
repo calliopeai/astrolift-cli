@@ -68,6 +68,11 @@ fields; the API marker alone does not prove that UI is installed. Native
 connections have no local CPU/GPU, pod, vLLM runtime or model-server readiness claim.
 `invokeAccess` remains `unknown` until independently established.
 
+If installation enablement or the credential declaration changes, the record
+remains identifiable as a native Bedrock connection while `nativeSource` can be
+unavailable. Refresh configuration and operator admission; absent metadata does
+not authorize another source or a local-runtime fallback.
+
 Super-admin settings edits can change the name, subscription enablement and
 shared/dedicated settings using the reviewed connection and placement versions.
 The source, account, region, destination set and credential declaration are
@@ -80,6 +85,11 @@ intents are resolved. It does not call the paid provisioning/deletion driver,
 change the cloud source or delete a model. A lost write response needs exact
 record recovery and fresh review; generic GraphQL invocation does not provide
 an idempotency guarantee for registration.
+
+After native records exist, rollback disables the feature and retains the
+forward database schema. Live and soft-deleted native rows prevent restoring
+the previous owner constraint. Do not purge or recast connection records to
+force a schema reversal.
 
 ## Connect apps under organization policy
 
@@ -94,6 +104,11 @@ applying the named configuration and owned AWS workload-identity policy. Observe
 the requested and applied subscription revision and reconciliation outcome.
 Connection changes can require an app restart. They do not restart or redeploy
 the AWS-hosted model.
+
+If a retained source becomes unavailable during another app's removal, cleanup
+can confirm that requested removal while the retained connection stays failed
+with its applied revision unchanged. Inspect both outcomes before retrying;
+partial cleanup does not confirm that the remaining app can invoke the model.
 
 The named binding uses `MODEL_<ALIAS>_ENDPOINT_URL`, `DEPLOYMENT_NAME`, `REGION`,
 `API_STYLE` and `AUTH_MODE`, each under the same alias prefix. For example,
