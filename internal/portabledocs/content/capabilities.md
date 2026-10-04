@@ -35,8 +35,9 @@ for persisted placement, bounded reads and trusted trace attribution.
 Model hosting discovery uses `models.admin_hosting`; connection discovery uses
 `models.huggingface_connections`, and local import uses `models.local_artifacts`.
 Using these flows also requires the installed source schema and independently
-configured runtime/storage. These markers grant no repository, license or cluster
-authority. See [model hosting](model-hosting.md) for setup, immutable sources,
+configured runtime/storage. Hosting and source/configuration writes require an
+active installation Super-admin with freshly admitted credentials. These markers
+grant no repository, license or cluster authority. See [model hosting](model-hosting.md) for setup, immutable sources,
 separate checks and safe metadata reads through the existing GraphQL CLI.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
