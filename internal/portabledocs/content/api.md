@@ -266,3 +266,14 @@ Model source/configuration and cluster runtime writes keep that same operator
 gate. App connections use separate scoped app authority and organization policy.
 API availability proves neither source access nor a configured object
 store/hydrator or successful model launch.
+
+`clusterModelUpdateAdmission` and `updateClusterModel` review the exact stored
+source and deployment version before changing hosting settings. Shared models
+accept independently admitted app connections; dedicated models restrict them
+to the selected app's environments while remaining organization-owned.
+`astroliftModelSubscriptionMetrics` reads one authenticated subscription under
+current `app.read_metrics` and organization visibility. Its declared placement
+and subscription identities must match. It exposes measured traffic, accepted
+ASGI response bytes and request duration; token use and cost are unsupported.
+Use `models.authenticated_subscription_metrics` for API discovery and the hosting
+guide's exact read-only query. A capability marker does not grant app access.
