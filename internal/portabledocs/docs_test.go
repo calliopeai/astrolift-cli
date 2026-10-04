@@ -22,6 +22,9 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
+		"org":                  "organization",
+		"teams":                "organization",
+		"membership":           "organization",
 		"astrolift-toml":       "manifest",
 		"astrolift.toml":       "manifest",
 		"toml":                 "manifest",
@@ -75,8 +78,8 @@ func TestPortableGuideLinks(t *testing.T) {
 
 func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	topics := Topics()
-	if len(topics) != 23 {
-		t.Fatalf("release snapshot has %d topics, want 23", len(topics))
+	if len(topics) != 24 {
+		t.Fatalf("release snapshot has %d topics, want 24", len(topics))
 	}
 	files, err := Files()
 	if err != nil {
@@ -86,7 +89,7 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 24 || len(entries) != len(files) {
+	if len(files) != 25 || len(entries) != len(files) {
 		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
 	}
 	for _, entry := range entries {

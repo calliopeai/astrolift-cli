@@ -67,6 +67,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Goal | Offline topic | Online guide |
 |---|---|---|
 | First login and deployment | `start` | [Getting started](../getting-started.md) |
+| Manage people, teams and direct membership | `organization` | [Running an organization](../running-an-org.md#manage-people-and-team-membership) |
 | Register and operate an application | `app-setup` | [Set up an app](app-setup.md) |
 | Package, register, and dispatch an agent | `agent-setup` | [Set up an agent](agent-setup.md) |
 | Compose and run stages | `workflow-setup` | [Set up a workflow](workflow-setup.md) |

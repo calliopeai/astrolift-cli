@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add an offline `organization` guide, with `org`, `teams` and `membership`
+  aliases, covering reviewed membership changes, inherited/provider access,
+  permission ceilings and lost-response recovery. Include the matching additive
+  GraphQL reference in search, export and agent onboarding (platform #2273).
+
 - Add release-matched model-hosting knowledge for admin Hugging Face connections,
   immutable local imports, pinned vLLM 0.15.1 admission, readiness and app
   subscriptions. Document safe metadata reads through the existing GraphQL CLI

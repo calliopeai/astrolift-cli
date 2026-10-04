@@ -273,6 +273,7 @@ astro agent inspect <task-guid> --json
 astro agent callbacks redeliver <task-guid> --json
 astro docs show callbacks
 astro docs show capabilities
+astro docs show organization
 astro docs show app-setup
 astro docs show agent-setup
 astro docs show workflow-setup
