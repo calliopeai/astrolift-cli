@@ -5,6 +5,11 @@ an app or project. After the deployment is ready, connect eligible app
 environments through independent subscriptions. Existing app/cloud endpoints
 remain a separate deployment path.
 
+For existing organization-owned Bedrock connections, use
+[native model connections](native-model-connections.md). That flow shares the
+inventory and app policy while retaining AWS identity, configuration and
+invocation semantics; it does not deploy a local vLLM runtime.
+
 This guide describes the prepared hosting contract. Check the selected
 installation's schema and capability metadata before use. Older servers without
 the hosting fields cannot run this flow. The offline `model-hosting` topic

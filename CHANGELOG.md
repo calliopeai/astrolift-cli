@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Embed the native Bedrock connection guide as `native-models`, with `bedrock`
+  and `native-model-connections` aliases. Explain default-off global enablement,
+  exact source/placement discovery, shared app policy and workload-identity
+  reconciliation without treating metadata or IAM configuration as inference.
+
 - Add an offline `organization` guide, with `org`, `teams` and `membership`
   aliases, covering reviewed membership changes, inherited/provider access,
   permission ceilings and lost-response recovery. Include the matching additive

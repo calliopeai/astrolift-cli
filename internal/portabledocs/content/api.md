@@ -92,6 +92,20 @@ routes still define payloads imperatively, so route introspection would publish
 names without truthful request, response, and authorization schemas. REST
 OpenAPI will be generated as those endpoints adopt shared typed contracts.
 
+## Native model connection operations
+
+Compatible servers advertising `models.bedrock_connections` expose bounded
+`bedrockModelSources` and exact `bedrockModelSource` reads, with separate
+installation/operator `bedrockModelConnectionSupport` and exact-placement
+`bedrockModelConnectionAction` admission. `registerBedrockModelConnection`,
+`updateBedrockModelConnection` and `unregisterBedrockModelConnection` manage a
+local existing-source connection record, returning the existing
+`ClusterModelDeploymentMutationResult` envelope. They do not allocate or delete
+native AWS model resources. Every write requires current hosting authority and
+reviewed target versions/source identity; registration has no generic GraphQL
+idempotency guarantee. See [native model connections](../guides/native-model-connections.md)
+for the read-only CLI documents, binding and reconciliation boundaries.
+
 ## Compatibility
 
 - Query server capabilities before assuming an optional module exists.
