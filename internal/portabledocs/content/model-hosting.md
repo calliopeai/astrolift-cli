@@ -113,6 +113,33 @@ or invalid session cannot count as a current approval. Use the server's current
 `canApprove`, `canReject`, `canCancel` and `canFinalize` hints to present actions;
 every mutation independently rechecks authority.
 
+### Connect and review in the dashboard
+
+Open a hosted model, then **Add connection**. Search or page through eligible
+app environments, enter an alias and review the exact destination. The current
+policy determines whether the action is **Connect**, **Request approval**, or a
+disabled action with a reason. An unavailable capability or failed admission
+read does not fall back to the legacy direct-write form.
+
+Open `/models/connections` for **My requests** or the permitted **Review inbox**.
+Select a request to inspect its current version and review an available action.
+Reviewing an approval does not connect the app: after approval, the current
+requester separately reviews **Connect**. A recorded subscription still needs
+reconciliation; the screen does not treat acceptance as a ready model endpoint.
+
+Organization administrators edit the connection policy at
+`/administration/organization`. Installation Super-admins edit a model's tighter
+restriction on its detail page. These are separate permissions. An absent model
+restriction is a neutral overlay, not a copy of the organization's effective
+policy.
+
+The request form retains safe reviewed metadata and the original request UUID
+in that browser tab for lost-response recovery. Restore and re-review the same
+destination before retrying; a changed policy, version, actor or source requires
+fresh admission. Clearing this local reminder does not cancel a server request.
+Use My requests to inspect the durable outcome. A write that succeeded remains
+accepted if the following read fails; refresh before taking another action.
+
 Read the organization's current policy before a versioned edit:
 
 ```graphql
