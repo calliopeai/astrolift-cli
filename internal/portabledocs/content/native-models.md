@@ -59,10 +59,13 @@ existing connection's grants.
 
 ## Manage the registered connection
 
-Native connections appear in the same organization model inventory as locally
-hosted deployments, with a native-source discriminator. Open the exact record
-to inspect its immutable source and configuration state. Native connections
-have no local CPU/GPU, pod, vLLM runtime or model-server readiness claim.
+The `clusterModelDeploymentsPage` API includes native connections in the same
+organization inventory as locally hosted deployments. Use
+`clusterModelDeployment` to inspect the exact record's `sourceKind` and
+`nativeSource` projection, including its immutable source and configuration
+state. Browser management also requires a UI version that presents these native
+fields; the API marker alone does not prove that UI is installed. Native
+connections have no local CPU/GPU, pod, vLLM runtime or model-server readiness claim.
 `invokeAccess` remains `unknown` until independently established.
 
 Super-admin settings edits can change the name, subscription enablement and
