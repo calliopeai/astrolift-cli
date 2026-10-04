@@ -22,25 +22,27 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
-		"org":                  "organization",
-		"teams":                "organization",
-		"membership":           "organization",
-		"astrolift-toml":       "manifest",
-		"astrolift.toml":       "manifest",
-		"toml":                 "manifest",
-		"agent-package":        "agents",
-		"agent-packages":       "agents",
-		"workflow":             "workflows",
-		"workflow-toml":        "workflows",
-		"loops":                "bounded-workflows",
-		"collections":          "bounded-workflows",
-		"apps":                 "app-setup",
-		"previews":             "preview-targets",
-		"metrics":              "workload-signals",
-		"services":             "shared-services",
-		"resources":            "shared-services",
-		"callback":             "callbacks",
-		"completion-callbacks": "callbacks",
+		"org":                      "organization",
+		"teams":                    "organization",
+		"membership":               "organization",
+		"bedrock":                  "native-models",
+		"native-model-connections": "native-models",
+		"astrolift-toml":           "manifest",
+		"astrolift.toml":           "manifest",
+		"toml":                     "manifest",
+		"agent-package":            "agents",
+		"agent-packages":           "agents",
+		"workflow":                 "workflows",
+		"workflow-toml":            "workflows",
+		"loops":                    "bounded-workflows",
+		"collections":              "bounded-workflows",
+		"apps":                     "app-setup",
+		"previews":                 "preview-targets",
+		"metrics":                  "workload-signals",
+		"services":                 "shared-services",
+		"resources":                "shared-services",
+		"callback":                 "callbacks",
+		"completion-callbacks":     "callbacks",
 	} {
 		topic, err := Resolve(alias)
 		if err != nil {
@@ -78,8 +80,8 @@ func TestPortableGuideLinks(t *testing.T) {
 
 func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	topics := Topics()
-	if len(topics) != 24 {
-		t.Fatalf("release snapshot has %d topics, want 24", len(topics))
+	if len(topics) != 25 {
+		t.Fatalf("release snapshot has %d topics, want 25", len(topics))
 	}
 	files, err := Files()
 	if err != nil {
@@ -89,7 +91,7 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 25 || len(entries) != len(files) {
+	if len(files) != 26 || len(entries) != len(files) {
 		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
 	}
 	for _, entry := range entries {

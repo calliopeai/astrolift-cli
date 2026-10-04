@@ -57,6 +57,13 @@ also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
 unavailable entries. Inspect its reason before selecting a kind and variant.
 
+`models.bedrock_connections` identifies the prepared native Bedrock discovery
+and existing-connection APIs. It does not enable the default-off installation
+setting, grant operator/app authority or prove inference. Check
+`bedrockModelConnectionSupport` before entering setup and the exact placement
+action before discovery/registration. See [native model connections](native-model-connections.md)
+for bounded metadata, immutable sources, workload identity and app policy.
+
 The server GraphQL explorer at `/app/gql/config/` exposes the exact supported
 schema. Download the [published SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
 from an immutable backend tag or commit when generating clients. Check both
@@ -75,6 +82,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |
 | Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
 | Host a shared model and review app subscriptions | `model-hosting` | [Model hosting](model-hosting.md) |
+| Discover and connect an existing Bedrock source | `native-models` | [Native model connections](native-model-connections.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |
 | Review a preview environment by GUID | `preview-targets` | [Exact preview targets](preview-targets.md) |
 | Install the cluster keep-alive agent | `cluster-agent-install` | [Server-owned installation](cluster-agent-install.md) |

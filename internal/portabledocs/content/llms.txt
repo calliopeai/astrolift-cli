@@ -32,6 +32,7 @@ Use these plain-Markdown references as the current public contract. The target i
 - [Reviewed starts](https://astrolift.dev/guides/reviewed-starts/): exact workflow definitions and pipeline runs, typed JSON inputs, durable request identity, read-only recovery and cancellation state
 - [Shared services](https://astrolift.dev/guides/shared-services/): catalogue discovery, provision once, attach apps and agents, and inspect readiness
 - [Model hosting](https://astrolift.dev/guides/model-hosting/): admin-gated Hugging Face or immutable local sources, separate access/license/runtime/hardware checks, readiness and app subscriptions
+- [Native model connections](https://astrolift.dev/guides/native-model-connections/): existing Bedrock sources, exact account/region identities, immutable registration, workload-identity bindings and shared app connection policy
 - [Agent completion callbacks](https://astrolift.dev/guides/agent-completion-callbacks/): signed final events, retries for 24 hours, replay, key rotation, and Python verification
 
 ## Operational guides

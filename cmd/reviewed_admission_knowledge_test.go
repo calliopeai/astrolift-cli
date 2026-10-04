@@ -35,6 +35,17 @@ func TestReviewedAdmissionKnowledgeTravelsThroughOfflineSetup(t *testing.T) {
 	if !found {
 		t.Fatal("team membership setup cannot be found offline")
 	}
+	search, err = searchPortableDocs(`"existing Bedrock"`, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, match := range search.Matches {
+		found = found || match.Topic.Slug == "native-models"
+	}
+	if !found {
+		t.Fatal("native model connection setup cannot be found offline")
+	}
 	dir := t.TempDir()
 	export := filepath.Join(dir, "export")
 	if _, err := exportPortableDocs(export, false); err != nil {
@@ -43,7 +54,7 @@ func TestReviewedAdmissionKnowledgeTravelsThroughOfflineSetup(t *testing.T) {
 	if _, err := installAgentDocs(dir, false, false); err != nil {
 		t.Fatal(err)
 	}
-	for _, slug := range []string{"start", "api", "capabilities", "organization", "reviewed-starts", "app-setup", "agent-setup", "workflow-setup", "shared-services", "model-hosting"} {
+	for _, slug := range []string{"start", "api", "capabilities", "organization", "reviewed-starts", "app-setup", "agent-setup", "workflow-setup", "shared-services", "model-hosting", "native-models"} {
 		body, topic, err := portabledocs.Read(slug)
 		if err != nil {
 			t.Fatal(err)
