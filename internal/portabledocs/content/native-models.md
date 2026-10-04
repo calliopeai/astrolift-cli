@@ -39,6 +39,22 @@ identity proof until the native check succeeds.
 
 ## Select and review the exact native source
 
+In the browser, open **Models → Connect** (`/models/connect`). The prepared
+wizard shows one step at a time:
+
+1. **Placement:** select Amazon Bedrock and an eligible cluster.
+2. **Source:** choose foundation models or inference profiles. Load the catalogue
+   and select a model, or inspect an exact ID/ARN.
+3. **Connection settings:** review the inspected source, name the connection,
+   choose whether apps may subscribe, and select shared or dedicated access.
+   Dedicated access also requires selecting the app.
+4. **Review:** confirm the source, placement and settings, then register the
+   connection. After registration, open its details to manage it.
+
+Going back preserves your selections so you can revise them before registering.
+Registration records the connection; a successful model response remains a
+separate check.
+
 Foundation models and inference profiles are separate sources. Select the
 native source kind and ID/ARN, then inspect its exact detail. A profile retains
 its own ARN and full destination-model ARN set; it is not replaced by a default

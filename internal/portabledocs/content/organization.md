@@ -31,7 +31,7 @@ not upgrade your server.
 
 To manage a team, open **Access → Teams**, select the team, then open **Members**
 at `/administration/access/teams/<team-slug>/members`. Search or page through the
-roster; **Add member** selects an existing, active organization member and a team
+roster; **Add people** selects an existing, active organization member and a team
 role you are allowed to grant. Review the exact person, team and role before
 confirming. Joining a team does not create a new user or organization membership.
 
