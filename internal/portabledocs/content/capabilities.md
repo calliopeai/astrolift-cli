@@ -48,6 +48,10 @@ read-only query for one exact app connection.
 selected cluster/provider and compute mode. Saving a declaration is separate
 from image building, hardware inspection and model deployment. Check current
 versions and the hosting guide's runtime setup query before editing.
+`models.connection_approvals` adds organization defaults, stricter model
+restrictions, pending requests and distinct-person review. Approval permits the
+current requester to connect; it does not create a subscription. The hosting
+guide explains current permissions, idempotency, stale requests and finalization.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and

@@ -66,6 +66,85 @@ separate physical machine. Existing subscriptions from other apps must finish
 revocation before the mode can change. Revocation requested or queued is not
 enough. Each app connection retains its own alias, credential and lifecycle.
 
+## Choose automatic access, approval or denial
+
+On servers advertising `models.connection_approvals`, the organization can set
+`AUTO`, `REQUIRE_APPROVAL` or `DENY` for new app connections. The installation
+defaults to automatic access, one reviewer and no self-approval. An organization
+administrator with current `org.update` can change its policy; an installation
+Super-admin can set a model restriction that only tightens the effective policy.
+Model restrictions can increase the quorum, prohibit self-approval or choose a
+stricter mode. They cannot bypass organization policy, app permissions, source
+access, readiness or shared/dedicated restrictions.
+
+Inspect a destination's current `modelConnectionAction` before acting. `AUTO`
+uses the existing direct subscription admission, including `org.read` and the
+destination's `app.update`. `REQUEST` permits an app owner with scoped
+`app.update` to submit an approval request without a separate organization-read
+or app-read grant. `DENY` prevents a new connection. Changes to these policies
+do not automatically disconnect existing subscriptions.
+
+The approval flow separates three actions:
+
+1. **Request:** `requestModelConnection` creates a pending request, with no
+   subscription, credential reference or reconciliation. Supply the exact
+   organization/model/cluster/provider/environment tuple, reviewed model, app
+   and environment versions, alias, current policy fingerprint and a fresh
+   caller-generated `idempotencyKey` GUID. Retain that key for recovery; retrying
+   the same reviewed request returns its identity, while reusing the key for a
+   different target is refused.
+2. **Review:** each distinct reviewer needs current `org.update` and scoped
+   `app.approve_deploy`. `approveModelConnectionRequest` records a vote;
+   `rejectModelConnectionRequest` closes the request. The quorum is one through
+   sixteen qualified people. Repeated votes never increase the count, and
+   self-review is refused unless the effective policy explicitly permits it.
+3. **Connect:** an approved request still needs the current requester to call
+   `finalizeModelConnectionRequest`. It rechecks the reviewed targets, source,
+   policy, requester and currently qualified votes. A successful repeat returns
+   the same subscription. Acceptance starts reconciliation; wait for the applied
+   subscription revision before treating the connection as ready.
+
+Use `modelConnectionRequestsPage` to recover your own requests, and
+`modelConnectionApprovalRequestsPage` for a qualified reviewer's inbox. Read the
+current request version before deciding, cancelling or finalizing it. Pending
+and approved requests may become `STALE` when reviewed targets, source or policy
+change; review again and create a new request. A withdrawn grant, expired token
+or invalid session cannot count as a current approval. Use the server's current
+`canApprove`, `canReject`, `canCancel` and `canFinalize` hints to present actions;
+every mutation independently rechecks authority.
+
+Read the organization's current policy before a versioned edit:
+
+```graphql
+query ModelAccessPolicy($organization: GUID!) {
+  organizationModelConnectionPolicy(organizationId: $organization) {
+    id version mode requiredApprovals allowSelfApproval
+  }
+}
+```
+
+`updateOrganizationModelConnectionPolicy` accepts that organization GUID,
+`ifMatchVersion`, mode, quorum and self-approval choice. Version zero means the
+organization is using installation defaults. A Super-admin reads a model's
+overlay with `modelConnectionRestriction` before editing it through
+`setModelConnectionRestriction`; an absent overlay is version zero and neutral,
+not the effective organization policy. Both writes require their reviewed
+versions; the model write also requires `ifMatchDeploymentVersion`.
+
+Check an exact app environment's action without creating a request:
+
+```graphql
+query ModelAccessAction($target: ModelConnectionTargetInput!) {
+  modelConnectionAction(input: $target) {
+    action reason policyVersion requiredApprovals allowSelfApproval
+  }
+}
+```
+
+`target` contains `organizationId`, `modelDeploymentId`, `expectedClusterId`,
+`expectedProviderId` and `appEnvironmentId`. Obtain GUIDs and reviewed versions
+from the installed server's eligible, paginated `modelConnectionTargetsPage`.
+
 ## Inspect traffic for one app connection
 
 Select a connection on the hosted model's detail page to inspect its recent
