@@ -22,6 +22,7 @@ func TestExportPortableDocs(t *testing.T) {
 		"guides/manifest.md",
 		"guides/mcp.md",
 		"guides/capabilities.md",
+		"guides/organization.md",
 		"guides/app-setup.md",
 		"guides/agent-setup.md",
 		"guides/workflow-setup.md",

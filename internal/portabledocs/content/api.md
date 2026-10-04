@@ -127,6 +127,62 @@ caller needs `secret:read` plus `secret.read` RBAC to reveal a value on the few
 surfaces that support reveal. `secret:write` permits write-through operations,
 not readback. MCP intentionally never exposes secret values.
 
+## Reviewed team membership
+
+The prepared additive contract advertises
+`identity.reviewed_team_membership`. Check the installed server's capability
+list and SDL before requesting it. See [membership setup](../running-an-org.md#manage-people-and-team-membership)
+for the browser flow and remaining-access rules.
+
+| Operation | Purpose |
+|---|---|
+| `astroliftTeamMembershipTeam(teamId, slug)` | Resolve exactly one live, visible team GUID or route slug. |
+| `astroliftTeamMembershipPerson(orgMemberId)` | Read the exact visible organization identity. |
+| `astroliftTeamMembershipsPage(teamId, search, page, pageSize)` | Page a team's roster and direct/inherited/provider provenance. |
+| `astroliftPersonTeamMembershipsPage(orgMemberId, search, page, pageSize)` | Page the person's currently visible teams. |
+| `astroliftTeamMemberCandidatesPage(teamId, search, page, pageSize)` | Select active existing organization members. |
+| `astroliftMembershipTeamsPage(search, page, pageSize)` | Page the caller's manageable team targets. |
+| `astroliftTeamMembershipRolesPage(teamId, search, page, pageSize)` | Page eligible team roles under the current grant ceiling. |
+| `astroliftTeamMembershipReview(teamId, orgMemberId, kind, roleId)` | Review `ADD` or `REMOVE`; return the exact `expectedSource` digest. |
+| `changeAstroliftTeamMembership(input)` | Commit or recover one reviewed direct-membership change. |
+
+For example, save this read-only query as `team-roster.graphql` and GUID variables
+as `team-roster-vars.json`, then use
+`astro api graphql --file team-roster.graphql --vars-file team-roster-vars.json`:
+
+```graphql
+query TeamRoster($team: GUID!) {
+  astroliftTeamMembershipsPage(teamId: $team, page: 1, pageSize: 25) {
+    totalCount page pageSize
+    items {
+      team { id name slug canManageMembers }
+      person { orgMemberId name active }
+      teamMemberId lifecycle canRemove
+      sources { id source scopeKind roleId roleName expired removable }
+    }
+  }
+}
+```
+
+```json
+{"team":"00000000-0000-4000-8000-000000000001"}
+```
+
+The mutation input carries `requestId`, `kind`, `teamId`, `orgMemberId`,
+`expectedSource`, and `roleId` for `ADD`. Obtain the digest from the exact review;
+do not compute it from roster text. Preserve the original UUID and reviewed input
+when recovering a lost reply. Successful `data` distinguishes `committed` from
+`replayed` and returns `changeId`, exact public GUIDs, removed binding GUIDs and
+the original remaining sources. Inspect the standard `ok`/`errors` envelope and
+refresh current membership afterward.
+
+Reads and writes check their concrete team/person visibility. Writes refresh
+credentials, ownership, membership, policy, role ceilings and required browser
+authentication after waits. Replay is confined to the original actor,
+organization, credential and reviewed identity. Neither metadata reads nor the
+advisory `me.teamAccessNavigation`/`team_access` hints establish write authority.
+Existing API-token scope definitions are unchanged.
+
 ## Agent completion callbacks
 
 `runAstroliftAgent` accepts optional `callbackUrl`, `callbackSecretRef`,

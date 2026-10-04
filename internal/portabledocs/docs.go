@@ -34,6 +34,7 @@ var topics = []Topic{
 	{Slug: "agents", Title: "Agent Package and repository reference", Filename: "agents.md", OnlinePath: "/reference/agent-packages/"},
 	{Slug: "workflows", Title: "Workflow TOML reference", Filename: "workflows.md", OnlinePath: "/reference/workflow-toml/"},
 	{Slug: "capabilities", Title: "Discover installation capabilities", Filename: "capabilities.md", OnlinePath: "/guides/capabilities/"},
+	{Slug: "organization", Title: "Manage organization access, teams and membership", Filename: "organization.md", OnlinePath: "/running-an-org/"},
 	{Slug: "app-setup", Title: "Set up and deploy an application", Filename: "app-setup.md", OnlinePath: "/guides/app-setup/"},
 	{Slug: "agent-setup", Title: "Package, register, and dispatch an agent", Filename: "agent-setup.md", OnlinePath: "/guides/agent-setup/"},
 	{Slug: "workflow-setup", Title: "Author, bind, and run a workflow", Filename: "workflow-setup.md", OnlinePath: "/guides/workflow-setup/"},
@@ -51,6 +52,9 @@ var topics = []Topic{
 }
 
 var aliases = map[string]string{
+	"org":                  "organization",
+	"teams":                "organization",
+	"membership":           "organization",
 	"models":               "model-hosting",
 	"loops":                "bounded-workflows",
 	"collections":          "bounded-workflows",
