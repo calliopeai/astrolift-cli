@@ -253,7 +253,7 @@ write replay for this hosting flow.
 | API | Boundary |
 |---|---|
 | `modelHostingAction` | Administrative eligibility hint for the current organization; not target-cluster authorization. |
-| `huggingFaceConnectionsPage` | Bounded safe connection metadata; no token. |
+| `huggingFaceConnectionsPage` | Super-admin-only bounded safe connection metadata; no token. |
 | `connectHuggingFace` | The write-only form submits organization/name/token; success returns safe connection metadata. |
 | `disconnectHuggingFace` | Exact organization, connection GUID and expected version; live model users prevent removal. |
 | `clusterModelSourceAccess` | Independent pinned-revision download check, using the selected connection GUID/version or anonymous access. |
@@ -366,8 +366,8 @@ query LocalModelSources($limit: Int!, $after: String) {
 ```
 
 Start with `limit: 25` and `after: null`; continue with the returned cursor in the
-same organization. The import API requires current organization administrative
-access even for this metadata read.
+same organization. The import API requires current installation Super-admin
+authority and admitted credentials even for this metadata read.
 
 Follow one deployment by its immutable GUID, independently of catalogue paging:
 
