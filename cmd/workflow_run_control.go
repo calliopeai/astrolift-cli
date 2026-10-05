@@ -281,8 +281,8 @@ cancelled while a gate was open leaves that gate open, so read it against the
 run state printed above it.
 
 This is read-only. Decide a pending gate with
-` + "`astro workflow gate <definition-slug> --decision approve|reject`" + `
-(#1820); list every pending gate across the org with
+` + "`astro workflow gate --run <run-guid> --stage <gate-guid> --temporal-run <run-id> --decision approve|reject --yes`" + `
+; recover its exact decision with ` + "`astro workflow gate-status --run <run-guid> --stage <gate-guid>`" + `, and list eligible pending gates with
 ` + "`astro workflow gates`" + `.
 
 By default this shows the newest run; --run <guid> selects one from

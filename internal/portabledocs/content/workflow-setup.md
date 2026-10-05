@@ -93,3 +93,35 @@ new requests. Slug-only or new-request literal-input callers must migrate;
 an existing request file recovers read-only without inspecting input flags. See
 [agent setup](agent-setup.md#migrate-a-legacy-workflow-definition-run). This does
 not change the separate app-bound configured `workflow run` contract.
+
+## Decide and recover an exact human gate
+
+```bash
+astro workflow gates --json
+astro workflow gate --run <runGuid> --stage <executionGuid> \
+  --temporal-run <temporalExecution.runId> --decision approve --note 'Reviewed' --yes
+astro workflow gate-status --run <runGuid> --stage <executionGuid> --json
+```
+
+Copy all three identities from the gate list. A collection gate belongs to its
+child Temporal execution, so the enclosing run's engine ID is not a substitute.
+`gates` walks every page, including filtered empty pages carrying a next cursor.
+Closed parent runs are excluded. Old unbound records remain visible but cannot
+use the recoverable decision operation.
+
+`--yes` asserts the user's explicit approved/rejected choice. The server records
+the authenticated caller; it does not independently prove human presence. Agents
+must relay the user's choice rather than treat their own assessment as approval.
+Named addresses restrict approvers; role/team references retain the server's
+workflow-trigger authority fallback. Current target permissions still apply.
+
+`requested` means the exact engine durably admitted the decision. `recorded`
+means the gate's outcome was persisted, not that the entire workflow succeeded.
+After an unknown or lost response, use `gate-status` with the same run and gate
+GUIDs before retrying. It never submits a decision. A retry with a conflicting
+choice, note or caller is refused. JSON includes the exact `target`, native
+`gate` receipt, errors and any `clientError`, including on failure.
+
+The former `gate <definition-slug>` command selected the newest pending attempt
+and used a generic signal. Migrate to the explicit flags above. Servers/workers
+must support the recoverable gate API; this CLI does not fall back to signals.
