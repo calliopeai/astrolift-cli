@@ -163,7 +163,7 @@ DNS. The `domains` / `dns` offline topic includes the same setup instructions.
 | Ownership verified | The required TXT proof was observed, or verification was not required | Exact provider zone binding |
 | Provisioned | The provisioning workflow reached its final configuration step | Public delegation and records |
 | Delegation matches | The observed public nameservers match the configured provider nameservers | The intended hostname's DNS answers |
-| DNS answer present | A resolver returned the requested record | Expected target, route and HTTPS |
+| Answer observed | A resolver returned the requested record; the expected target may be unknown | Review the intended target, route and HTTPS |
 | Route recorded | Astrolift has an authorized app/environment URL under the zone | The actual ingress and hostname response |
 | HTTPS response observed | A public address accepted verified TLS for the hostname and returned an HTTP status | Application health and expected status |
 
@@ -171,6 +171,22 @@ The zone apex does not need an A or AAAA record if you only serve subdomains.
 Check the hostname you intend to use. A wildcard also does not prove that every
 name resolves: explicit records, delegation boundaries and TLS wildcard scope
 can affect the result.
+
+### Read an observation at its actual scope
+
+`DNS_ANSWER` is shown as **Answer observed**. It means the requested DNS answer
+was returned, not that it matches an intended app or load balancer. **Expected:
+Unknown** means that this check has no configured expected answer to compare;
+it is neither a failed lookup nor a verified routing target. The typed `OK`
+state alone does not establish hostname or application health.
+
+A public **Delegation matches** check compares nameservers only. It does not
+check apex A/AAAA records, wildcard answers, app ingress or TLS. Run a lookup
+for the exact intended hostname and inspect its route and HTTPS separately.
+
+**Internal DNS probe not configured** means there is no configured in-cluster
+observer for this diagnostic. It cannot establish private-zone, pod or cluster
+DNS visibility. Public resolver answers do not substitute for that observation.
 
 ## Compare public delegation with the provider zone
 
@@ -197,6 +213,61 @@ describes that distinction.
 A private hosted zone is resolved from its associated network. Public delegation
 is not a health requirement for that zone. A public check cannot verify private
 network visibility, and the page reports that limitation explicitly.
+
+### Resume an authorized legacy provisioning run
+
+Certificate registration preserves the domain's existing configuration and its
+actual provisioning cluster. The recorded cluster link keeps authorized
+revalidation available when a delegation check pauses a run. This does not
+backfill older rows, associate an arbitrary cluster or change an organization's
+effective app/preview domain. Existing app hostnames and fleet routing are not
+migrated automatically.
+
+For a supported managed writer, use **Revalidate** when its current action hint
+allows it. Revalidation signals the exact provisioning run to check again; if
+the old delegation gate closed that run, it can start a new run for the reviewed
+cluster and zone. This is an intentional provisioning action, separate from a
+read-only diagnostic refresh. It may resume zone or certificate work and does
+not prove that app ingress records or a redeployment are complete.
+
+A legacy row without a cluster association needs an authorized operator to
+review the original intended cluster. Use its exact public GUID and the exact
+registered zone; do not guess a cluster from a name or pass an internal integer
+ID as a GUID. The mutation requires current `cluster.manage` for that cluster,
+selected-organization domain access and platform-operator authority for shared
+resources. DNS-read permission and a navigation hint do not grant these rights.
+Cloudflare read-only registration is not a managed writer.
+
+Save the existing mutation as `revalidate-domain.graphql`:
+
+```graphql
+mutation RevalidateDomain($clusterId: GUID!, $zone: String!) {
+  revalidateManagedDomain(clusterId: $clusterId, zone: $zone) {
+    ok errors { code message }
+    data { zone signaled message }
+  }
+}
+```
+
+With `umask 077`, put the reviewed existing public cluster GUID and registered
+zone in a private `revalidate-domain.json`:
+
+```json
+{"clusterId":"REVIEWED_EXISTING_CLUSTER_GUID","zone":"EXACT_REGISTERED_ZONE"}
+```
+
+```sh
+astro --server staging --org ORGANIZATION_GUID api graphql \
+  --file revalidate-domain.graphql --vars-file revalidate-domain.json
+```
+
+This existing mutation accepts cluster GUID and zone, not an expected-version
+argument. Review the current domain/cluster tuple before submitting. Inspect
+GraphQL errors, `ok`, `signaled` and `message`: a restart may be reported with
+`signaled=false`, and a disabled/unavailable workflow is not success. An
+accepted request is not a completed check. After a lost reply or failed refresh,
+read the current domain, diagnostics and run status before considering another
+write; do not automatically replay it.
 
 ## Inspect records and routes
 
