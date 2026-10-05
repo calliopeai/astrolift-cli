@@ -156,6 +156,13 @@ astro --server staging --org ORGANIZATION_GUID api graphql \
   --file alert-send.graphql --vars-file alert-test.json
 ```
 
+The send service refuses an enclosing database transaction or disabled autocommit
+with `ALERT_MAIL_ENCLOSING_TRANSACTION_UNSUPPORTED`, after current permission
+admission and before reserving an intent or contacting SMTP. Intent and pre-DATA
+transitions must commit independently before native effects. Internal integrations
+must not wrap the service in a transaction that could roll back nonce history
+after sending.
+
 There is no dedicated test-send CLI verb. HTTP success or CLI exit zero does not
 establish mutation success; inspect GraphQL errors, `ok/errors/data` and the receipt.
 The message content is fixed. The receipt stores addresses, event and intent/source
