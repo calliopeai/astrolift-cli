@@ -193,3 +193,43 @@ func TestEmailDeliveryKnowledgeSearchExportAndBoundaries(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallAlertMailKnowledgeSearchExportAndBoundaries(t *testing.T) {
+	result, err := searchPortableDocs(`"installAlertMailSupport"`, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, match := range result.Matches {
+		found = found || match.Topic.Slug == "install-alert-mail"
+	}
+	if !found {
+		t.Fatal("offline search omitted installed SMTP setup and source review")
+	}
+	directory := filepath.Join(t.TempDir(), "export")
+	if _, err := exportPortableDocs(directory, false); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(directory, "guides/install-alert-mail.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"django.core.mail.backends.smtp.EmailBackend", "EMAIL_NOTIFICATIONS", "EMAIL_USE_TLS", "EMAIL_USE_SSL",
+		"astroliftMyNotificationPreferences", "setNotificationPreference", "installAlertMailSupport",
+		"sendInstallAlertMailTest", "installAlertMailTestsPage", "--vars-file alert-test.json",
+		"/settings/notifications?section=install-email", "active platform operator", "org.update",
+		"deliveryObserved=false", "Do not automatically create a fresh UUID", "maximum is 50",
+		"(email-delivery.md)", "(capabilities.md)", "(api.md)",
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("exported alert SMTP guide lost %q", want)
+		}
+	}
+	for _, alias := range []string{"alert-mail", "install-smtp", "install-alert-mail"} {
+		_, topic, err := portabledocs.Read(alias)
+		if err != nil || topic.Slug != "install-alert-mail" {
+			t.Errorf("alert SMTP topic %q: %#v %v", alias, topic, err)
+		}
+	}
+}
