@@ -248,6 +248,10 @@ finite timeouts and a 30-second test-send budget. The current rate admission is
 three tests per actor, ten per service and thirty per organization per minute;
 its effective scope depends on the installed cache backend.
 
+For the separate configured install SMTP channel, use the
+[install alert SMTP guide](install-alert-mail.md). It tests only the operator's
+own mailbox and does not fall back from this app-owned service.
+
 This flow currently supports the exact AWS SES app-bound service. Azure email,
 SMTP, global alert-channel tests and a fallback global mail transport are not
 implemented here. Microsoft 365, Google mail and shared inbox management are

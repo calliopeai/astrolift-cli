@@ -52,6 +52,11 @@ and the current bearer ceiling; support metadata is separate from native
 preflight. See [email delivery](email-delivery.md) for stable request recovery,
 suppression and timed-out observations.
 
+Install alert SMTP has no dedicated advertised capability key in this contract.
+Use the actual `installAlertMailSupport` query for current operator, event and
+configured-channel support; SES capabilities are separate. See
+[install alert SMTP](install-alert-mail.md) for private setup and nonce recovery.
+
 The server GraphQL explorer at `/app/gql/config/` exposes the exact supported
 schema. Download the [published SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
 from an immutable backend tag or commit when generating clients. Check both
@@ -61,6 +66,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 
 | Goal | Offline topic | Online guide |
 |---|---|---|
+| Test the configured install SMTP channel in your own mailbox | `install-alert-mail` | [Install alert SMTP](install-alert-mail.md) |
 | First login and deployment | `start` | [Getting started](../getting-started.md) |
 | Inspect domain records, public delegation and app routes | `domains` | [Domains and DNS](domains-dns.md) |
 | Test an exact applied SES service and read delivery observations | `email-delivery` | [Email delivery](email-delivery.md) |

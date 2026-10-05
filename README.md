@@ -490,6 +490,7 @@ astro docs show manifest
 astro docs show callbacks
 astro docs show capabilities
 astro docs show shared-services
+astro docs show install-alert-mail
 astro docs export ./astrolift-docs
 astro docs man ./man/man1
 ```
