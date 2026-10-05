@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.11.2 — 2026-10-04
+
 - Bundle searchable install-alert SMTP setup and test knowledge, including current operator/source review, event preferences and recovery without ambiguous resends (#2289).
 
 ## 0.11.1 — 2026-10-04
