@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.11.1 — 2026-10-04
+
+- Restore managed-domain list/create/update compatibility with older servers. Read the domain version only for new exact-domain diagnostic commands, and omit unavailable versions from legacy JSON output (#2287).
+
 ## 0.11.0 — 2026-10-04
 
 - Add exact versioned server-side Domains/DNS diagnostic commands and offline Cloudflare connection and SES email-delivery guides, including safe recovery and explicit read-only/provider limits.

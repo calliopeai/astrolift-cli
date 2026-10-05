@@ -11,7 +11,7 @@ import (
 )
 
 const managedDomainReadQuery = `query ManagedDomain($domainId: GUID!) {
-  astroliftManagedDomain(domainId: $domainId) { ` + managedDomainFields + ` }
+  astroliftManagedDomain(domainId: $domainId) { version ` + managedDomainFields + ` }
 }`
 
 const managedDomainDiagnosticsQuery = `query ManagedDomainDiagnostics(

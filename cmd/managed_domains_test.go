@@ -358,3 +358,45 @@ func TestManagedDomainsWarnsWhenAuditMayBeTruncated(t *testing.T) {
 		t.Fatalf("truncated audit must keep JSON valid and warn: err=%v, rows=%d, stderr=%s", err, len(domains), &diagnostics)
 	}
 }
+
+func TestManagedDomainLegacyVersionCompatibility(t *testing.T) {
+	for _, test := range []struct {
+		name, field string
+		args        []string
+	}{
+		{"list", "astroliftManagedDomains", []string{"list", "--json"}},
+		{"create", "createManagedDomain", []string{"create", "apps.example.test", "--dns-driver", "route53", "--json"}},
+		{"update", "updateManagedDomain", []string{"update", managedDomainTestID, "--default-for", "none", "--json"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			server := managedDomainWireServer(t, func(w http.ResponseWriter, request managedDomainWireRequest) {
+				calls++
+				if strings.Contains(request.Query, "version") {
+					_, _ = fmt.Fprint(w, `{"errors":[{"message":"Cannot query field 'version' on type 'AstroliftManagedDomain'."}]}`)
+					return
+				}
+				if test.name == "list" {
+					managedDomainResponse(t, w, test.field, []interface{}{managedDomainFixture("org")})
+				} else {
+					managedDomainResponse(t, w, test.field, map[string]interface{}{"ok": true, "data": managedDomainFixture("org")})
+				}
+			})
+			defer server.Close()
+			serverSelectionFixture(t, server.URL)
+			command, out := managedDomainTestCommand(test.args...)
+			if err := command.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 1 {
+				t.Fatalf("unexpected domain attempts: %d", calls)
+			}
+			if strings.Contains(out.String(), `"version"`) {
+				t.Fatalf("legacy response invented a version: %s", out)
+			}
+		})
+	}
+	if !strings.Contains(managedDomainReadQuery, "version") {
+		t.Fatal("exact diagnostic read lost its version selection")
+	}
+}
