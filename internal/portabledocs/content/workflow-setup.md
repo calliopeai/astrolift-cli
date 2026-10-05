@@ -96,6 +96,10 @@ not change the separate app-bound configured `workflow run` contract.
 
 ## Decide and recover an exact human gate
 
+These commands require a CLI release with `gate-status` and exact gate flags,
+plus compatible upgraded servers and workers. Check command help before use;
+the older `gate` command name alone does not establish support.
+
 ```bash
 astro workflow gates --json
 astro workflow gate --run <runGuid> --stage <executionGuid> \
