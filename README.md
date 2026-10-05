@@ -364,8 +364,6 @@ Every command supports `--json` for machine-readable output, plus
 `--no-color`, `--no-prompt`, and `--debug` as global flags. Errors go
 to stderr; data goes to stdout.
 
-### Exact workflow executions
-
 ### Native workflow schedule recovery
 
 A saved workflow configuration does not prove its Temporal schedule is active or
@@ -407,6 +405,8 @@ fields or retrying a mutation. Creation through `run-manifest` uses the same
 receipt contract. Active schedule writes require native trigger authority in
 addition to create/update authority; cleanup after deletion requires delete
 authority. Organization and bearer scope restrictions are enforced by the server.
+
+### Exact workflow executions
 
 Use the execution GUID returned by `workflow run`, `workflow run-manifest`,
 `workflow definition-start`, or reviewed `agent run` to observe the exact run.
