@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bundle searchable install-alert SMTP setup and test knowledge, including current operator/source review, event preferences and recovery without ambiguous resends (#2289).
+
 ## 0.11.1 — 2026-10-04
 
 - Restore managed-domain list/create/update compatibility with older servers. Read the domain version only for new exact-domain diagnostic commands, and omit unavailable versions from legacy JSON output (#2287).

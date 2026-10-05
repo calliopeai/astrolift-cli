@@ -14,6 +14,12 @@ is advisory source/write admission, not native deliverability certification.
 See [Email delivery](../guides/email-delivery.md) for reviewed versions, current
 permissions, suppression and read-only recovery.
 
+Install SMTP diagnostics use `installAlertMailSupport`, `sendInstallAlertMailTest`
+and cursor-paginated `installAlertMailTestsPage`. They require current platform
+operator and organization admission, a reviewed source fingerprint and stable
+request UUID. Recipient is the caller's registered mailbox; SMTP acceptance is
+not delivery. See [install alert SMTP](../guides/install-alert-mail.md).
+
 Cloudflare setup uses `dnsProviderConnectionSupport`, versioned
 `dnsProviderConnectionsPage`, `cloudflareDnsZones` and `cloudflareDnsRecords`.
 `registerCloudflareDnsZone` creates a read-only registration;

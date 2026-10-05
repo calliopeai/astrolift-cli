@@ -47,9 +47,12 @@ var topics = []Topic{
 	{Slug: "workload-signals", Title: "Observe workload metrics with explicit scope and instrumentation", Filename: "workload-signals.md", OnlinePath: "/guides/workload-signals/"},
 	{Slug: "domains", Title: "Connect domains and inspect DNS and routing", Filename: "domains.md", OnlinePath: "/guides/domains-dns/"},
 	{Slug: "email-delivery", Title: "Test exact email-service delivery and read observations", Filename: "email-delivery.md", OnlinePath: "/guides/email-delivery/"},
+	{Slug: "install-alert-mail", Title: "Set up and test install alert SMTP", Filename: "install-alert-mail.md", OnlinePath: "/guides/install-alert-mail/"},
 }
 
 var aliases = map[string]string{
+	"alert-mail":           "install-alert-mail",
+	"install-smtp":         "install-alert-mail",
 	"dns":                  "domains",
 	"domains-dns":          "domains",
 	"mail":                 "email-delivery",

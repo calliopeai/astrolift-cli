@@ -22,6 +22,8 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
+		"alert-mail":           "install-alert-mail",
+		"install-smtp":         "install-alert-mail",
 		"dns":                  "domains",
 		"domains-dns":          "domains",
 		"mail":                 "email-delivery",
