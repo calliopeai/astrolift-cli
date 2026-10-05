@@ -425,17 +425,13 @@ func createConfiguredWorkflow(
 	}
 
 	var resp struct {
-		Result struct {
-			Ok       bool                `json:"ok"`
-			Errors   validationErrors    `json:"errors"`
-			Workflow *configuredWorkflow `json:"workflow"`
-		} `json:"createWorkflow"`
+		Result workflowConfigurationResult `json:"createWorkflow"`
 	}
 	if err := client.GraphQL(createCtx, createWorkflowMutation, vars, &resp); err != nil {
 		return nil, fmt.Errorf("creating workflow: %w", err)
 	}
-	if !resp.Result.Ok {
-		return nil, fmt.Errorf("create failed: %s", firstValidationError(resp.Result.Errors))
+	if err := validateWorkflowConfiguration(resp.Result, "create", ""); err != nil {
+		return nil, err
 	}
 	if resp.Result.Workflow == nil {
 		return nil, fmt.Errorf("create succeeded but returned no workflow")
