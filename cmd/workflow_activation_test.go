@@ -59,7 +59,7 @@ func TestRunManifestActivation(t *testing.T) {
 					if req.Variables["definitionSlug"] != "review-copy-2" {
 						t.Error("configured the wrong definition")
 					}
-					data["createWorkflow"] = map[string]interface{}{"ok": true, "workflow": map[string]interface{}{"guid": "wf-id", "slug": "review-config", "name": "Review"}}
+					data["createWorkflow"] = map[string]interface{}{"ok": true, "configurationSaved": true, "schedule": map[string]interface{}{"workflowId": "wf-id", "scheduleId": "workflow-wf-id", "configurationVersion": 1, "observedState": "not_requested"}, "workflow": map[string]interface{}{"guid": "wf-id", "slug": "review-config", "name": "Review"}}
 				case strings.Contains(req.Query, "updateWorkflowDefinition"):
 					calls = append(calls, "enable")
 					if req.Variables["slug"] != "review-copy-2" || !strings.Contains(req.Query, "isEnabled: true") {

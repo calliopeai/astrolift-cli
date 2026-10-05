@@ -366,6 +366,48 @@ to stderr; data goes to stdout.
 
 ### Exact workflow executions
 
+### Native workflow schedule recovery
+
+A saved workflow configuration does not prove its Temporal schedule is active or
+removed. Create, update and delete report `configurationSaved` separately from
+`schedule.confirmed`. `--json` preserves the full selected native result even when
+an operation exits nonzero. Keep `schedule.workflowId` on partial failure; recover
+that configuration instead of creating another one.
+
+```bash
+astro workflow create --definition-id <definition-guid> --name "Weekly research" --trigger schedule --cron "0 9 * * 1" --enabled=false --json
+astro workflow update <workflow-guid> --enabled=true --json
+astro workflow schedule inspect <workflow-guid> --json
+astro workflow schedule reconcile <workflow-guid> --expected-version 7 --expected-active=true --json
+astro workflow update <workflow-guid> --enabled=false --json
+astro workflow delete --workflow-id <workflow-guid> --yes --json
+```
+
+Use the `configurationVersion` and `desiredActive` values from your reviewed
+inspection in `reconcile`; both flags are required, including an explicit
+`--expected-active=false` for cleanup. The server rejects stale reviews. Recovery
+updates the existing native schedule and does not start an immediate run. A
+successful active receipt requires `confirmed: true, observedState: "active"`;
+cleanup requires confirmed `"missing"`. `"not_requested"` describes an inactive
+draft with no requested engine operation. `"unknown"`, `"drifted"` and `"paused"`
+are not confirmed success. Inspection exits nonzero when engine observation fails
+but still emits the returned state and recovery identity.
+
+`update` accepts `--enabled`, `--cron` and `--trigger manual|schedule`; omitted
+flags leave the corresponding fields unchanged. An explicit empty `--cron=` clears
+it, subject to native validation. Event activation is not offered here. Existing
+`create --definition <slug>` and `delete <slug> --yes` remain available; supplying
+both a definition GUID and slug asserts that they match. A supplied workflow GUID
+never falls back to slug resolution.
+
+The selected server must support the native schedule lifecycle GraphQL contract,
+including `workflowSchedule`, `reconcileWorkflowSchedule` and configuration
+mutation receipts. An older schema fails explicitly, without dropping receipt
+fields or retrying a mutation. Creation through `run-manifest` uses the same
+receipt contract. Active schedule writes require native trigger authority in
+addition to create/update authority; cleanup after deletion requires delete
+authority. Organization and bearer scope restrictions are enforced by the server.
+
 Use the execution GUID returned by `workflow run`, `workflow run-manifest`,
 `workflow definition-start`, or reviewed `agent run` to observe the exact run.
 `execution` looks up that record even after it leaves the recent-run list:
