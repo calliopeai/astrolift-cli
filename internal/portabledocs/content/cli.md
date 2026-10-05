@@ -214,6 +214,17 @@ older build/deploy irrelevant.
 
 ## Offline documentation and man pages
 
+### Domain checks
+
+`astro operator domains list` discovers visible zones; `show <id>` reads an
+exact GUID. `check <id>` reports provider records, public delegation and recorded
+app routes. `lookup <id>` (alias `dig`) accepts `--hostname` and `--record-type`;
+`probe <id>` accepts `--hostname` and `--tool https|ping|traceroute`. Each check
+uses the selected organization/server and a fresh domain version. Observations
+come from the server, and unsupported tools or mismatches remain explicit.
+No diagnostic changes DNS. See [Domains and DNS](../guides/domains-dns.md) or
+`astro docs show domains` for the full contract.
+
 Released binaries embed a release-matched Markdown snapshot:
 
 ```bash
@@ -273,6 +284,8 @@ astro agent inspect <task-guid> --json
 astro agent callbacks redeliver <task-guid> --json
 astro docs show callbacks
 astro docs show capabilities
+astro docs show domains
+astro docs show email-delivery
 astro docs show app-setup
 astro docs show agent-setup
 astro docs show workflow-setup

@@ -22,6 +22,10 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
+		"dns":                  "domains",
+		"domains-dns":          "domains",
+		"mail":                 "email-delivery",
+		"email":                "email-delivery",
 		"astrolift-toml":       "manifest",
 		"astrolift.toml":       "manifest",
 		"toml":                 "manifest",

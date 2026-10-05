@@ -37,6 +37,21 @@ also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
 unavailable entries. Inspect its reason before selecting a kind and variant.
 
+`domains.cloudflare_connections` adds encrypted organization-owned Cloudflare
+OAuth/API-token connections and protected read-only zone binding. Require the
+current connection support hint, active platform Super-admin and exact org
+permissions. The [Domains guide](domains-dns.md#connect-cloudflare-in-five-steps)
+explains five-step setup, operator prerequisites and safe recovery. The marker
+does not enable DNS writes, registrar migration or certificate provisioning.
+
+`email.exact_service_delivery_tests`, `email.delivery_test_history` and
+`email.signed_delivery_observations` identify exact applied-service SES tests,
+content-free history and signed provider feedback. They do not certify sending
+configuration or delivery. Test sends require current app/service write authority
+and the current bearer ceiling; support metadata is separate from native
+preflight. See [email delivery](email-delivery.md) for stable request recovery,
+suppression and timed-out observations.
+
 The server GraphQL explorer at `/app/gql/config/` exposes the exact supported
 schema. Download the [published SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
 from an immutable backend tag or commit when generating clients. Check both
@@ -47,6 +62,8 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Goal | Offline topic | Online guide |
 |---|---|---|
 | First login and deployment | `start` | [Getting started](../getting-started.md) |
+| Inspect domain records, public delegation and app routes | `domains` | [Domains and DNS](domains-dns.md) |
+| Test an exact applied SES service and read delivery observations | `email-delivery` | [Email delivery](email-delivery.md) |
 | Register and operate an application | `app-setup` | [Set up an app](app-setup.md) |
 | Package, register, and dispatch an agent | `agent-setup` | [Set up an agent](agent-setup.md) |
 | Compose and run stages | `workflow-setup` | [Set up a workflow](workflow-setup.md) |
