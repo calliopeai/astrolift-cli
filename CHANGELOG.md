@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.11.0 — 2026-10-04
+
+- Add exact versioned server-side Domains/DNS diagnostic commands and offline Cloudflare connection and SES email-delivery guides, including safe recovery and explicit read-only/provider limits.
+
 ## 0.10.1 — 2026-10-03
 
 - Embed an exact-environment logs/traces guide with scoped availability and trusted

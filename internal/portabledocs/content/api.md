@@ -1,5 +1,28 @@
 # Control API reference
 
+Domain setup reads include an exact GUID/version query,
+`astroliftManagedDomainDiagnostics` and `astroliftManagedDomainProbe`. They
+separate provider inventory, public delegation, recorded routes and bounded
+network observations, with current domain permissions and explicit unavailable
+states. See [Domains and DNS](../guides/domains-dns.md) for query examples.
+
+Exact service email diagnostics use `emailDeliveryTestSupport`,
+`sendEmailDeliveryTest` and cursor-paginated `emailDeliveryTestsPage`. A stable
+request UUID recovers the original send intent; provider acceptance, uncertain
+acceptance and signed delivery observations remain separate. The support query
+is advisory source/write admission, not native deliverability certification.
+See [Email delivery](../guides/email-delivery.md) for reviewed versions, current
+permissions, suppression and read-only recovery.
+
+Cloudflare setup uses `dnsProviderConnectionSupport`, versioned
+`dnsProviderConnectionsPage`, `cloudflareDnsZones` and `cloudflareDnsRecords`.
+`registerCloudflareDnsZone` creates a read-only registration;
+`attachCloudflareDnsZone` preserves an existing writer.
+`dnsProviderDomainBinding` recovers the protected tuple and exact `canVerify`
+hint. These operations add no DNS or registrar writer. See
+[Cloudflare setup](../guides/domains-dns.md#connect-cloudflare-in-five-steps).
+
+
 Astrolift's typed control-plane API is GraphQL. Focused REST, SSE, and WebSocket
 routes exist where device authentication, callbacks, streaming, or CI semantics
 do not fit GraphQL well.
