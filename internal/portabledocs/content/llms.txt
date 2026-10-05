@@ -26,6 +26,8 @@ Use these plain-Markdown references as the current public contract. The target i
 
 ## Setup and final notifications
 
+- [Install alert SMTP](https://astrolift.dev/guides/install-alert-mail/): private verified-TLS install setup, eight own-event preferences, current operator source review, stable nonce and acceptance-only history; no automatic resend
+
 - [Email delivery](https://astrolift.dev/guides/email-delivery/): exact app-bound SES service, reviewed version and stable request nonce, suppression, content-free cursor history and signed observations; acceptance is not delivery
 
 - [Capabilities](https://astrolift.dev/guides/capabilities/): discover server version, API surface, provider support, and permissions

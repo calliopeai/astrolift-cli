@@ -28,6 +28,7 @@ func TestExportPortableDocs(t *testing.T) {
 		"guides/shared-services.md",
 		"guides/domains.md",
 		"guides/email-delivery.md",
+		"guides/install-alert-mail.md",
 		"guides/callbacks.md",
 		"guides/environment-actions.md",
 		"commands/astro.md",
