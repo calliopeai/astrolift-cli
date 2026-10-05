@@ -13,7 +13,7 @@ import (
 )
 
 // DNS config is write-only in this API; do not synthesize or round-trip it.
-const managedDomainFields = `id version zone organizationSlug dnsDriver defaultFor isWildcardManaged
+const managedDomainFields = `id zone organizationSlug dnsDriver defaultFor isWildcardManaged
   createdAt provisionState provisionNameservers provisionValidationRecords delegationCheck
   provisionClusterId verificationState challengeRecordName challengeRecordValue verifiedAt`
 const managedDomainsListQuery = `query { astroliftManagedDomains { ` + managedDomainFields + ` } }`
@@ -29,7 +29,7 @@ const managedDomainVerifyMutation = `mutation($input: VerifyManagedDomainInput!)
 
 type managedDomain struct {
 	ID                         string          `json:"id"`
-	Version                    int             `json:"version"`
+	Version                    int             `json:"version,omitempty"`
 	Zone                       string          `json:"zone"`
 	OrganizationSlug           *string         `json:"organizationSlug"`
 	DNSDriver                  string          `json:"dnsDriver"`
