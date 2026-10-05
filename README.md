@@ -247,6 +247,10 @@ canonical zone names, proof of control and provisioning are enforced by the API.
 
 ```bash
 astro operator domains list --org acme
+astro operator domains show <domain-id> --org acme
+astro operator domains check <domain-id> --org acme --json
+astro operator domains lookup <domain-id> --hostname api.apps.example.com --record-type A --org acme
+astro operator domains probe <domain-id> --hostname api.apps.example.com --tool https --org acme
 astro operator domains list --org acme --json | jq '.[] | select(.defaultFor == "none")'
 astro operator domains create apps.example.com --dns-driver route53 --org acme
 astro operator domains create previews.example.com --dns-driver route53 --default-for preview_envs --org acme
