@@ -78,3 +78,15 @@ revoked role. Basic reads perform no pricing query and expose no configuration
 markers. This suite does not contact a provider or dispatch a Temporal worker;
 worker fencing and provider lifecycle acceptance are covered by the app's
 separate real PostgreSQL/Temporal tests.
+
+## Recoverable human gates
+
+`test_human_gates.py` invokes the compiled CLI against real bearer ASGI,
+PostgreSQL and production Temporal workers. It exercises root, collection and
+nested gates; a local forwarding proxy drops the actual accepted decision reply.
+Read-only `gate-status` recovers the same recorded decision, identical retries
+acknowledge it, and conflicting retries are refused. No API, authentication,
+workflow, activity or Temporal client is replaced. Use a backend containing the
+recoverable human-gate API and the usual CLI binary environment variable, with
+its pytest configuration and backend conftest loaded. Temporary test tokens and
+configuration directories never read production credentials.
