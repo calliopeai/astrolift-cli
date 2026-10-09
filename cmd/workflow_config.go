@@ -26,7 +26,7 @@
 //   - import      → importWorkflowManifest(toml, preview, replace) →
 //     { ok, errors, createdSlug, mode, repointedSlugs }; mode is one of
 //     "created" / "updated_in_place" / "versioned" (#1822)
-//   - delete      → deleteWorkflow(slug) → MutationResult
+//   - delete      → deleteWorkflow(slug) → WorkflowScheduleResult
 //   - definition-delete → deleteWorkflowDefinition(slug) → MutationResult
 //
 // All commands are org-scoped: the working org (resolveOrg) is sent as the
@@ -59,13 +59,15 @@ var (
 	workflowDefsGlobal bool
 	workflowDefsOrg    bool
 
-	workflowCreateDefinition string
-	workflowCreateName       string
-	workflowCreateSlug       string
-	workflowCreateBinds      []string
-	workflowCreateInputs     []string
-	workflowCreateTrigger    string
-	workflowCreateCron       string
+	workflowCreateDefinition   string
+	workflowCreateDefinitionID string
+	workflowCreateEnabled      = true
+	workflowCreateName         string
+	workflowCreateSlug         string
+	workflowCreateBinds        []string
+	workflowCreateInputs       []string
+	workflowCreateTrigger      string
+	workflowCreateCron         string
 
 	workflowRunConfigInputs []string
 
@@ -124,11 +126,11 @@ const workflowBySlugQuery = `query($slug: String!) {
   }
 }`
 
-const createWorkflowMutation = `mutation($name: String!, $definitionSlug: String!, $slug: String, $stageBindings: JSON, $inputs: JSON, $triggerKind: String!, $scheduleCron: String) {
-  createWorkflow(name: $name, definitionSlug: $definitionSlug, slug: $slug, stageBindings: $stageBindings, inputs: $inputs, triggerKind: $triggerKind, scheduleCron: $scheduleCron) {
-    ok
-    errors { field messages }
-    workflow { guid name slug triggerKind isEnabled }
+const createWorkflowMutation = `mutation($name: String!, $definitionSlug: String, $definitionId: GUID, $slug: String, $stageBindings: JSON, $inputs: JSON, $triggerKind: String!, $scheduleCron: String, $isEnabled: Boolean! = true) {
+  createWorkflow(name: $name, definitionSlug: $definitionSlug, definitionId: $definitionId, slug: $slug, stageBindings: $stageBindings, inputs: $inputs, triggerKind: $triggerKind, scheduleCron: $scheduleCron, isEnabled: $isEnabled) {
+    ok errors { field messages } configurationSaved
+    workflow { guid name slug definitionGuid definitionSlug triggerKind isEnabled runCount }
+    schedule { ` + workflowScheduleFields + ` }
   }
 }`
 
@@ -164,10 +166,10 @@ const importWorkflowManifestMutation = `mutation($toml: String!, $preview: Boole
   }
 }`
 
-const deleteWorkflowMutation = `mutation($slug: String!) {
-  deleteWorkflow(slug: $slug) {
-    ok
-    errors { field messages }
+const deleteWorkflowMutation = `mutation($slug: String, $workflowId: GUID) {
+  deleteWorkflow(slug: $slug, workflowId: $workflowId) {
+    ok errors { field messages } configurationSaved
+    schedule { ` + workflowScheduleFields + ` }
   }
 }`
 
@@ -217,6 +219,7 @@ type configuredWorkflow struct {
 	Name           string `json:"name"`
 	Slug           string `json:"slug"`
 	DefinitionSlug string `json:"definitionSlug"`
+	DefinitionGUID string `json:"definitionGuid"`
 	TriggerKind    string `json:"triggerKind"`
 	IsEnabled      bool   `json:"isEnabled"`
 	RunCount       int    `json:"runCount"`
@@ -459,6 +462,7 @@ func runWorkflowList(cmd *cobra.Command, ctx context.Context, client *api.Client
 var workflowCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Configure a Workflow from a visible definition",
+	Args:  cobra.NoArgs,
 	Long: `Creates a configured Workflow (tier 2) from a visible definition via
 createWorkflow. Every agent_dispatch stage must resolve to an agent — either
 the stage's own default or a --bind:
@@ -469,31 +473,45 @@ the stage's own default or a --bind:
 Example:
   astro workflow create --definition feature-dev --name "Feature Dev" \
     --bind 0=9f2c... --input repo=myorg/api --trigger schedule --cron "0 9 * * 1"`,
-	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ []string) error {
-		return runWorkflowCreate(cmd, ctx, client)
-	}),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if _, err := workflowCreateVariables(); err != nil {
+			return err
+		}
+		return workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ []string) error {
+			return runWorkflowCreate(cmd, ctx, client)
+		})(cmd, args)
+	},
 }
 
-func runWorkflowCreate(cmd *cobra.Command, ctx context.Context, client *api.Client) error {
-	if workflowCreateDefinition == "" {
-		return fmt.Errorf("--definition is required")
+func workflowCreateVariables() (map[string]interface{}, error) {
+	if workflowCreateDefinition == "" && workflowCreateDefinitionID == "" {
+		return nil, fmt.Errorf("--definition or --definition-id is required")
+	}
+	if workflowCreateDefinitionID != "" {
+		if err := workflowGUIDArgs(&cobra.Command{}, []string{workflowCreateDefinitionID}); err != nil {
+			return nil, fmt.Errorf("--definition-id: %w", err)
+		}
 	}
 	if workflowCreateName == "" {
-		return fmt.Errorf("--name is required")
+		return nil, fmt.Errorf("--name is required")
+	}
+	if workflowCreateTrigger != "manual" && workflowCreateTrigger != "schedule" {
+		return nil, fmt.Errorf("--trigger must be manual or schedule")
 	}
 	bindings, err := parseStageBindings(workflowCreateBinds)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	inputs, err := parseKeyValues("--input", workflowCreateInputs)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	vars := map[string]interface{}{
-		"name":           workflowCreateName,
-		"definitionSlug": workflowCreateDefinition,
-		"triggerKind":    workflowCreateTrigger,
+	vars := map[string]interface{}{"name": workflowCreateName, "triggerKind": workflowCreateTrigger, "isEnabled": workflowCreateEnabled}
+	if workflowCreateDefinition != "" {
+		vars["definitionSlug"] = workflowCreateDefinition
+	}
+	if workflowCreateDefinitionID != "" {
+		vars["definitionId"] = workflowCreateDefinitionID
 	}
 	if workflowCreateSlug != "" {
 		vars["slug"] = workflowCreateSlug
@@ -507,34 +525,28 @@ func runWorkflowCreate(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	if workflowCreateCron != "" {
 		vars["scheduleCron"] = workflowCreateCron
 	}
+	return vars, nil
+}
 
+func runWorkflowCreate(cmd *cobra.Command, ctx context.Context, client *api.Client) error {
+	vars, err := workflowCreateVariables()
+	if err != nil {
+		return err
+	}
 	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-
 	var resp struct {
-		Result struct {
-			Ok       bool                `json:"ok"`
-			Errors   validationErrors    `json:"errors"`
-			Workflow *configuredWorkflow `json:"workflow"`
-		} `json:"createWorkflow"`
+		Result workflowConfigurationResult `json:"createWorkflow"`
 	}
 	if err := client.GraphQL(createCtx, createWorkflowMutation, vars, &resp); err != nil {
 		return fmt.Errorf("creating workflow: %w", err)
 	}
-	if !resp.Result.Ok {
-		return fmt.Errorf("create failed: %s", firstValidationError(resp.Result.Errors))
+	if err := reportWorkflowConfiguration(cmd, resp.Result, "create", ""); err != nil {
+		return err
 	}
-
-	out := cmd.OutOrStdout()
-	wf := resp.Result.Workflow
-	if wf == nil {
-		fmt.Fprintln(out, "Workflow created.")
-		return nil
+	if !boolFlag(cmd, "json") && resp.Result.Workflow != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "Created workflow: %s (%s)\n", resp.Result.Workflow.Name, resp.Result.Workflow.Slug)
 	}
-	fmt.Fprintf(out, "Created workflow: %s (%s)\n", wf.Name, wf.Slug)
-	fmt.Fprintf(out, "ID:               %s\n", wf.GUID)
-	fmt.Fprintf(out, "Trigger:          %s\n", wf.TriggerKind)
-	fmt.Fprintf(out, "\nRun it with `astro workflow run %s`.\n", wf.Slug)
 	return nil
 }
 
@@ -863,27 +875,57 @@ func runWorkflowImport(cmd *cobra.Command, ctx context.Context, client *api.Clie
 // ---- astro workflow delete -----------------------------------------------------
 
 var workflowDeleteCmd = &cobra.Command{
-	Use:   "delete <workflow-slug>",
+	Use:   "delete [workflow-slug]",
 	Short: "Soft-delete a configured Workflow",
 	Long: `Soft-deletes a configured Workflow (tier 2) via the deleteWorkflow
-GraphQL mutation and tears down its Temporal schedule. Past runs are kept.
+GraphQL mutation and reports whether Temporal confirmed schedule cleanup. Past runs are kept.
+Use --workflow-id for an exact configured workflow GUID. On partial failure,
+inspect and reconcile the returned ID with workflow schedule.
 
 There is no interactive prompt: --yes is the confirmation (CI-safe).
 Without it, nothing is changed.`,
-	Args: cobra.ExactArgs(1),
-	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
-		return runWorkflowDelete(cmd, ctx, client, args[0])
-	}),
+	Args: func(cmd *cobra.Command, args []string) error { _, err := workflowDeleteTarget(cmd, args); return err },
+	RunE: func(cmd *cobra.Command, args []string) error {
+		vars, err := workflowDeleteTarget(cmd, args)
+		if err != nil {
+			return err
+		}
+		if !workflowDeleteYes {
+			return fmt.Errorf("--yes is required to delete a configured workflow")
+		}
+		return workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ []string) error {
+			return runWorkflowDeleteResult(cmd, ctx, client, vars)
+		})(cmd, args)
+	},
 }
 
 func runWorkflowDelete(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
+	return runWorkflowDeleteResult(cmd, ctx, client, map[string]interface{}{"slug": slug})
+}
+
+func runWorkflowDeleteResult(cmd *cobra.Command, ctx context.Context, client *api.Client, vars map[string]interface{}) error {
 	if !workflowDeleteYes {
-		return fmt.Errorf("refusing to delete workflow %q without --yes (nothing was changed)", slug)
+		return fmt.Errorf("--yes is required to delete a configured workflow")
 	}
-	if err := execWorkflowMutationResult(ctx, client, deleteWorkflowMutation, "deleteWorkflow", slug); err != nil {
-		return fmt.Errorf("deleting workflow: %w", err)
+	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	var resp struct {
+		Result workflowConfigurationResult `json:"deleteWorkflow"`
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow: %s (schedule torn down; past runs kept)\n", slug)
+	if err := client.GraphQL(callCtx, deleteWorkflowMutation, vars, &resp); err != nil {
+		return fmt.Errorf("deleting workflow: %w; inspect the workflow before retrying", err)
+	}
+	id, _ := vars["workflowId"].(string)
+	if err := reportWorkflowConfiguration(cmd, resp.Result, "delete", id); err != nil {
+		return err
+	}
+	if !boolFlag(cmd, "json") {
+		label := id
+		if label == "" {
+			label, _ = vars["slug"].(string)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Deleted workflow: %s (past runs kept)\n", label)
+	}
 	return nil
 }
 
@@ -969,7 +1011,9 @@ func init() {
 	workflowDefinitionsCmd.Flags().BoolVar(&workflowDefsOrg, "org-only", false, "Only the working org's own definitions")
 
 	// create
-	workflowCreateCmd.Flags().StringVar(&workflowCreateDefinition, "definition", "", "Definition slug to configure (required)")
+	workflowCreateCmd.Flags().StringVar(&workflowCreateDefinitionID, "definition-id", "", "Exact definition GUID to configure")
+	workflowCreateCmd.Flags().BoolVar(&workflowCreateEnabled, "enabled", true, "Enable the configuration; use --enabled=false to prepare an inactive draft")
+	workflowCreateCmd.Flags().StringVar(&workflowCreateDefinition, "definition", "", "Definition slug to configure; with --definition-id, assert its matching slug")
 	workflowCreateCmd.Flags().StringVar(&workflowCreateName, "name", "", "Workflow display name (required)")
 	workflowCreateCmd.Flags().StringVar(&workflowCreateSlug, "slug", "", "Workflow slug (default: derived from the name)")
 	workflowCreateCmd.Flags().StringArrayVar(&workflowCreateBinds, "bind", nil, "Stage binding <stageOrder>=<agentWorkloadGuid> (repeatable)")
@@ -988,6 +1032,7 @@ func init() {
 	workflowImportCmd.Flags().BoolVar(&workflowImportReplace, "replace", false, "Upsert the org's own definition sharing this slug instead of always creating a new one")
 
 	// delete / definition-delete
+	workflowDeleteCmd.Flags().String("workflow-id", "", "Exact configured workflow GUID instead of a legacy slug")
 	workflowDeleteCmd.Flags().BoolVarP(&workflowDeleteYes, "yes", "y", false, "Confirm the deletion (required to proceed)")
 	workflowDefinitionDeleteCmd.Flags().BoolVarP(&workflowDefDeleteYes, "yes", "y", false, "Confirm the deletion (required to proceed)")
 
