@@ -343,3 +343,13 @@ operation using `astro api graphql --file query.graphql --vars-file vars.json --
 against a compatible server. Existing CLI app/preview logs remain historical
 polling. The `logs-traces` offline topic requires the CLI documentation snapshot
 containing this guide; released v0.10.0 does not contain it.
+
+## Human gate decisions
+
+Use `astro workflow gates --json` for public run/gate GUIDs and the gate's captured
+Temporal identity. `astro workflow gate --run <guid> --stage <guid>
+--temporal-run <id> --decision approve|reject --yes` submits the user's explicit
+choice. `astro workflow gate-status --run <guid> --stage <guid> --json` recovers
+read-only. Requested and recorded outcomes are distinct; retain the exact target
+from JSON/error output after a lost response. The former slug/newest-gate flow
+is replaced. See [workflow setup](../guides/workflow-setup.md).

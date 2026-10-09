@@ -1,19 +1,3 @@
-// Package cmd: `astro workflow gates` / `astro workflow gate`.
-//
-// CLI parity for #1820: today the only way to decide a pending human_gate is
-// the raw signalWorkflowInstance mutation, keyed on the gate's integer
-// executionId rather than the guid workflowStageExecutions otherwise uses
-// everywhere else (#1786's footgun). These two verbs read the org-wide
-// pendingHumanGates query (the same one the web "pending gates" list reads,
-// and the same authorization: WORKFLOW_TRIGGER, narrowed to the gates the
-// caller may decide) so a CLI-side approver never resolves an executionId by
-// hand, and never risks sending the wrong id shape.
-//
-// GraphQL operations (field names per backend/schema.graphql):
-//   - pendingHumanGates(limit)                 → [PendingHumanGate]
-//   - signalWorkflowInstance(workflowId, ...)   → MutationResult
-//
-// Issue: calliopeai/astrolift-app#1820
 package cmd
 
 import (
@@ -22,132 +6,178 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode/utf8"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/spf13/cobra"
 )
 
-// ---- flags -----------------------------------------------------------------
-
-var (
-	workflowGateRun      string
-	workflowGateDecision string
-	workflowGateNote     string
-)
-
-// ---- GraphQL operations ----------------------------------------------------
-
-const pendingHumanGatesQuery = `query($limit: Int!) {
-  pendingHumanGates(limit: $limit) {
-    executionId workflowId runGuid definitionSlug definitionName
-    stageRole stageApprovers startedAt
-  }
+const pendingHumanGatesQuery = `query PendingHumanGates($limit: Int!, $after: String) {
+ pendingHumanGatesPage(limit: $limit, after: $after) {
+  items { executionGuid stageGuid runGuid definitionSlug definitionName stageRole stageApprovers startedAt
+   temporalExecution { namespace workflowId runId } }
+  nextCursor
+ }
+}`
+const humanGateFields = `executionGuid stageExecutionGuid stageGuid stageStatus runStatus requestState
+ requestedDecision recordedDecision note decidedByMe observationError temporalExecution { namespace workflowId runId }`
+const humanGateStatusQuery = `query HumanGateDecision($executionId: ID!, $stageExecutionId: ID!) {
+ humanGateDecision(executionId: $executionId, stageExecutionId: $stageExecutionId) { ` + humanGateFields + ` }
+}`
+const humanGateDecisionMutation = `mutation DecideHumanGate($executionId: ID!, $stageExecutionId: ID!, $temporalRunId: String!, $decision: String!, $confirmed: Boolean!, $note: String!) {
+ decideHumanGate(executionId: $executionId, stageExecutionId: $stageExecutionId, temporalRunId: $temporalRunId,
+  decision: $decision, confirmed: $confirmed, note: $note) {
+   ok errors { field messages } gate { ` + humanGateFields + ` }
+ }
 }`
 
-// pendingGatesFetchLimit is comfortably above the "8+ pending gates" the
-// issue reports for one org today; --json on `gates` is the escape hatch if
-// an install ever needs more in one page.
-const pendingGatesFetchLimit = 200
-
-// ---- response shapes (GraphQL camelCase) -----------------------------------
-
-// pendingHumanGateRow mirrors PendingHumanGateType. executionId is the
-// stage-execution pk as a string, what signalWorkflowInstance's payload
-// takes (#1786: a guid is silently dropped); workflowId is the Temporal
-// workflow id its own workflowId argument takes; runGuid is the astrolift
-// WorkflowRun guid the web observe page's ?run= deep link uses (#2068).
+type gateTemporalIdentity struct {
+	Namespace  string `json:"namespace"`
+	WorkflowID string `json:"workflowId"`
+	RunID      string `json:"runId"`
+}
 type pendingHumanGateRow struct {
-	ExecutionID    string   `json:"executionId"`
-	WorkflowID     string   `json:"workflowId"`
-	RunGUID        string   `json:"runGuid"`
-	DefinitionSlug string   `json:"definitionSlug"`
-	DefinitionName string   `json:"definitionName"`
-	StageRole      string   `json:"stageRole"`
-	StageApprovers []string `json:"stageApprovers"`
-	StartedAt      *string  `json:"startedAt"`
+	ExecutionGUID     string                `json:"executionGuid"`
+	StageGUID         string                `json:"stageGuid"`
+	RunGUID           string                `json:"runGuid"`
+	DefinitionSlug    string                `json:"definitionSlug"`
+	DefinitionName    string                `json:"definitionName"`
+	StageRole         string                `json:"stageRole"`
+	StageApprovers    []string              `json:"stageApprovers"`
+	StartedAt         *string               `json:"startedAt"`
+	TemporalExecution *gateTemporalIdentity `json:"temporalExecution"`
+}
+type humanGateState struct {
+	ExecutionGUID      string                `json:"executionGuid"`
+	StageExecutionGUID string                `json:"stageExecutionGuid"`
+	StageGUID          string                `json:"stageGuid"`
+	TemporalExecution  *gateTemporalIdentity `json:"temporalExecution"`
+	StageStatus        string                `json:"stageStatus"`
+	RunStatus          string                `json:"runStatus"`
+	RequestState       string                `json:"requestState"`
+	RequestedDecision  *string               `json:"requestedDecision"`
+	RecordedDecision   *string               `json:"recordedDecision"`
+	Note               string                `json:"note"`
+	DecidedByMe        *bool                 `json:"decidedByMe"`
+	ObservationError   string                `json:"observationError"`
+}
+type gateTarget struct {
+	RunGUID            string `json:"runGuid"`
+	StageExecutionGUID string `json:"stageExecutionGuid"`
+	TemporalRunID      string `json:"temporalRunId,omitempty"`
+}
+type gateReview struct {
+	gateTarget
+	Decision  string
+	Note      string
+	Confirmed bool
+}
+type humanGateReceipt struct {
+	OK          bool             `json:"ok"`
+	Errors      validationErrors `json:"errors"`
+	Gate        *humanGateState  `json:"gate"`
+	Target      gateTarget       `json:"target"`
+	ClientError string           `json:"clientError,omitempty"`
 }
 
 func fetchPendingHumanGates(ctx context.Context, client *api.Client) ([]pendingHumanGateRow, error) {
 	listCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	var resp struct {
-		Gates []pendingHumanGateRow `json:"pendingHumanGates"`
+	rows := []pendingHumanGateRow{}
+	var cursor *string
+	seen := map[string]bool{}
+	for {
+		var resp struct {
+			Page *struct {
+				Items      []pendingHumanGateRow `json:"items"`
+				NextCursor *string               `json:"nextCursor"`
+			} `json:"pendingHumanGatesPage"`
+		}
+		if err := client.GraphQL(listCtx, pendingHumanGatesQuery,
+			map[string]interface{}{"limit": 200, "after": cursor}, &resp); err != nil {
+			return nil, fmt.Errorf("pendingHumanGatesPage: %w; this install must support recoverable human gates", err)
+		}
+		if resp.Page == nil {
+			return nil, fmt.Errorf("server did not return pendingHumanGatesPage")
+		}
+		rows = append(rows, resp.Page.Items...)
+		cursor = resp.Page.NextCursor
+		if cursor == nil {
+			return rows, nil
+		}
+		if *cursor == "" || seen[*cursor] {
+			return nil, fmt.Errorf("server repeated an invalid pending-gate cursor; refresh the list")
+		}
+		seen[*cursor] = true
 	}
-	if err := client.GraphQL(listCtx, pendingHumanGatesQuery,
-		map[string]interface{}{"limit": pendingGatesFetchLimit}, &resp); err != nil {
-		return nil, fmt.Errorf("pendingHumanGates: %w", err)
-	}
-	return resp.Gates, nil
 }
 
-// ---- astro workflow gates ---------------------------------------------------
-
-var workflowGatesCmd = &cobra.Command{
-	Use:   "gates",
-	Short: "List pending human gates across the organization",
-	Long: `Lists every open human_gate stage execution across the org's workflow
-runs via the pendingHumanGates GraphQL query, the same query the web
-"pending gates" list reads, and the same authorization the decide path
-applies (WORKFLOW_TRIGGER, narrowed to the gates the caller may decide; a
-gate naming specific approver addresses shows only to them).
-
-Newest first. Decide one with ` + "`astro workflow gate <definition-slug> --run <guid> --decision approve|reject`" + `.`,
-	Args: cobra.NoArgs,
-	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
-		return runWorkflowGates(cmd, ctx, client)
-	}),
+func newWorkflowGatesCmd() *cobra.Command {
+	return &cobra.Command{Use: "gates", Short: "List eligible pending human gates with exact recovery identities",
+		Long: `Read every pendingHumanGatesPage, including empty pages carrying a next cursor.
+Closed parent runs are excluded. The server applies workflow trigger authority and
+named-approver checks. Role/team approver references retain native trigger-authority
+fallback. Inspect the run, gate GUID and captured Temporal identity before deciding.
+Legacy unbound gates remain visible but cannot use the recoverable decision API.`,
+		Args: cobra.NoArgs, RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ []string) error {
+			return runWorkflowGates(cmd, ctx, client)
+		})}
 }
-
 func runWorkflowGates(cmd *cobra.Command, ctx context.Context, client *api.Client) error {
-	gates, err := fetchPendingHumanGates(ctx, client)
+	rows, err := fetchPendingHumanGates(ctx, client)
 	if err != nil {
 		return err
 	}
 	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, gates)
+		return renderJSON(cmd, rows)
 	}
-	out := cmd.OutOrStdout()
-	if len(gates) == 0 {
-		fmt.Fprintln(out, "No pending gates.")
+	if len(rows) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No pending gates.")
 		return nil
 	}
-	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "DEFINITION\tROLE\tAPPROVERS\tSTARTED\tRUN")
-	for _, g := range gates {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			g.DefinitionSlug, dashIfEmpty(g.StageRole), dashIfEmpty(strings.Join(g.StageApprovers, ", ")),
-			shortTime(g.StartedAt), g.RunGUID)
+	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "DEFINITION\tROLE\tAPPROVERS\tRUN\tGATE\tTEMPORAL RUN")
+	for _, row := range rows {
+		runID := "unbound"
+		if row.TemporalExecution != nil {
+			runID = row.TemporalExecution.RunID
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", row.DefinitionSlug, dashIfEmpty(row.StageRole),
+			dashIfEmpty(strings.Join(row.StageApprovers, ", ")), row.RunGUID, row.ExecutionGUID, runID)
 	}
 	return w.Flush()
 }
 
-// ---- astro workflow gate ----------------------------------------------------
-
-var workflowGateCmd = &cobra.Command{
-	Use:   "gate <definition-slug>",
-	Short: "Approve or reject a pending human gate",
-	Long: `Decides a pending human_gate stage execution via the signalWorkflowInstance
-GraphQL mutation. Resolves the gate off the same pendingHumanGates query
-` + "`astro workflow gates`" + ` reads (org-scoped, WORKFLOW_TRIGGER), so this
-never needs the executionId or the guid/integer distinction #1786 documents;
-the CLI resolves executionId itself.
-
---run <guid> selects a specific run's gate (the run guid from
-` + "`astro workflow gates`" + `); by default the newest pending gate for the
-definition. --decision accepts approve/approved or reject/rejected.
---note is optional and stored on the decision record.
-
-Who may decide is the server's call, same as everywhere else: a refusal
-comes back as a mutation error naming why.`,
-	Args: cobra.ExactArgs(1),
-	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
-		return runWorkflowGate(cmd, ctx, client, args[0])
-	}),
+func gateTargetFlags(cmd *cobra.Command) gateTarget {
+	run, _ := cmd.Flags().GetString("run")
+	stage, _ := cmd.Flags().GetString("stage")
+	temporal, _ := cmd.Flags().GetString("temporal-run")
+	return gateTarget{RunGUID: run, StageExecutionGUID: stage, TemporalRunID: temporal}
 }
-
-// normalizeGateDecision accepts either tense (the issue text used
-// approve/reject; the backend and #2068's UI use approved/rejected) and
-// maps to the wire value signalWorkflowInstance's payload requires.
+func validateGateTarget(target gateTarget) error {
+	if !definitionGUIDValid(target.RunGUID) || !definitionGUIDValid(target.StageExecutionGUID) {
+		return fmt.Errorf("--run and --stage must be exact canonical GUIDs from workflow gates; newest-gate selection is not supported")
+	}
+	return nil
+}
+func validateGateReview(review gateReview) error {
+	if err := validateGateTarget(review.gateTarget); err != nil {
+		return err
+	}
+	if !definitionGUIDValid(review.TemporalRunID) {
+		return fmt.Errorf("--temporal-run must be the captured runId reviewed for this gate")
+	}
+	if !review.Confirmed {
+		return fmt.Errorf("--yes is required to confirm the user's explicit decision")
+	}
+	if review.Decision != "approved" && review.Decision != "rejected" {
+		return fmt.Errorf("--decision must be approve or reject")
+	}
+	if !utf8.ValidString(review.Note) || utf8.RuneCountInString(review.Note) > 4096 {
+		return fmt.Errorf("--note must contain at most 4096 Unicode characters")
+	}
+	return nil
+}
 func normalizeGateDecision(raw string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "approve", "approved":
@@ -158,93 +188,166 @@ func normalizeGateDecision(raw string) (string, error) {
 		return "", fmt.Errorf("--decision must be approve or reject, got %q", raw)
 	}
 }
+func newWorkflowGateCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "gate", Short: "Submit an explicit decision to an exact reviewed human gate",
+		Long: `Use --run, --stage and --temporal-run from workflow gates. All identities are
+required; this command never selects the newest gate or falls back to a generic
+signal. --decision accepts approve/approved or reject/rejected; --yes asserts the
+user explicitly chose it. The server records the authenticated caller as approver.
+An agent's own assessment is not a human decision.
 
-func runWorkflowGate(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
-	decision, err := normalizeGateDecision(workflowGateDecision)
-	if err != nil {
+The result distinguishes requested from recorded. After an uncertain response,
+use gate-status with the same run and stage GUIDs before retrying. Conflicting
+retries cannot replace an accepted decision. Old servers/workers may refuse this
+operation and must be upgraded; there is no signal fallback.`, Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, _ := cmd.Flags().GetString("decision")
+			decision, err := normalizeGateDecision(raw)
+			if err != nil {
+				return err
+			}
+			note, _ := cmd.Flags().GetString("note")
+			review := gateReview{gateTarget: gateTargetFlags(cmd), Decision: decision, Note: note, Confirmed: boolFlag(cmd, "yes")}
+			if err := validateGateReview(review); err != nil {
+				return err
+			}
+			return workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ []string) error {
+				return runWorkflowGate(cmd, ctx, client, review)
+			})(cmd, args)
+		}}
+	cmd.Flags().String("run", "", "Exact workflow run GUID (required)")
+	cmd.Flags().String("stage", "", "Exact gate execution GUID (required)")
+	cmd.Flags().String("temporal-run", "", "Reviewed temporalExecution.runId of the gate, including child runs (required)")
+	cmd.Flags().String("decision", "", "approve or reject (required)")
+	cmd.Flags().String("note", "", "Note stored with the decision, at most 4096 characters")
+	cmd.Flags().Bool("yes", false, "Confirm the user's explicit decision (required; no prompt)")
+	return cmd
+}
+func newWorkflowGateStatusCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "gate-status", Short: "Recover an exact human-gate decision without resubmitting",
+		Long: `Read humanGateDecision for the exact --run and --stage GUIDs. This command
+never sends a decision. Requested means durably admitted; recorded means the gate
+outcome was persisted, not that the whole workflow succeeded. Unknown means the
+engine could not confirm the receipt; retain these IDs. Closed or unbound gates
+are reported explicitly. Current permissions and named-approver checks still apply.`, Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := gateTargetFlags(cmd)
+			if err := validateGateTarget(target); err != nil {
+				return err
+			}
+			return workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ []string) error {
+				return runWorkflowGateStatus(cmd, ctx, client, target)
+			})(cmd, args)
+		}}
+	cmd.Flags().String("run", "", "Exact workflow run GUID (required)")
+	cmd.Flags().String("stage", "", "Exact gate execution GUID (required)")
+	return cmd
+}
+
+func validateGateReceipt(gate *humanGateState, target gateTarget) error {
+	if gate == nil {
+		return fmt.Errorf("no visible decision receipt for this gate")
+	}
+	if !sameWorkflowGUID(gate.ExecutionGUID, target.RunGUID) || !sameWorkflowGUID(gate.StageExecutionGUID, target.StageExecutionGUID) {
+		return fmt.Errorf("server returned a different gate identity")
+	}
+	if target.TemporalRunID != "" && (gate.TemporalExecution == nil || !sameWorkflowGUID(gate.TemporalExecution.RunID, target.TemporalRunID)) {
+		return fmt.Errorf("server returned a different Temporal incarnation")
+	}
+	switch gate.RequestState {
+	case "not_requested", "requested", "recorded", "closed", "unbound", "refused", "unknown":
+		return nil
+	default:
+		return fmt.Errorf("server returned an unsupported decision state %q", gate.RequestState)
+	}
+}
+func runWorkflowGate(cmd *cobra.Command, ctx context.Context, client *api.Client, review gateReview) error {
+	if err := validateGateReview(review); err != nil {
 		return err
 	}
-
-	gates, err := fetchPendingHumanGates(ctx, client)
-	if err != nil {
-		return err
-	}
-	var match *pendingHumanGateRow
-	for i := range gates {
-		if gates[i].DefinitionSlug != slug {
-			continue
-		}
-		if workflowGateRun != "" && gates[i].RunGUID != workflowGateRun {
-			continue
-		}
-		// pendingHumanGates is newest-first; the first match is the newest
-		// pending gate for this definition (or this exact run, with --run).
-		match = &gates[i]
-		break
-	}
-	if match == nil {
-		if workflowGateRun != "" {
-			return fmt.Errorf("no pending human gate for workflow %q on run %q (see `astro workflow gates`)",
-				slug, workflowGateRun)
-		}
-		return fmt.Errorf("no pending human gate for workflow %q (see `astro workflow gates`)", slug)
-	}
-
-	mutateCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var resp struct {
-		Result struct {
-			OK     bool             `json:"ok"`
-			Errors validationErrors `json:"errors"`
-		} `json:"signalWorkflowInstance"`
+		Result humanGateReceipt `json:"decideHumanGate"`
 	}
-	vars := map[string]interface{}{
-		"workflowId": match.WorkflowID,
-		"signalName": "human_gate_decision",
-		"payload": map[string]interface{}{
-			"execution_id": match.ExecutionID,
-			"decision":     decision,
-			"note":         workflowGateNote,
-		},
+	err := client.GraphQL(callCtx, humanGateDecisionMutation, map[string]interface{}{
+		"executionId": review.RunGUID, "stageExecutionId": review.StageExecutionGUID, "temporalRunId": review.TemporalRunID,
+		"decision": review.Decision, "confirmed": true, "note": review.Note,
+	}, &resp)
+	result := resp.Result
+	result.Target = review.gateTarget
+	if err != nil {
+		return reportGateReceipt(cmd, result, fmt.Errorf("decision delivery is unconfirmed: %w", err))
 	}
-	if err := client.GraphQL(mutateCtx, signalWorkflowInstanceMutation, vars, &resp); err != nil {
-		return workflowRunControlError("decide", err)
+	if !result.OK {
+		return reportGateReceipt(cmd, result, fmt.Errorf("decision refused or unconfirmed: %s", firstValidationError(result.Errors)))
 	}
-	if !resp.Result.OK {
-		return fmt.Errorf("decide failed: %s", firstValidationError(resp.Result.Errors))
+	if err := validateGateReceipt(result.Gate, review.gateTarget); err != nil {
+		return reportGateReceipt(cmd, result, err)
 	}
-
+	gate := result.Gate
+	if gate.RequestedDecision == nil || *gate.RequestedDecision != review.Decision || gate.Note != review.Note || gate.DecidedByMe == nil || !*gate.DecidedByMe {
+		return reportGateReceipt(cmd, result, fmt.Errorf("receipt does not confirm this caller's requested decision and note"))
+	}
+	if gate.RequestState != "requested" && gate.RequestState != "recorded" {
+		return reportGateReceipt(cmd, result, fmt.Errorf("decision is %s; inspect this exact gate", gate.RequestState))
+	}
+	if gate.RequestState == "recorded" && (gate.RecordedDecision == nil || *gate.RecordedDecision != review.Decision) {
+		return reportGateReceipt(cmd, result, fmt.Errorf("recorded outcome does not match the requested decision"))
+	}
+	return reportGateReceipt(cmd, result, nil)
+}
+func runWorkflowGateStatus(cmd *cobra.Command, ctx context.Context, client *api.Client, target gateTarget) error {
+	if err := validateGateTarget(target); err != nil {
+		return err
+	}
+	readCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	var resp struct {
+		Gate *humanGateState `json:"humanGateDecision"`
+	}
+	err := client.GraphQL(readCtx, humanGateStatusQuery, map[string]interface{}{"executionId": target.RunGUID, "stageExecutionId": target.StageExecutionGUID}, &resp)
+	result := humanGateReceipt{OK: err == nil, Target: target, Gate: resp.Gate}
+	if err == nil {
+		err = validateGateReceipt(result.Gate, target)
+	}
+	if err == nil && (result.Gate.RequestState == "unknown" || result.Gate.RequestState == "refused") {
+		err = fmt.Errorf("decision observation is %s: %s", result.Gate.RequestState, result.Gate.ObservationError)
+	}
+	return reportGateReceipt(cmd, result, err)
+}
+func reportGateReceipt(cmd *cobra.Command, result humanGateReceipt, failure error) error {
+	if failure != nil {
+		result.OK = false
+		result.ClientError = failure.Error()
+	}
 	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, map[string]interface{}{
-			"workflow": slug, "run": match.RunGUID, "decision": decision, "note": workflowGateNote,
-		})
+		if err := renderJSON(cmd, result); err != nil {
+			return err
+		}
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "Run: %s\nGate: %s\n", result.Target.RunGUID, result.Target.StageExecutionGUID)
+		if g := result.Gate; g != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "Decision state: %s\nStage: %s\nRun status: %s\n", g.RequestState, g.StageStatus, g.RunStatus)
+			if g.RequestedDecision != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "Requested decision: %s\n", *g.RequestedDecision)
+			}
+			if g.RecordedDecision != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "Recorded decision: %s\n", *g.RecordedDecision)
+			}
+			if g.Note != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "Note: %s\n", g.Note)
+			}
+			if g.ObservationError != "" {
+				fmt.Fprintln(cmd.OutOrStdout(), g.ObservationError)
+			}
+		}
 	}
-	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "Decision recorded: %s (%s)\n", decision, slug)
-	fmt.Fprintf(out, "Run:        %s\n", match.RunGUID)
-	if workflowGateNote != "" {
-		fmt.Fprintf(out, "Note:       %s\n", workflowGateNote)
+	if failure != nil {
+		return fmt.Errorf("%w; recover with: astro workflow gate-status --run %s --stage %s", failure, result.Target.RunGUID, result.Target.StageExecutionGUID)
 	}
 	return nil
 }
-
-// signalWorkflowInstanceMutation is shared with a raw-signal escape hatch
-// nowhere else in this package yet, but matches the field names
-// workflow_run_control.go documents for the control plane's signal path.
-const signalWorkflowInstanceMutation = `mutation($workflowId: String!, $signalName: String!, $payload: JSON) {
-  signalWorkflowInstance(workflowId: $workflowId, signalName: $signalName, payload: $payload) {
-    ok
-    errors { field messages }
-  }
-}`
-
-// ---- init ------------------------------------------------------------------
-
 func init() {
-	workflowGateCmd.Flags().StringVar(&workflowGateRun, "run", "", "Run guid to decide (default: the newest pending gate for this workflow)")
-	workflowGateCmd.Flags().StringVar(&workflowGateDecision, "decision", "", "approve or reject (required)")
-	workflowGateCmd.Flags().StringVar(&workflowGateNote, "note", "", "Note for the decision record (optional)")
-	_ = workflowGateCmd.MarkFlagRequired("decision")
-
-	workflowCmd.AddCommand(workflowGatesCmd, workflowGateCmd)
+	workflowCmd.AddCommand(newWorkflowGatesCmd(), newWorkflowGateCmd(), newWorkflowGateStatusCmd())
 }
