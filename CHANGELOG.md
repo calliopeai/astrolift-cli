@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `astro skill` for the organization skill catalog: list and inspect skills with their origin and tools, import a repository's astrolift.toml, and register, update or remove skill-repository sources, all against the working org with `--json` (#148).
+
 ## 0.11.2 — 2026-10-04
 
 - Bundle searchable install-alert SMTP setup and test knowledge, including current operator/source review, event preferences and recovery without ambiguous resends (#2289).
