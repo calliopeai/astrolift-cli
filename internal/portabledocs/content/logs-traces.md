@@ -125,6 +125,114 @@ These CloudWatch requirements do not change Loki's record format or install a
 collector for either backend. Local SDK and database tests establish admission
 behavior, not production collector trust or successful ingestion.
 
+## CloudWatch reader identity and collector handoff
+
+This handoff describes a prepared App/Opscode source contract. It requires a
+compatible released server and operator-reviewed collector installation; it does
+not establish that a collector is installed or historical reads are activated.
+Use the matching reviewed source release for `aws/modules/observability-fluent-bit`
+and `helm/tenant-telemetry/fluent-bit`, rather than mixing newer values with an
+older unverified deployment.
+
+### Registered read identity
+
+The CloudWatch reader uses `TenantCluster.provider_config.credential` through the
+shared AWS session factory. An explicit `aws_assume_role` declaration carries the
+registered `role_arn` and optional `external_id` into role assumption; the group
+and region come from `log_config.log_group` and `log_config.region` with
+`log_driver: cloudwatch_logs`. The credential declaration contains role/account
+pointers, not inline access keys or session secrets.
+
+Without an explicit credential declaration, the reader uses the control plane's
+ambient identity. Legacy `log_config.role_arn` is supported only with an ambient
+registration. Remove that legacy override before enabling an explicit registered
+credential. Conflicting declarations or failed role assumption refuse the read;
+they do not retry under ambient authority or select another account. The current
+read identity needs `logs:FilterLogEvents` on the exact selected group. A role ARN
+or external ID alone does not grant that permission or change the role's trust.
+
+### Collector and reader policy are separate
+
+The Opscode module exports a candidate handoff for the operator and the owner of
+the runtime connection:
+
+| Output | Handoff |
+|---|---|
+| `collector_contract` | Exact namespace, ServiceAccount, OIDC subject, collector IRSA role, region and group |
+| `historical_reader_config` | Candidate `log_driver/log_config` with the actual group, region and stream prefix; no implicit reader role |
+| `historical_reader_policy_json` | Unattached exact-group `logs:FilterLogEvents` policy for review by the runtime connection owner |
+| `optional_retention_metadata_policy_json` | Separate optional group-metadata inspection; not a historical-query prerequisite |
+
+The collector's IRSA role can create streams, write messages and describe stream
+metadata in its Terraform-owned group. It cannot read messages, create groups or
+change retention. Never substitute that write role for the runtime connection's
+reader role. Exporting a policy does not attach it, grant assume-role authority
+or update a trust policy. Optional `DescribeLogGroups` metadata inspection uses
+account-wide `Resource: "*"`; that separate grant is not needed for ordinary
+historical queries. See the [CloudWatch Logs IAM action/resource reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_logs.html).
+
+Use the action's ARN form when reviewing either policy. For a canonical group
+such as
+`arn:aws:logs:us-west-2:123456789012:log-group:/astrolift/clusters/00000000-0000-4000-8000-000000000170/pods`:
+
+| Purpose | ARN form |
+|---|---|
+| Physical group identity, `logGroupIdentifier`, and tagging `resourceArn` | The plain group ARN above |
+| IAM `logs:DescribeLogStreams` for the writer and `logs:FilterLogEvents` for the reader | The same group ARN with `:*` appended |
+| IAM `logs:CreateLogStream` and `logs:PutLogEvents` | The plain group ARN with `:log-stream:*` appended |
+| IAM `logs:TagResource`, `logs:UntagResource`, and `logs:ListTagsForResource` | The plain group ARN |
+
+Keep the account, region and cluster GUID exact when adding the suffix. Compare
+the physical group ARN and its creation identity separately from the IAM policy
+resource. AWS documents these distinct forms in the
+[CloudWatch Logs LogGroup API reference](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html).
+
+Terraform's `enable_fluent_bit` creates the group and write role, not the
+DaemonSet. The pinned chart installation is a separate operation requiring
+Kubernetes API reachability from its authorized installer. The actual chart
+namespace and `serviceAccount.name` must match `collector_contract` and the
+IRSA trust subject. Existing defaults remain `kube-system/fluent-bit`; a future
+worker-managed `astrolift-system` collector must be explicitly provisioned for
+that namespace, rather than moving an existing collector implicitly. This
+Terraform source handoff does not itself provide that worker installation
+operation. A separate compatible server API can perform
+[reviewed collector installation](cluster-log-collector.md); it does not migrate
+an existing Terraform collector or external backend implicitly.
+
+The reviewed AWS profile exports the complete collector JSON record. It keeps
+`Merge_Log Off`, `K8S-Logging.Parser Off`, `K8S-Logging.Exclude Off` and `Keep_Log On`
+so application JSON and annotations cannot promote fields into Kubernetes
+metadata or discard the retained message. The CloudWatch output must not set
+`log_key`, which would discard that metadata. Terraform owns group creation and
+retention; the collector output uses `auto_create_group Off` and does not set
+`log_retention_days`. These settings follow the official
+[Kubernetes filter](https://docs.fluentbit.io/manual/data-pipeline/filters/kubernetes)
+and [CloudWatch output](https://docs.fluentbit.io/manual/data-pipeline/outputs/cloudwatch)
+contracts.
+
+### Verify before activation
+
+Before saving or enabling the candidate reader configuration, the operator must
+verify the actual installation, trusted ingestion and current connection:
+
+1. Check the installed DaemonSet's readiness, exact namespace/ServiceAccount and
+   IRSA trust subject, plus the runtime connection's exact-group read authority.
+2. Ingest a unique non-sensitive marker from an authorized fixture with the
+   recorded namespace, app and workload metadata; retrieve it through the scoped
+   historical API or existing CLI polling path.
+3. After the fixture's source pod is removed, retrieve that already-ingested
+   marker from the historical backend. Records not collected before source loss
+   cannot be promised recoverable.
+4. Verify refusal or exclusion for other namespaces, other apps, missing identity
+   and duplicate-key records. Confirm the effective retention boundary separately.
+
+Preserve the current external backend until this acceptance succeeds. Native
+Helm renders, Terraform provider fixtures and credential-threading tests establish
+source contracts; they do not prove installed IAM admission, private-network
+reachability, live ingestion or recovery after actual pod loss. This CloudWatch
+log profile does not install tracing, an OTel collector or application
+instrumentation, and an X-Ray export role does not establish Tempo attribution.
+
 ## Bounded trace search and detail
 
 Traces require `APP_READ` with current app visibility and token scope. Trace

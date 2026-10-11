@@ -66,10 +66,17 @@ The organization header selects one organization when the identity belongs to
 more than one. Never use a slug where the API requires a GUID. The token's
 scopes narrow the user's RBAC grants; requests must pass both checks.
 
-Current API-token scopes are `read:apps`, `write:apps`, `read:clusters`,
-`agent-env-spec:write`, `secret:read`, `secret:write`, `mcp:read`,
-`mcp:dispatch`, `mcp:write`, and `admin`. Use the smallest set that supports
-the integration.
+The reviewed server scope catalogue includes `read:apps`, `write:apps`,
+`read:clusters`, `write:clusters`, `manage:clusters`, `manage:auth-users`,
+`write:app-access`, `agent-env-spec:write`, `project:write`, `team:write`,
+`app:onboard`, `secret:read`, `secret:write`, `workflow:write`,
+`workflow:trigger`, `mcp:read`, `mcp:dispatch`, `mcp:write`, and `admin`.
+The selected installation's token catalogue is authoritative; a listed scope
+is not necessarily part of the default device-flow credential. Use the smallest
+set that supports the integration. `astro auth login --scope` selects documented
+CLI profiles (currently `clusters`), not an arbitrary comma-separated scope list.
+Account grants from `astro whoami --permissions --json` are informational and
+cannot establish this credential's ceiling or exact target authority.
 
 ## GraphQL request
 
@@ -114,6 +121,35 @@ routes still define payloads imperatively, so route introspection would publish
 names without truthful request, response, and authorization schemas. REST
 OpenAPI will be generated as those endpoints adopt shared typed contracts.
 
+## Native model connection operations
+
+Compatible servers advertising `models.bedrock_connections` expose bounded
+`bedrockModelSources` and exact `bedrockModelSource` reads, with separate
+installation/operator `bedrockModelConnectionSupport` and exact-placement
+`bedrockModelConnectionAction` admission. `registerBedrockModelConnection`,
+`updateBedrockModelConnection` and `unregisterBedrockModelConnection` manage a
+local existing-source connection record, returning the existing
+`ClusterModelDeploymentMutationResult` envelope. They do not allocate or delete
+native AWS model resources. Every write requires current hosting authority and
+reviewed target versions/source identity; registration has no generic GraphQL
+idempotency guarantee. See [native model connections](../guides/native-model-connections.md)
+for the read-only CLI documents, binding and reconciliation boundaries.
+
+`models.native_connection_metadata` adds `ClusterModelDeployment.nativeConnection`
+to inventory and detail reads under their existing permissions. Its family and
+source-kind enums distinguish Bedrock foundation models/inference profiles,
+Vertex Endpoints, Foundry deployments and unknown native records. The
+`NativeConnectionSource` union carries provider-specific metadata; a null source
+with `UNAVAILABLE` preserves the native distinction. Local hosted records return
+null for `nativeConnection`.
+
+Existing Bedrock records populate this projection. The Vertex/Foundry union
+types do not implement adoption or app connection operations. Invocation access
+remains `UNKNOWN`; resource and reviewed-source fingerprints are metadata hashes,
+not ownership or inference proofs. This marker is independent of the Bedrock
+implementation marker and default-off runtime flag. See the native connection
+guide's typed query for the exact fields.
+
 ## Compatibility
 
 - Query server capabilities before assuming an optional module exists.
@@ -128,12 +164,82 @@ There is no single catch-all REST/OpenAPI surface for control-plane CRUD. Use
 GraphQL unless a documented workflow explicitly names a REST, SSE, or WebSocket
 route. This avoids depending on internal Django paths.
 
+## Browser elevation and bearer admission
+
+A compatible server can require recent authentication for sensitive browser
+mutations. Handle `STEP_UP_REQUIRED` using its `supportedMethods` and
+`requiresAttestation` fields; a CLI confirmation, account permission list or
+successful metadata read is not that proof. The existing browser-recency gate
+does not apply to API-token calls, which retain their bearer and scoped-grant
+gates. Reviewed workflow reservation, dispatch and recovery additionally refresh
+identity, membership, token ceiling, policy and ownership after lock waits. See the
+[reviewed-start SSO setup](../guides/reviewed-starts.md#browser-sso-setup-for-sensitive-operations)
+for exact callback registration, identity-link and session requirements, time
+limits and refusal recovery. No new capability key or CLI elevation verb is
+assumed for this admission repair.
+
 ## Secrets
 
 Secret-list operations return names, references, and presence metadata. A
 caller needs `secret:read` plus `secret.read` RBAC to reveal a value on the few
 surfaces that support reveal. `secret:write` permits write-through operations,
 not readback. MCP intentionally never exposes secret values.
+
+## Reviewed team membership
+
+The prepared additive contract advertises
+`identity.reviewed_team_membership`. Check the installed server's capability
+list and SDL before requesting it. See [membership setup](../running-an-org.md#manage-people-and-team-membership)
+for the browser flow and remaining-access rules.
+
+| Operation | Purpose |
+|---|---|
+| `astroliftTeamMembershipTeam(teamId, slug)` | Resolve exactly one live, visible team GUID or route slug. |
+| `astroliftTeamMembershipPerson(orgMemberId)` | Read the exact visible organization identity. |
+| `astroliftTeamMembershipsPage(teamId, search, page, pageSize)` | Page a team's roster and direct/inherited/provider provenance. |
+| `astroliftPersonTeamMembershipsPage(orgMemberId, search, page, pageSize)` | Page the person's currently visible teams. |
+| `astroliftTeamMemberCandidatesPage(teamId, search, page, pageSize)` | Select active existing organization members. |
+| `astroliftMembershipTeamsPage(search, page, pageSize)` | Page the caller's manageable team targets. |
+| `astroliftTeamMembershipRolesPage(teamId, search, page, pageSize)` | Page eligible team roles under the current grant ceiling. |
+| `astroliftTeamMembershipReview(teamId, orgMemberId, kind, roleId)` | Review `ADD` or `REMOVE`; return the exact `expectedSource` digest. |
+| `changeAstroliftTeamMembership(input)` | Commit or recover one reviewed direct-membership change. |
+
+For example, save this read-only query as `team-roster.graphql` and GUID variables
+as `team-roster-vars.json`, then use
+`astro api graphql --file team-roster.graphql --vars-file team-roster-vars.json`:
+
+```graphql
+query TeamRoster($team: GUID!) {
+  astroliftTeamMembershipsPage(teamId: $team, page: 1, pageSize: 25) {
+    totalCount page pageSize
+    items {
+      team { id name slug canManageMembers }
+      person { orgMemberId name active }
+      teamMemberId lifecycle canRemove
+      sources { id source scopeKind roleId roleName expired removable }
+    }
+  }
+}
+```
+
+```json
+{"team":"00000000-0000-4000-8000-000000000001"}
+```
+
+The mutation input carries `requestId`, `kind`, `teamId`, `orgMemberId`,
+`expectedSource`, and `roleId` for `ADD`. Obtain the digest from the exact review;
+do not compute it from roster text. Preserve the original UUID and reviewed input
+when recovering a lost reply. Successful `data` distinguishes `committed` from
+`replayed` and returns `changeId`, exact public GUIDs, removed binding GUIDs and
+the original remaining sources. Inspect the standard `ok`/`errors` envelope and
+refresh current membership afterward.
+
+Reads and writes check their concrete team/person visibility. Writes refresh
+credentials, ownership, membership, policy, role ceilings and required browser
+authentication after waits. Replay is confined to the original actor,
+organization, credential and reviewed identity. Neither metadata reads nor the
+advisory `me.teamAccessNavigation`/`team_access` hints establish write authority.
+Existing API-token scope definitions are unchanged.
 
 ## Agent completion callbacks
 
@@ -229,3 +335,70 @@ and scope as well as items. Trusted collector attribution is required before
 trace exposure; a missing collector is not a zero-traffic or successful empty
 response. These read-only queries can be submitted through `astro api graphql`;
 their fields require a compatible server and do not add CLI live/export commands.
+
+## Server-owned cluster keep-alive installation
+
+The prepared `astroliftClusterAgentInstallReview(clusterId)`,
+`installClusterAgent(input)` and `astroliftClusterAgentInstall(installId)` APIs
+review an exact registered cluster and return version/source proof. Installation
+requires unchanged `expectedVersion` and `expectedSource`, reserves an original
+request UUID and returns metadata-only installation status. They require `cluster.manage`, current
+organization authority and the credential ceiling; shared platform clusters
+retain their platform-operator gate. No new discovery capability is assumed.
+Check the actual installation schema before use.
+
+Read the [server-owned installation guide](../guides/cluster-agent-install.md)
+for private original-request recovery and heartbeat confirmation. Only
+`SUCCEEDED` with `heartbeatConfirmed: true` establishes installation success;
+queue acceptance and resource writes do not. This prepared API does not install
+log collectors or activate tracing.
+
+### Prepared reviewed log collector API
+
+Compatible future servers expose `astroliftClusterLogCollectorReview`,
+`astroliftInstallClusterLogCollector` and
+`astroliftClusterLogCollectorOperation`. Public capability
+`clusters.reviewed_log_collector_install` describes API presence, not grants or
+health. All target operations require scoped `cluster.manage`. Review returns an
+unattached candidate reader policy; original private request recovery and
+post-pod-loss activation are described in the
+[collector installation guide](../guides/cluster-log-collector.md).
+
+## Admin model hosting and source metadata
+
+[Model hosting](../guides/model-hosting.md) separates catalogue discovery,
+organization hosting authority, exact repository access, license review,
+operator-certified CPU/GPU runtime admission and recorded readiness. Compatible
+servers expose `modelHostingAction`, bounded `huggingFaceConnectionsPage`,
+`clusterModelSourceAccess` and independent local-artifact metadata/import APIs.
+Connection reads are metadata-only; the UI submits an HF token through a
+write-only field and the server stores it encrypted. Local upload authorizations
+are private capabilities, distinct from immutable manifest metadata. Hosting
+requires an active installation Super-admin and freshly admitted credentials;
+organization or team administration alone does not grant hosting authority.
+Model source/configuration and cluster runtime writes keep that same operator
+gate. App connections use separate scoped app authority and organization policy.
+API availability proves neither source access nor a configured object
+store/hydrator or successful model launch.
+
+`clusterModelUpdateAdmission` and `updateClusterModel` review the exact stored
+source and deployment version before changing hosting settings. Shared models
+accept independently admitted app connections; dedicated models restrict them
+to the selected app's environments while remaining organization-owned.
+`astroliftModelSubscriptionMetrics` reads one authenticated subscription under
+current `app.read_metrics` and organization visibility. Its declared placement
+and subscription identities must match. It exposes measured traffic, accepted
+ASGI response bytes and request duration; token use and cost are unsupported.
+Use `models.authenticated_subscription_metrics` for API discovery and the hosting
+guide's exact read-only query. A capability marker does not grant app access.
+
+`models.connection_approvals` advertises policy-governed connection intake.
+`modelConnectionTargetsPage` and `modelConnectionAction` return the current
+`AUTO`, `REQUEST` or `DENY` action. `requestModelConnection` stores an idempotent
+reviewed request without connecting the app; reviewers with current `org.update`
+and scoped `app.approve_deploy` can approve or reject. The current requester
+explicitly invokes `finalizeModelConnectionRequest` after approval. It rechecks
+the policy, target versions and distinct live quorum before the subscription is
+created. Organization policy writes use `org.update`; model restrictions retain
+the installation Super-admin hosting gate and only tighten effective policy.
+See the hosting guide for recovery, request versions and stale outcomes.

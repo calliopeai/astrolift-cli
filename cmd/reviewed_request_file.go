@@ -28,6 +28,8 @@ type reviewedStartRequest struct {
 	Ref               string `json:"ref,omitempty"`
 	Revision          string `json:"revision,omitempty"`
 	InputSchemaDigest string `json:"inputSchemaDigest,omitempty"`
+	IntervalSeconds   int    `json:"intervalSeconds,omitempty"`
+	ExpectedSource    string `json:"expectedSource,omitempty"`
 }
 
 func reviewedRequestScope(cmd *cobra.Command, client *api.Client) (string, int, error) {

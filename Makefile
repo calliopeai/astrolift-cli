@@ -57,15 +57,20 @@ vendor-docs:
 	cp "$(DOCS_SRC)/reference/agent-packages.md" "$(DOCS_DST)/agents.md"
 	cp "$(DOCS_SRC)/reference/workflow-toml.md" "$(DOCS_DST)/workflows.md"
 	cp "$(DOCS_SRC)/guides/capabilities.md" "$(DOCS_DST)/capabilities.md"
+	cp "$(DOCS_SRC)/running-an-org.md" "$(DOCS_DST)/organization.md"
 	cp "$(DOCS_SRC)/guides/app-setup.md" "$(DOCS_DST)/app-setup.md"
 	cp "$(DOCS_SRC)/guides/agent-setup.md" "$(DOCS_DST)/agent-setup.md"
 	cp "$(DOCS_SRC)/guides/workflow-setup.md" "$(DOCS_DST)/workflow-setup.md"
 	cp "$(DOCS_SRC)/guides/bounded-workflows.md" "$(DOCS_DST)/bounded-workflows.md"
 	cp "$(DOCS_SRC)/guides/shared-services.md" "$(DOCS_DST)/shared-services.md"
+	cp "$(DOCS_SRC)/guides/model-hosting.md" "$(DOCS_DST)/model-hosting.md"
+	cp "$(DOCS_SRC)/guides/native-model-connections.md" "$(DOCS_DST)/native-models.md"
 	cp "$(DOCS_SRC)/guides/agent-completion-callbacks.md" "$(DOCS_DST)/callbacks.md"
 	cp "$(DOCS_SRC)/guides/environment-actions.md" "$(DOCS_DST)/environment-actions.md"
 	cp "$(DOCS_SRC)/guides/reviewed-starts.md" "$(DOCS_DST)/reviewed-starts.md"
 	cp "$(DOCS_SRC)/guides/preview-targets.md" "$(DOCS_DST)/preview-targets.md"
+	cp "$(DOCS_SRC)/guides/cluster-log-collector.md" "$(DOCS_DST)/cluster-log-collector.md"
+	cp "$(DOCS_SRC)/guides/cluster-agent-install.md" "$(DOCS_DST)/cluster-agent-install.md"
 	cp "$(DOCS_SRC)/guides/logs-traces.md" "$(DOCS_DST)/logs-traces.md"
 	cp "$(DOCS_SRC)/guides/workload-signals.md" "$(DOCS_DST)/workload-signals.md"
 	cp "$(DOCS_SRC)/guides/domains-dns.md" "$(DOCS_DST)/domains.md"
@@ -74,7 +79,7 @@ vendor-docs:
 	cp "$(DOCS_SRC)/llms.txt" "$(DOCS_DST)/llms.txt"
 
 vendor-docs-check:
-	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md capabilities.md app-setup.md agent-setup.md workflow-setup.md bounded-workflows.md shared-services.md callbacks.md environment-actions.md reviewed-starts.md preview-targets.md logs-traces.md workload-signals.md domains.md email-delivery.md install-alert-mail.md llms.txt; do \
+	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md capabilities.md organization.md app-setup.md agent-setup.md workflow-setup.md bounded-workflows.md shared-services.md model-hosting.md native-models.md callbacks.md environment-actions.md reviewed-starts.md preview-targets.md cluster-agent-install.md cluster-log-collector.md logs-traces.md workload-signals.md domains.md email-delivery.md install-alert-mail.md llms.txt; do \
 		test -s "$(DOCS_DST)/$$file" || { echo "missing $(DOCS_DST)/$$file — run \`make vendor-docs\`"; exit 1; }; \
 	done
 	@if [ -d "$(DOCS_SRC)" ]; then \
@@ -88,15 +93,20 @@ vendor-docs-check:
 			"reference/agent-packages.md:agents.md" \
 			"reference/workflow-toml.md:workflows.md" \
 			"guides/capabilities.md:capabilities.md" \
+			"running-an-org.md:organization.md" \
 			"guides/app-setup.md:app-setup.md" \
 			"guides/agent-setup.md:agent-setup.md" \
 			"guides/workflow-setup.md:workflow-setup.md" \
 			"guides/bounded-workflows.md:bounded-workflows.md" \
 			"guides/shared-services.md:shared-services.md" \
+			"guides/model-hosting.md:model-hosting.md" \
+			"guides/native-model-connections.md:native-models.md" \
 			"guides/agent-completion-callbacks.md:callbacks.md" \
 			"guides/environment-actions.md:environment-actions.md" \
 			"guides/reviewed-starts.md:reviewed-starts.md" \
 			"guides/preview-targets.md:preview-targets.md" \
+			"guides/cluster-log-collector.md:cluster-log-collector.md" \
+			"guides/cluster-agent-install.md:cluster-agent-install.md" \
 			"guides/logs-traces.md:logs-traces.md" \
 			"guides/workload-signals.md:workload-signals.md" \
 			"guides/domains-dns.md:domains.md" \

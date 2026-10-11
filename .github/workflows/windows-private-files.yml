@@ -28,4 +28,4 @@ jobs:
       - name: Test actual file ACLs and saved-login round trips
         run: go test -v ./internal/privatefile ./internal/config
       - name: Test actual reviewed-request consumer recovery
-        run: go test -v ./cmd -run '^(TestPrivateFile|TestReviewedRequestFile|TestReviewedPipeline|TestReviewedWorkflowDefinition|TestReviewedAgent)'
+        run: go test -v ./cmd -run '^(TestPrivateFile|TestReviewedRequestFile|TestReviewedPipeline|TestReviewedWorkflowDefinition|TestReviewedAgent|TestClusterAgentInstall|TestCollector|TestClusterInstall|TestPublicInstallDiscovery)'
