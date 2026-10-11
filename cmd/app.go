@@ -120,6 +120,9 @@ type registeredApp struct {
 	ProjectSlug      string `json:"projectSlug"`
 	K8sNamespace     string `json:"k8sNamespace"`
 	Subdomain        string `json:"subdomain"`
+	// SourceConnectionWarning is selected only from servers advertising
+	// scm.registration_owner_warning; older schemas reject the field.
+	SourceConnectionWarning string `json:"sourceConnectionWarning,omitempty"`
 }
 
 type registerAppResult struct {
@@ -207,14 +210,18 @@ Example:
 			return err
 		}
 
-		const m = `
+		warningField := ""
+		if serverAdvertises(cmd.Context(), client, "scm.registration_owner_warning") {
+			warningField = " sourceConnectionWarning"
+		}
+		m := `
 mutation RegisterApp($input: RegisterAppInput!) {
   registerApp(input: $input) {
     ok
     errors { message }
     data {
       id slug name organizationSlug projectSlug
-      k8sNamespace subdomain
+      k8sNamespace subdomain` + warningField + `
     }
   }
 }`
@@ -249,6 +256,9 @@ mutation RegisterApp($input: RegisterAppInput!) {
 		fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
 		if app.Subdomain != "" {
 			fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
+		}
+		if app.SourceConnectionWarning != "" {
+			fmt.Fprintf(cmd.ErrOrStderr(), "\nWarning: %s\n", app.SourceConnectionWarning)
 		}
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "Next step: run `astro app deploy` to trigger the first deployment.")

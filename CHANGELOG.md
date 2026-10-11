@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `astro app register` prints the server's advisory when no organization GitHub connection is recorded on the source repository's owner. The field is requested only from servers advertising `scm.registration_owner_warning` (platform #2297).
+
 - Embed the native Bedrock connection guide as `native-models`, with `bedrock`
   and `native-model-connections` aliases. Explain default-off global enablement,
   exact source/placement discovery, shared app policy and workload-identity
