@@ -244,6 +244,7 @@ func TestWorkflowCreateSendsBindingsAndInputs(t *testing.T) {
 	var captured gqlRequest
 	srv := gqlServer(t, map[string]interface{}{
 		"createWorkflow": map[string]interface{}{
+			"configurationSaved": true, "schedule": map[string]interface{}{"workflowId": "w-1", "scheduleId": "workflow-w-1", "configurationVersion": 1, "desiredActive": true, "confirmed": true, "observedState": "active"},
 			"ok": true, "errors": []interface{}{},
 			"workflow": map[string]interface{}{
 				"guid": "w-1", "name": "Nightly OODA", "slug": "nightly-ooda",
@@ -732,7 +733,7 @@ func TestWorkflowDeleteHappyPath(t *testing.T) {
 
 	var captured gqlRequest
 	srv := gqlServer(t, map[string]interface{}{
-		"deleteWorkflow": map[string]interface{}{"ok": true, "errors": []interface{}{}},
+		"deleteWorkflow": map[string]interface{}{"ok": true, "errors": []interface{}{}, "configurationSaved": true, "schedule": map[string]interface{}{"workflowId": "w-1", "scheduleId": "workflow-w-1", "configurationVersion": 1, "confirmed": true, "observedState": "missing"}},
 	}, &captured)
 	defer srv.Close()
 
@@ -741,7 +742,7 @@ func TestWorkflowDeleteHappyPath(t *testing.T) {
 	if err := runWorkflowDelete(cmd, context.Background(), client, "nightly-report"); err != nil {
 		t.Fatalf("runWorkflowDelete: %v", err)
 	}
-	if !strings.Contains(captured.Query, "deleteWorkflow(slug: $slug)") {
+	if !strings.Contains(captured.Query, "deleteWorkflow(slug: $slug, workflowId: $workflowId)") {
 		t.Errorf("query did not call deleteWorkflow:\n%s", captured.Query)
 	}
 	if captured.Variables["slug"] != "nightly-report" {

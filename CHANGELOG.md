@@ -22,8 +22,6 @@
   request tuples on recovery and optionally verify status receipts against the
   selected cluster. Slug discovery still requires `cluster.register`.
 
-## 0.11.0 — 2026-10-03
-
 - Install cluster agents through the server's private network using a durable
   reviewed request file. Recover the original operation after lost replies and
   expose exact installation status with authenticated heartbeat confirmation.
@@ -40,6 +38,18 @@
   installation, with no local or broader-credential fallback (#1706, #1696).
 - Embed reviewed collector setup, reader-policy handoff, recovery and bounded
   Linux EC2 coverage guidance in the offline documentation.
+
+## 0.11.2 — 2026-10-04
+
+- Bundle searchable install-alert SMTP setup and test knowledge, including current operator/source review, event preferences and recovery without ambiguous resends (#2289).
+
+## 0.11.1 — 2026-10-04
+
+- Restore managed-domain list/create/update compatibility with older servers. Read the domain version only for new exact-domain diagnostic commands, and omit unavailable versions from legacy JSON output (#2287).
+
+## 0.11.0 — 2026-10-04
+
+- Add exact versioned server-side Domains/DNS diagnostic commands and offline Cloudflare connection and SES email-delivery guides, including safe recovery and explicit read-only/provider limits.
 
 ## 0.10.1 — 2026-10-03
 

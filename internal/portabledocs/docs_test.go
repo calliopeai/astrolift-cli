@@ -22,11 +22,12 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
-		"org":                      "organization",
-		"teams":                    "organization",
-		"membership":               "organization",
-		"bedrock":                  "native-models",
-		"native-model-connections": "native-models",
+		"alert-mail":               "install-alert-mail",
+		"install-smtp":             "install-alert-mail",
+		"dns":                      "domains",
+		"domains-dns":              "domains",
+		"mail":                     "email-delivery",
+		"email":                    "email-delivery",
 		"astrolift-toml":           "manifest",
 		"astrolift.toml":           "manifest",
 		"toml":                     "manifest",
@@ -43,6 +44,11 @@ func TestAliasesResolve(t *testing.T) {
 		"resources":                "shared-services",
 		"callback":                 "callbacks",
 		"completion-callbacks":     "callbacks",
+		"org":                      "organization",
+		"teams":                    "organization",
+		"membership":               "organization",
+		"bedrock":                  "native-models",
+		"native-model-connections": "native-models",
 	} {
 		topic, err := Resolve(alias)
 		if err != nil {
@@ -80,8 +86,8 @@ func TestPortableGuideLinks(t *testing.T) {
 
 func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	topics := Topics()
-	if len(topics) != 25 {
-		t.Fatalf("release snapshot has %d topics, want 25", len(topics))
+	if len(topics) != 28 {
+		t.Fatalf("release snapshot has %d topics, want 28", len(topics))
 	}
 	files, err := Files()
 	if err != nil {
@@ -91,7 +97,7 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 26 || len(entries) != len(files) {
+	if len(files) != 29 || len(entries) != len(files) {
 		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
 	}
 	for _, entry := range entries {

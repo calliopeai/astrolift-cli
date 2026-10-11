@@ -6,6 +6,8 @@ Use these plain-Markdown references as the current public contract. The target i
 
 ## Start here
 
+- [Domains and DNS diagnostics](https://astrolift.dev/guides/domains-dns/): five-step read-only Cloudflare OAuth/token connection, protected zone binding, operator prerequisites, provider records, public delegation, app routing and bounded DNS/network checks
+
 - [Choose a client](https://astrolift.dev/guides/clients/): dashboard, CLI, API, and MCP decision guide
 - [Platform reference](https://astrolift.dev/reference/): reference index and versioning rules
 - [Getting started](https://astrolift.dev/getting-started/): install, authenticate, register, and deploy
@@ -23,6 +25,10 @@ Use these plain-Markdown references as the current public contract. The target i
 - [Workflow TOML](https://astrolift.dev/reference/workflow-toml/): ordered stages, agent binding, outputs, and repo reconciliation
 
 ## Setup and final notifications
+
+- [Install alert SMTP](https://astrolift.dev/guides/install-alert-mail/): private verified-TLS install setup, eight own-event preferences, current operator source review, stable nonce and acceptance-only history; no automatic resend
+
+- [Email delivery](https://astrolift.dev/guides/email-delivery/): exact app-bound SES service, reviewed version and stable request nonce, suppression, content-free cursor history and signed observations; acceptance is not delivery
 
 - [Capabilities](https://astrolift.dev/guides/capabilities/): discover server version, API surface, provider support, and permissions
 - [App setup](https://astrolift.dev/guides/app-setup/): source registration, image deployment, health, and shared bindings

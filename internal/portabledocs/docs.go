@@ -50,15 +50,18 @@ var topics = []Topic{
 	{Slug: "cluster-agent-install", Title: "Install the cluster keep-alive agent through the server", Filename: "cluster-agent-install.md", OnlinePath: "/guides/cluster-agent-install/"},
 	{Slug: "logs-traces", Title: "Read exact environment logs and scoped trace envelopes", Filename: "logs-traces.md", OnlinePath: "/guides/logs-traces/"},
 	{Slug: "workload-signals", Title: "Observe workload metrics with explicit scope and instrumentation", Filename: "workload-signals.md", OnlinePath: "/guides/workload-signals/"},
+	{Slug: "domains", Title: "Connect domains and inspect DNS and routing", Filename: "domains.md", OnlinePath: "/guides/domains-dns/"},
+	{Slug: "email-delivery", Title: "Test exact email-service delivery and read observations", Filename: "email-delivery.md", OnlinePath: "/guides/email-delivery/"},
+	{Slug: "install-alert-mail", Title: "Set up and test install alert SMTP", Filename: "install-alert-mail.md", OnlinePath: "/guides/install-alert-mail/"},
 }
 
 var aliases = map[string]string{
-	"org":                      "organization",
-	"teams":                    "organization",
-	"membership":               "organization",
-	"models":                   "model-hosting",
-	"bedrock":                  "native-models",
-	"native-model-connections": "native-models",
+	"alert-mail":               "install-alert-mail",
+	"install-smtp":             "install-alert-mail",
+	"dns":                      "domains",
+	"domains-dns":              "domains",
+	"mail":                     "email-delivery",
+	"email":                    "email-delivery",
 	"loops":                    "bounded-workflows",
 	"collections":              "bounded-workflows",
 	"apps":                     "app-setup",
@@ -80,6 +83,12 @@ var aliases = map[string]string{
 	"workflow-toml":            "workflows",
 	"control-api":              "api",
 	"command-line":             "cli",
+	"org":                      "organization",
+	"teams":                    "organization",
+	"membership":               "organization",
+	"models":                   "model-hosting",
+	"bedrock":                  "native-models",
+	"native-model-connections": "native-models",
 }
 
 // Topics returns a stable copy sorted in the order users normally encounter
