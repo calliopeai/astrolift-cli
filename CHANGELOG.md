@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `astro app register` prints the server's advisory when no organization GitHub connection is recorded on the source repository's owner. The field is requested only from servers advertising `scm.registration_owner_warning` (platform #2297).
+
 - Add `astro zentinelle status|connect|disconnect` and `astro zentinelle cluster register|unregister|enable|disable|rotate` over the control plane's Zentinelle API, with `--json` and confirmation for the destructive verbs (#113).
 
 - Add `astro box images`, the images environment specs run, and `astro auth status --json`, which reports `capabilities.box.customImage` when the server enforces `agent_box.custom_image` (#86).
