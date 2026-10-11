@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/permissioncatalog"
 	"github.com/spf13/cobra"
 )
 
@@ -239,50 +240,32 @@ func redactPermissionReport(client *api.Client, result *PermsDiagnoseResult) {
 	}
 }
 
-// permsListCmd implements `astro perms list` — raw list of all platform permissions.
+// permsListCmd lists bundled definitions, independently of login or server.
 var permsListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all platform permission strings",
-	Long: `Print every permission string defined by the platform.
-Useful when writing custom roles or debugging access control.`,
+	Short: "List bundled permission definitions from a pinned backend revision",
+	Long: `Print the CLI's offline permission-definition snapshot and source revision.
+The selected server may expose a different catalogue. These definitions are not
+account grants, token scopes or permission to act on any target. Current target,
+credential, environment and policy checks remain the server's responsibility.
+No server connection or authentication is performed. JSON retains permissions[]
+and adds catalogueKind, source, interpretation and requiresTargetCheck metadata.`,
+	Args: cobra.NoArgs,
+	// This offline catalogue must not inherit the root's optional network
+	// release check, even in a stamped release with a GitHub credential.
+	PersistentPostRun: func(_ *cobra.Command, _ []string) {},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// All known permission strings — mirrors core.permissions.Permission in the backend.
-		// Keep this in sync with backend/core/permissions.py.
-		permissions := []string{
-			// Org-level
-			"org.read", "org.update", "org.delete",
-			"org.member.invite", "org.member.remove", "org.member.update_role",
-			"org.team.create", "org.team.delete",
-			"org.project.create",
-			// App-level
-			"app.read", "app.create", "app.update", "app.delete",
-			"app.deploy", "app.rollback", "app.promote",
-			"app.approve_deploy",
-			"app.read_logs", "app.read_metrics",
-			"app.secret.read", "app.secret.write",
-			"app.exec",
-			// Cluster-level
-			"cluster.register", "cluster.update", "cluster.delete",
-			"cluster.observe",
-			// Billing
-			"billing.read", "billing.update",
-			// Audit
-			"audit_log.read", "audit_log.export",
+		catalogue, err := permissioncatalog.Read()
+		if err != nil {
+			return err
 		}
-
-		asJSON, _ := cmd.Flags().GetBool("json")
-		if asJSON {
-			return renderJSON(cmd, map[string]any{"permissions": permissions})
+		if boolFlag(cmd, "json") {
+			return renderJSON(cmd, catalogue)
 		}
-
-		fmt.Fprintln(cmd.OutOrStdout(), "Platform permissions:")
-		for _, p := range permissions {
-			parts := strings.SplitN(p, ".", 2)
-			if len(parts) == 2 {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %-40s  (%s scope)\n", p, parts[0])
-			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", p)
-			}
+		fmt.Fprintf(cmd.OutOrStdout(), "Bundled permission definitions (%s@%s):\n", catalogue.Source.Repository, catalogue.Source.Revision)
+		fmt.Fprintln(cmd.OutOrStdout(), catalogue.Interpretation)
+		for _, permission := range catalogue.Permissions {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", permission)
 		}
 		return nil
 	},

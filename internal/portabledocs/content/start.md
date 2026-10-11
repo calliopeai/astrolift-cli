@@ -33,7 +33,23 @@ astro server add prod https://astrolift.example.com
 astro auth login
 ```
 
-This opens a browser window to complete authentication.
+This opens a browser window to approve the CLI credential. Then select your
+organization and verify the current server and actor:
+
+```bash
+astro org list --json
+astro org use <organization-slug>
+astro whoami --json
+astro status --json
+```
+
+Approval does not create missing organization membership or target grants.
+CLI device-flow authentication and sensitive-operation browser SSO elevation are
+separate. If a browser mutation asks for recent authentication, follow its
+supported method; see [SSO setup and refusal recovery](guides/reviewed-starts.md#browser-sso-setup-for-sensitive-operations).
+Start a new ceremony after a stale or changed-session refusal rather than
+reusing a login link. Keep original workflow/pipeline request files after an
+uncertain write; [reviewed starts](guides/reviewed-starts.md) explains recovery.
 
 ## Create a manifest
 
