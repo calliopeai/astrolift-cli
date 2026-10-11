@@ -265,7 +265,11 @@ var authStatusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		asJSON := boolFlag(cmd, "json")
 		if cfg.CurrentServer == "" && strings.TrimSpace(viper.GetString("server")) == "" {
+			if asJSON {
+				return renderJSON(cmd, authStatusReport{})
+			}
 			fmt.Fprintln(cmd.OutOrStdout(), "Not logged in. No current server.")
 			return nil
 		}
@@ -275,12 +279,28 @@ var authStatusCmd = &cobra.Command{
 		}
 		creds, err := config.LoadCredentials(serverSlug)
 		if err != nil {
+			if asJSON {
+				return renderJSON(cmd, authStatusReport{Server: serverSlug, APIURL: entry.APIURL})
+			}
 			_, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "Server: %s (%s)\nNot logged in.\n", serverSlug, entry.APIURL)
 			return writeErr
 		}
 		state := "valid"
-		if creds.IsExpired(time.Minute) {
+		expired := creds.IsExpired(time.Minute)
+		if expired {
 			state = "EXPIRED — run `astro auth refresh`"
+		}
+		if asJSON {
+			report := authStatusReport{
+				Server: serverSlug, APIURL: entry.APIURL, LoggedIn: true,
+				ExpiresAt: &creds.ExpiresAt, Expired: expired,
+			}
+			if !expired {
+				if client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug")); err == nil {
+					report.Capabilities = boxCapabilities(cmd, cmd.Context(), client, cfg)
+				}
+			}
+			return renderJSON(cmd, report)
 		}
 		fmt.Fprintf(
 			cmd.OutOrStdout(),
