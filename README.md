@@ -496,6 +496,30 @@ astro auth wait --session-id <id>    # blocks until they finish, then stores
 The MCP config references `${ASTROLIFT_TOKEN}` rather than a resolved bearer,
 so the file is safe to commit and works for every agent on the machine.
 
+### Organization skill catalog
+
+`astro onboard --only skills` installs bundled skills into a local workspace.
+The organization catalog that agents use on the platform is separate, and
+`astro skill` manages it against the working org:
+
+```bash
+astro skill list                              # org skills plus the global catalog
+astro skill list --global                     # only the platform's global skills
+astro skill inspect review                    # source, version, tools and content
+astro skill repo register team acme/skills --ref main
+astro skill repo list
+astro skill import https://github.com/acme/skills --branch main
+astro skill repo update team --ref v2 --active false
+astro skill repo remove team --yes            # imported skills stay in the catalog
+```
+
+The ORIGIN column tells the sources apart: `global` for the platform catalog,
+`repo_import owner/repo@ref` for imported entries, and `manual` for skills
+written in the web UI. `import` writes the catalog (matching slugs update in
+place) and the server has no preview, so review the repository first. An
+invalid manifest, such as an unknown tool adapter, imports nothing. Every
+command takes `--json`.
+
 ### Signed task completion callbacks
 
 With a compatible server, configure organization callback destinations and a
