@@ -295,6 +295,40 @@ most 200 visible zones without pagination; a full-sized result emits a warning
 on stderr, and cannot establish a complete install-wide audit. Deletion and
 provisioning repair commands are not exposed here.
 
+## Inspect bundled permission definitions
+
+```bash
+astro perms list
+astro perms list --json
+```
+
+This command works offline without login. It lists a bundled snapshot of
+`core.permissions.Permission` from published backend commit
+`20cfdf2f4a8df9f4a3546f2d4a09b61f4d4e3ee4`, not a query of the selected server.
+JSON preserves the existing `permissions` array of strings and adds
+`catalogueKind: "bundled"`, immutable `source` provenance, `interpretation`, and
+`requiresTargetCheck: true`. Resource names in permission slugs are categories,
+not the ORG/TEAM/PROJECT/APP instance scopes of a grant.
+
+Use the selected server's role editor and actual supported contract when authoring
+roles; a newer, older or extended installation can define different permissions.
+The snapshot is not an account-grant list, bearer-token scope list or action
+preflight. Missing definitions do not authorize a fallback, and listed definitions
+grant nothing. Existing account inspection and diagnostics remain below.
+
+Maintainers refresh the snapshot from an explicitly reviewed immutable backend
+Git tree without importing backend code or contacting an installation:
+
+```bash
+python3 scripts/vendor-permissions.py refresh --source /path/to/astrolift-app \
+  --revision <full-reviewed-backend-commit>
+python3 scripts/vendor-permissions.py check --source /path/to/astrolift-app \
+  --revision <same-full-reviewed-backend-commit>
+```
+
+Commit the generated snapshot with the source-provenance review. A moving `main`
+or `HEAD` is refused; dirty checkout files cannot change the selected Git tree.
+
 ## Inspect identity and account grants
 
 ```bash
@@ -351,6 +385,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `project resources` discovers the selected cluster's full provider catalogue and manages project-owned shared services and their app/agent attachments. |
 | `astro operator` | Cluster, provider, and federation management, plus `domains list/create/update/verify` for organization-owned and visible platform-shared managed DNS zones. Shared writes require platform-operator permission. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
+| `astro operator cluster install-agent` | Install the keep-alive agent through the control plane's private network. Exactly one of `--cluster-id <GUID>` or `--slug` plus `--request-file` is required; a known GUID skips operator inventory discovery, while slug discovery requires `cluster.register`; the private metadata file retains the original cluster/version/provider source proof and request UUID before dispatch. Keep that exact tuple for recovery after lost replies; a missing source proof refuses without replacement. No local kubeconfig or raw agent key is transferred. `agent-install-status --install-id <UUID>` reads the exact operation; optional `--cluster-id` refuses a receipt for another cluster; queued acceptance is distinct from authenticated heartbeat confirmation. Requires the server's `installClusterAgent` API; older servers refuse rather than falling back to local key rotation. |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
 | `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
@@ -970,3 +1005,85 @@ attribution, shared-cluster placement and explicit unavailable states. Existing
 CLI app/preview logs remain historical polling; no live WebSocket or export command
 is added. The paired preview guide documents compatible API live/export proof and
 original-requester/credential downloads, including limits of old name-only artifacts.
+
+### Server-owned cluster keep-alive installation reference
+
+This source snapshot adds the offline `cluster-agent-install` guide for the
+prepared server-owned installation API. Released v0.10.0 lacks this topic and
+the matching remote installation commands. Check actual server schema and CLI
+help before using them.
+
+```sh
+astro docs show cluster-agent-install
+astro docs search 'heartbeat confirmation'
+```
+
+The guide covers exact cluster review, a private original request file,
+credential-bound recovery and metadata-only status. Only `SUCCEEDED` with
+`heartbeatConfirmed: true` establishes installation success. The separate
+`logs-traces` guide explains registered CloudWatch role/external-ID threading,
+collector/read-policy handoff and the future live ingestion/post-pod-loss checks
+required before accepting that setup. Neither guide certifies an installed
+collector, a production heartbeat or tracing activation.
+
+### Reviewed server-owned log collector installation
+
+This prepared source adds three remote commands and an offline
+`cluster-log-collector` guide; released v0.10.0 and the separate v0.10.1
+documentation patch do not contain them.
+
+```sh
+astro operator cluster log-collector-review --cluster-id CLUSTER_GUID --retention-days 30 --json
+astro operator cluster install-log-collector --cluster-id CLUSTER_GUID --request-file collector-install.json --json
+astro operator cluster log-collector-status --operation-id OPERATION_GUID --cluster-id CLUSTER_GUID --json
+astro docs show cluster-log-collector
+```
+
+The CLI requires public handshake `clusters.reviewed_log_collector_install`,
+then authenticated exact target authority. Existing server-owned install-agent
+now similarly requires `clusters.reviewed_agent_install`. API markers grant no
+permission, provider support, node coverage or health. No local kubeconfig or
+credential fallback is used.
+
+Review and installation require exactly one of `--cluster-id` or `--slug`. A known
+canonical nonzero GUID goes directly to the scoped `cluster.manage` API without
+an inventory request. Current membership and credential ceilings still apply;
+shared platform clusters also require the platform-operator gate. Slug discovery retains its `cluster.register` requirement;
+a narrow cluster-scoped credential should use the known GUID. Knowing a GUID
+grants no access. Optional `--cluster-id` on either status command verifies the
+returned target before printing a receipt.
+
+The private request file is exclusively created and flushed before dispatch.
+After lost replies, the same file preserves original server/org/actor, cluster
+GUID/version/source, retention and request UUID. Omitted retention uses the
+stored value; explicit changes and missing source refuse without refreshing or
+replacing the request. An existing slug-selected file can also be recovered with
+its exact stored cluster GUID; its original bytes and tuple remain unchanged.
+Files require POSIX `0600` or Windows protected current-user/
+SYSTEM ACL.
+
+Only ACTIVATED with post-loss proof timestamps confirms collector installation
+and reader activation, not ongoing health or tracing. Reader-policy output is
+unattached; external grants require the connection owner's action. The server
+supports Linux EC2 EKS nodes, not Fargate/Windows collection. Native fixtures
+prove transport/recovery behavior; no production install or ingestion is claimed.
+
+### Shared model hosting knowledge
+
+This source adds the release-matched `model-hosting` offline topic: admin-gated
+Hugging Face connections or immutable local sources, separate access/license/
+CPU-GPU/vLLM 0.15.1 checks, storage and runtime prerequisites, recorded model-server
+readiness and subsequent app subscriptions. Known source IDs grant no authority.
+The CLI has no native model-management verbs; use the guide’s bounded metadata
+queries with existing `astro api graphql`. Token writes use the write-only UI,
+and private upload URLs must remain outside logs and metadata output.
+
+```bash
+astro docs show model-hosting
+astro docs search '"immutable manifest"' --json
+```
+
+The source snapshot now contains 23 topics and 24 canonical mirrored files,
+including `llms.txt`. `astro docs list` and generated help reflect the executing
+binary; this addition does not change the release version or establish a live
+installation’s capability, storage setup or model health.

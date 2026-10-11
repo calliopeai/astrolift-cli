@@ -62,6 +62,15 @@ func (c *Client) Token() string { return c.token }
 // data field into the provided target. The target is the inner shape
 // (i.e. `{"app": {...}}`), not the full envelope.
 func (c *Client) GraphQL(ctx context.Context, query string, variables map[string]interface{}, target interface{}) error {
+	return c.graphQL(ctx, "/app/gql/config/", false, query, variables, target)
+}
+
+// PublicGraphQL discovers installation metadata without sending bearer or tenant credentials.
+func (c *Client) PublicGraphQL(ctx context.Context, query string, variables map[string]interface{}, target interface{}) error {
+	return c.graphQL(ctx, "/app/gql/config/public/", true, query, variables, target)
+}
+
+func (c *Client) graphQL(ctx context.Context, path string, public bool, query string, variables map[string]interface{}, target interface{}) error {
 	body := map[string]interface{}{
 		"query":     query,
 		"variables": variables,
@@ -71,13 +80,23 @@ func (c *Client) GraphQL(ctx context.Context, query string, variables map[string
 		return fmt.Errorf("marshalling graphql body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/app/gql/config/", bytes.NewReader(encoded))
+	req, err := c.newRequest(ctx, http.MethodPost, path, bytes.NewReader(encoded))
 	if err != nil {
 		return err
 	}
+	if public {
+		req.Header.Del("Authorization")
+		req.Header.Del("X-Astrolift-Organization")
+	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	requestClient := c.httpClient
+	if public {
+		clone := *c.httpClient
+		clone.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+		requestClient = &clone
+	}
+	resp, err := requestClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("graphql request: %w", err)
 	}

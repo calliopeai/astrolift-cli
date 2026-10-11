@@ -80,6 +80,113 @@ the request. The API rechecks that revision, schema, enabled state and current
 authority under its dispatch locks. A no-input definition omits `--inputs-file`;
 an input-bearing contract requires a file, including `{}` when defaults suffice.
 
+## Current authority and safe refusal recovery
+
+Review is advisory at the time of the read. Servers containing the reviewed-start
+admission repair refresh the active actor, organization membership, bearer scope
+ceiling and scoped grants after
+reservation, dispatch and recovery locks. Before creating or submitting work,
+it checks the complete locked definition/stage graph, current project/team
+ownership and current agent-cluster region against fresh policy decisions.
+A retained role binding does not authorize a removed member. An active
+platform-operator browser session retains its existing membership exception;
+that exception does not extend to a bearer token without active membership.
+These checks do not cancel an execution that was already accepted before a
+later permission or policy change.
+
+| Observed result | Next step |
+|---|---|
+| `PERMISSION_DENIED` | Confirm the selected organization, active membership, exact target grants and credential ceiling. Reauthentication can refresh a credential; it cannot grant missing authority. |
+| `PRECONDITION` from changed revision/schema or enabled state | Re-read the exact GUID and review its current contract. Preserve an existing request file and reconcile its original identity before considering a separate new request. |
+| `STEP_UP_REQUIRED` in a browser | Follow the server's `supportedMethods` and `requiresAttestation` result. Browser SSO setup is below; a local `--yes` is not elevation. |
+| Lost response, transport error or `dispatchStatus: uncertain` | Retain the original request file and reconcile. Do not infer that no work started or create a replacement blindly. |
+| Recovery refused after authority withdrawal | Preserve the request identity; restore legitimate access or ask an authorized operator to inspect the execution through its own permitted read surface. Recovery does not bypass current authority. |
+
+`astro whoami --permissions --json` reports account grants held somewhere in the
+selected organization. It does not report this token's scope ceiling or permission
+to act on the selected definition. A server capability is API availability, not
+an authorization decision or proof that Temporal and its worker are ready.
+
+## Browser SSO setup for sensitive operations
+
+This section applies to a compatible server with the reviewed SSO admission
+contract. CLI device-flow login yields a bearer credential; it does not elevate
+the separate browser session. The existing elevation decorator checks browser
+session recency when the installation enables `REQUIRE_STEP_UP_AUTH` (default
+`false`); API-token calls use the existing bearer/grant checks instead. Never
+copy browser cookies into CLI configuration or retry a browser ceremony with a
+bearer token. There is no dedicated `astro` SSO-elevation command.
+
+Operators configure the existing OIDC client with `AUTH0_DOMAIN`,
+`AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_CLIENT_SCOPES` including `openid`,
+and optionally `AUTH0_SERVER_METADATA_URL`. Keep the client secret in the
+installation's secret configuration. Register the exact callback URL generated
+by the server's `auth1-elevate-sso-callback` route with that provider. With the
+normal `/app/` API prefix and HTTPS origin, it is:
+
+```text
+https://astrolift.example.com/app/auth1/elevate-sso/callback/
+```
+
+Use the actual API origin and configured route prefix, including the trailing
+slash. A frontend-only origin or localhost callback does not substitute for it.
+The flow requires persisted Django database sessions. Verify the signed ID token's
+configured issuer/audience, requested nonce and fresh `auth_time` are supported
+by the IdP. User-info JSON or matching email is not authentication proof: the
+verified issuer/subject must link to the same active internal actor already
+using that browser session. An unlinked account must use the normal supported
+login/linking procedure first; step-up does not create or link accounts.
+
+The browser uses `auth1-elevate-sso-start` with a safe relative return path, for
+example `/app/auth1/elevate-sso/?return=/app/admin/`. The server requests
+`prompt=login` and `max_age=0`. `STEP_UP_SSO_FRESHNESS_SECONDS` defaults to 60
+seconds and is checked after admission locks. Elevation lasts for the existing
+`STEP_UP_AUTH_TTL_SECONDS`, capped by `STEP_UP_AUTH_MAX_TTL_SECONDS` (both default
+900 seconds). Do not increase a time limit simply to reuse a stale proof.
+
+Concurrent logout, session expiry or key rotation, authentication-hash/password
+changes, account switching and removed/reassigned identity links refuse the
+ceremony. A refusal returns a short `stepUp` code such as `session_mismatch`,
+`identity_mismatch`, `stale_auth_time` or `token_exchange_failed`. Start a new
+ceremony in the current authenticated session; ceremonies started before the
+binding upgrade must also be restarted. Do not log provider bodies, claims,
+state/nonce values or credentials while diagnosing a refusal. Elevation is
+recent authentication, not approval or new target authority.
+
+The API exposes metadata about the current caller's elevation:
+
+```graphql
+query CurrentElevation {
+  astroliftElevationStatus {
+    elevated elevatedUntil secondsRemaining method requiredFor
+  }
+}
+```
+
+This query does not elevate a session. A query through `astro api graphql` uses
+the CLI bearer context, not the browser's session. `requiredFor` is a discovery
+list; enforce the actual mutation envelope rather than treating it as a complete
+admission matrix. When implementing a client, request every public error field
+so version and elevation refusals remain usable:
+
+```graphql
+mutation ReviewedDefinitionStart($input: StartWorkflowDefinitionInput!) {
+  startWorkflowDefinition(input: $input) {
+    ok
+    errors {
+      code message field currentVersion requestedVersion
+      supportedMethods requiresAttestation
+    }
+    data { requestId executionId temporalWorkflowId temporalRunId dispatchStatus }
+  }
+}
+```
+
+Use the stable reviewed request/body described above. This mutation example is a
+contract illustration, not a setup probe: do not submit it merely to test SSO or
+installation availability. Configure and verify an explicitly disposable
+installation before collecting end-to-end acceptance receipts.
+
 ## Keep the request file and reconcile
 
 Before dispatch, the CLI exclusively creates and flushes a private metadata

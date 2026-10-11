@@ -22,28 +22,33 @@ func TestEveryTopicIsEmbedded(t *testing.T) {
 
 func TestAliasesResolve(t *testing.T) {
 	for alias, want := range map[string]string{
-		"alert-mail":           "install-alert-mail",
-		"install-smtp":         "install-alert-mail",
-		"dns":                  "domains",
-		"domains-dns":          "domains",
-		"mail":                 "email-delivery",
-		"email":                "email-delivery",
-		"astrolift-toml":       "manifest",
-		"astrolift.toml":       "manifest",
-		"toml":                 "manifest",
-		"agent-package":        "agents",
-		"agent-packages":       "agents",
-		"workflow":             "workflows",
-		"workflow-toml":        "workflows",
-		"loops":                "bounded-workflows",
-		"collections":          "bounded-workflows",
-		"apps":                 "app-setup",
-		"previews":             "preview-targets",
-		"metrics":              "workload-signals",
-		"services":             "shared-services",
-		"resources":            "shared-services",
-		"callback":             "callbacks",
-		"completion-callbacks": "callbacks",
+		"alert-mail":               "install-alert-mail",
+		"install-smtp":             "install-alert-mail",
+		"dns":                      "domains",
+		"domains-dns":              "domains",
+		"mail":                     "email-delivery",
+		"email":                    "email-delivery",
+		"astrolift-toml":           "manifest",
+		"astrolift.toml":           "manifest",
+		"toml":                     "manifest",
+		"agent-package":            "agents",
+		"agent-packages":           "agents",
+		"workflow":                 "workflows",
+		"workflow-toml":            "workflows",
+		"loops":                    "bounded-workflows",
+		"collections":              "bounded-workflows",
+		"apps":                     "app-setup",
+		"previews":                 "preview-targets",
+		"metrics":                  "workload-signals",
+		"services":                 "shared-services",
+		"resources":                "shared-services",
+		"callback":                 "callbacks",
+		"completion-callbacks":     "callbacks",
+		"org":                      "organization",
+		"teams":                    "organization",
+		"membership":               "organization",
+		"bedrock":                  "native-models",
+		"native-model-connections": "native-models",
 	} {
 		topic, err := Resolve(alias)
 		if err != nil {
@@ -75,6 +80,39 @@ func TestPortableGuideLinks(t *testing.T) {
 	for _, want := range []string{"[Package](agents.md#briefs-and-skills)", "[Callbacks](callbacks.md)", "[Dashboard](https://astrolift.dev/working-with-apps/)", "[Same](#observe)", "[Reference](https://astrolift.dev/reference/)", "[Home](https://astrolift.dev/)", "[Literal](../reference/api.md)"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing portable link %q in %s", want, got)
+		}
+	}
+}
+
+func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
+	topics := Topics()
+	if len(topics) != 28 {
+		t.Fatalf("release snapshot has %d topics, want 28", len(topics))
+	}
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := content.ReadDir("content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 29 || len(entries) != len(files) {
+		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
+	}
+	for _, entry := range entries {
+		if _, ok := files[entry.Name()]; !ok {
+			t.Fatalf("unregistered embedded source: %s", entry.Name())
+		}
+	}
+	body, topic, err := Read("models")
+	if err != nil || topic.Slug != "model-hosting" || topic.OnlinePath != "/guides/model-hosting/" {
+		t.Fatalf("model-hosting resolution: %#v %v", topic, err)
+	}
+	portable := PortableMarkdown(topic, body)
+	for _, href := range []string{"(start.md)", "(capabilities.md)", "(api.md)", "https://docs.vllm.ai/en/v0.15.1/models/supported_models/"} {
+		if !strings.Contains(portable, href) {
+			t.Fatalf("portable hosting guide lacks %s", href)
 		}
 	}
 }

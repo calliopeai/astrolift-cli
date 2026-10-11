@@ -32,10 +32,45 @@ WebSocket or export command.
 Environment log and trace explorers require `observability.exact_environment_logs`
 and `observability.scoped_trace_envelopes`. See [logs and traces](logs-traces.md)
 for persisted placement, bounded reads and trusted trace attribution.
+Model hosting discovery uses `models.admin_hosting`; connection discovery uses
+`models.huggingface_connections`, and local import uses `models.local_artifacts`.
+Using these flows also requires the installed source schema and independently
+configured runtime/storage. Hosting and source/configuration writes require an
+active installation Super-admin with freshly admitted credentials. These markers
+grant no repository, license or cluster authority. See [model hosting](model-hosting.md) for setup, immutable sources,
+separate checks and safe metadata reads through the existing GraphQL CLI.
+Per-app model traffic uses `models.authenticated_subscription_metrics` and
+current app-metrics authority. The runtime must provide its version 2 credential
+mapping and authenticated scrape. Missing data is distinct from measured zero;
+token counts and cost remain unsupported. The hosting guide includes a bounded
+read-only query for one exact app connection.
+`models.runtime_settings` adds typed Super-admin runtime declarations for one
+selected cluster/provider and compute mode. Saving a declaration is separate
+from image building, hardware inspection and model deployment. Check current
+versions and the hosting guide's runtime setup query before editing.
+`models.connection_approvals` adds organization defaults, stricter model
+restrictions, pending requests and distinct-person review. Approval permits the
+current requester to connect; it does not create a subscription. The hosting
+guide explains current permissions, idempotency, stale requests and finalization.
 For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
 unavailable entries. Inspect its reason before selecting a kind and variant.
+
+`models.bedrock_connections` identifies the prepared native Bedrock discovery
+and existing-connection APIs. It does not enable the default-off installation
+setting, grant operator/app authority or prove inference. Check
+`bedrockModelConnectionSupport` before entering setup and the exact placement
+action before discovery/registration. See [native model connections](native-model-connections.md)
+for bounded metadata, immutable sources, workload identity and app policy.
+
+`models.native_connection_metadata` adds the typed `nativeConnection` field to
+the existing model inventory/detail reads. It distinguishes native family,
+source kind, configuration availability and invocation access, with a nullable
+typed source. Local hosted records return null. Unavailable native metadata
+does not become local runtime metadata. Vertex and Foundry source types do not
+enable those providers' connection flows; require their actual operations before
+offering setup. This capability grants no authority or inference guarantee.
 
 `domains.cloudflare_connections` adds encrypted organization-owned Cloudflare
 OAuth/API-token connections and protected read-only zone binding. Require the
@@ -68,6 +103,7 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 |---|---|---|
 | Test the configured install SMTP channel in your own mailbox | `install-alert-mail` | [Install alert SMTP](install-alert-mail.md) |
 | First login and deployment | `start` | [Getting started](../getting-started.md) |
+| Manage people, teams and direct membership | `organization` | [Running an organization](../running-an-org.md#manage-people-and-team-membership) |
 | Inspect domain records, public delegation and app routes | `domains` | [Domains and DNS](domains-dns.md) |
 | Test an exact applied SES service and read delivery observations | `email-delivery` | [Email delivery](email-delivery.md) |
 | Register and operate an application | `app-setup` | [Set up an app](app-setup.md) |
@@ -76,8 +112,11 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Bound revisions, retries and record bodies | `bounded-workflows` | [Bounded workflows](bounded-workflows.md) |
 | Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |
 | Act on an exact environment | `environment-actions` | [Environment actions](environment-actions.md) |
+| Host a shared model and review app subscriptions | `model-hosting` | [Model hosting](model-hosting.md) |
+| Discover and connect an existing Bedrock source | `native-models` | [Native model connections](native-model-connections.md) |
 | Provision once and attach consumers | `shared-services` | [Shared services](shared-services.md) |
 | Review a preview environment by GUID | `preview-targets` | [Exact preview targets](preview-targets.md) |
+| Install the cluster keep-alive agent | `cluster-agent-install` | [Server-owned installation](cluster-agent-install.md) |
 | Read environment logs and traces | `logs-traces` | [Logs and traces](logs-traces.md) |
 | Interpret workload measurements | `workload-signals` | [Workload signals](workload-signals.md) |
 | Receive a final task event | `callbacks` | [Agent completion callbacks](agent-completion-callbacks.md) |
@@ -100,3 +139,62 @@ current public documentation release. Compare `astro version` and `astro
 status --json` before using newly added API fields against an older server.
 Refresh authentication after a newly required token scope is added. A token
 scope narrows RBAC; it cannot grant access the identity does not already have.
+
+`astro perms list --json` reads the permission catalogue bundled with the
+executing CLI, without a server connection or login. Its `source` records the
+backend repository, immutable revision, source path and SHA-256; `permissions`
+remains the array of names. This snapshot does not enumerate the selected
+server's current definitions or prove any account or credential has a grant.
+`requiresTargetCheck: true` means the actual target's current permission, token
+ceiling and approval requirements still apply before an action.
+
+Server-owned cluster-agent installation requires the actual `installClusterAgent`,
+`astroliftClusterAgentInstallReview` and `astroliftClusterAgentInstall` fields plus
+the matching CLI. No new capability key is assumed; see
+[cluster-agent installation](cluster-agent-install.md) for recovery and the
+heartbeat-confirmed success boundary. Registration and API acceptance alone
+do not prove an installed healthy agent.
+
+## Reviewed cluster installation APIs
+
+Compatible prepared server releases advertise `clusters.reviewed_agent_install`
+and `clusters.reviewed_log_collector_install` through the public installation
+handshake. They mean API availability only: target permission, provider support,
+node coverage and ongoing health remain independently checked. These new commands
+are not part of released CLI v0.10.0 or the separate v0.10.1 documentation patch.
+
+Read `astro docs show cluster-agent-install` for original agent-install request
+recovery and heartbeat confirmation, and `astro docs show cluster-log-collector`
+for original collector tuple recovery, reader grants and post-loss activation. See
+[agent installation](cluster-agent-install.md) and
+[collector installation](cluster-log-collector.md).
+
+## Prepare authenticated admission, not just discovery
+
+Before a write, confirm `astro whoami --json`, the selected organization,
+active membership and exact target authority. `astro whoami --permissions --json`
+is an informational account-grant list, not this credential's limits or an action
+matrix. Installation `authMethods` advertises available families; it does not
+prove an OIDC callback/client is configured or a session is elevated. See
+[reviewed-start admission and SSO setup](reviewed-starts.md#current-authority-and-safe-refusal-recovery)
+for fresh post-lock checks, browser setup and keeping original request identity
+after a refusal or uncertain reply. These fixes introduce no new capability key.
+
+For offline setup context, use the existing embedded guides directly:
+
+```bash
+astro docs show app-setup
+astro docs show agent-setup
+astro docs show workflow-setup
+astro docs show shared-services
+astro docs show model-hosting
+astro docs search '"Browser SSO setup"' --json
+astro onboard --only docs --dry-run --json
+astro onboard --only docs
+```
+
+`onboard --only docs` installs release-matched Markdown under `.astrolift/docs`;
+it neither authenticates nor provisions anything. Dry-run reports proposed files,
+and existing files are preserved unless explicitly replaced with `--force`.
+Installing knowledge does not establish connectivity, permissions, source access,
+worker readiness or a completed runtime acceptance test.

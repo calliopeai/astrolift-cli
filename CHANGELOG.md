@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- Embed the native Bedrock connection guide as `native-models`, with `bedrock`
+  and `native-model-connections` aliases. Explain default-off global enablement,
+  exact source/placement discovery, shared app policy and workload-identity
+  reconciliation without treating metadata or IAM configuration as inference.
+
+- Add an offline `organization` guide, with `org`, `teams` and `membership`
+  aliases, covering reviewed membership changes, inherited/provider access,
+  permission ceilings and lost-response recovery. Include the matching additive
+  GraphQL reference in search, export and agent onboarding (platform #2273).
+
+- Add release-matched model-hosting knowledge for admin Hugging Face connections,
+  immutable local imports, pinned vLLM 0.15.1 admission, readiness and app
+  subscriptions. Document safe metadata reads through the existing GraphQL CLI
+  and explain the required authority, configured storage and observed launch.
+
+- Select reviewed agent and collector installations directly with `--cluster-id`
+  for scoped credentials, without operator inventory discovery. Preserve original
+  request tuples on recovery and optionally verify status receipts against the
+  selected cluster. Slug discovery still requires `cluster.register`.
+
+- Install cluster agents through the server's private network using a durable
+  reviewed request file. Recover the original operation after lost replies and
+  expose exact installation status with authenticated heartbeat confirmation.
+  Preserve the original cluster and provider source proof on every replay;
+  refuse a missing source proof without replacing an uncertain request.
+  Show incomplete previous-deployment retirement even after the replacement's
+  heartbeat is confirmed.
+  Refuse local kubeconfig/key-rotation fallback on older servers (#1696).
+
+- Review, install and inspect the exact server-owned CloudWatch collector using
+  a private original request tuple; preserve UUID/version/source/retention after
+  lost replies. Expose post-pod-loss activation separately from ongoing health.
+  Require credential-free public capability discovery before collector or agent
+  installation, with no local or broader-credential fallback (#1706, #1696).
+- Embed reviewed collector setup, reader-policy handoff, recovery and bounded
+  Linux EC2 coverage guidance in the offline documentation.
+
 ## 0.11.2 — 2026-10-04
 
 - Bundle searchable install-alert SMTP setup and test knowledge, including current operator/source review, event preferences and recovery without ambiguous resends (#2289).
