@@ -247,6 +247,10 @@ canonical zone names, proof of control and provisioning are enforced by the API.
 
 ```bash
 astro operator domains list --org acme
+astro operator domains show <domain-id> --org acme
+astro operator domains check <domain-id> --org acme --json
+astro operator domains lookup <domain-id> --hostname api.apps.example.com --record-type A --org acme
+astro operator domains probe <domain-id> --hostname api.apps.example.com --tool https --org acme
 astro operator domains list --org acme --json | jq '.[] | select(.defaultFor == "none")'
 astro operator domains create apps.example.com --dns-driver route53 --org acme
 astro operator domains create previews.example.com --dns-driver route53 --default-for preview_envs --org acme
@@ -376,7 +380,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro agent` | Agent dispatch (`dispatch`, `run`, `ls`, `logs`, `cancel`, `inspect`, `register-repo`, `workloads`, `vnc`, `send`, `input-receipt`) plus sub-resources: `env-spec` (dispatch recipe CRUD) and `secret` (write-through VALUE management for an env-spec's secret refs — `set`/`ls`/`rm`; `set` prefers `--stdin`/hidden prompt, never echoes the value). `dispatch <agent-slug>` runs a registered agent `Workload(kind=agent)` once via `runAstroliftAgent` (`--input` JSON/@file → triggerPayload; `--env-spec <slug>` pins the image+secret packet; `--wait`/`--tail`); a bounded backfill is a payload the agent loops on (e.g. `{"mode":"backfill","batches":N,"batch_size":M}`). `run <definition-guid> --request-file <file> --yes` is the reviewed WorkflowDefinition alias; its optional `--wait` follows the returned exact engine identity. Slug-only starts and literal `--input` are refused; use `--inputs-file` (or `--input @file`). `workloads ls` enumerates the org's registered `kind=agent` workloads, carrying both the slug `dispatch` takes and the GUID `workflow create --bind` takes. `vnc <task-id>` resolves a task to the absolute console URL that serves its live VNC viewer (the stored `vnc_url` is a root-relative WebSocket relay path, not openable). `send <task-id> <input>` queues a follow-up prompt for a task that is already running (`--stdin` for multi-line input; `--json`) — the steering channel: the message is applied at the agent's next turn boundary, so a send confirms queue admission; `deliveredAt` records a delivery claim, not execution. The task must be running, and not every agent runtime can accept a follow-up prompt; one that cannot leaves the message queued rather than dropping it. |
 | `astro apply` | Declarative agent environment specs: `apply -f <file.toml>` reads `[[env_spec]]` tables and makes the platform match. A missing spec is created, a spec that differs is updated field by field with the diff printed, and an unchanged spec is left alone, so a second apply is a no-op. Only keys present in the file are managed. `--dry-run` prints the plan and changes nothing. |
 | `astro box` | Agent-boxes: warm containers an interactive agent session attaches to (`ensure`, `ls`, `rm`, `attach`). Unlike `agent dispatch`, which starts a batch run that ends, a box holds a tmux session open and waits, so the agent survives a dropped connection, an IDE restart, or a closed laptop, and more than one person can watch it. `ensure` is idempotent by design — it is what a button calls, so pressing it twice attaches to the box you already have rather than starting a rival one on a second node; a box that was idle-reaped restarts under the same slug, so a stored address keeps working. Name what to run with `--agent` (a registered agent whose run mode is `persistent`) or `--env-spec` (which is where the image and the secret packet come from). `--idle-timeout` takes `90m`, a number of seconds, or `never`, and is measured from the last pane activity rather than the last attach, so an agent working while you are away keeps its box. `ls` shows warm boxes only (`--all` includes the settled ones, which is how you find out why a box went away). `attach` ensures, waits, and joins the session; detaching leaves the agent running. Note: `attach` does not work yet — the exec relay admits registered apps only and a box is not one, so it fails as a permission error; tracked in calliopeai/astrolift#129. `ensure`, `ls` and `rm` are unaffected. |
-| `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, control, and delete organization workflows. `validate --server` is authoritative for the selected install. `run-manifest <file.toml>` collapses `import` → `create --bind` → activation → `run` into one call, resolving each `agent_dispatch` stage's declared agent against the org's registered workloads (`--dry-run` shows the resolved bindings; `--no-run` leaves the imported definition disabled for review). `import --replace` upserts the org's own definition sharing the manifest's slug instead of always creating a new one: in place when the stage kinds are unchanged, so configured Workflows, bindings and schedules keep working untouched, otherwise as a new version with every configured Workflow repointed to it, or a clear refusal (nothing changed) when a repoint would break one's bindings. Launching enables only the newly imported definition through the platform update API and requires workflow update permission. Use `definition <slug>` to review an import and `definition-enable <slug>` to enable it explicitly; `workflow run` never enables existing definitions implicitly. `run-cancel <slug>` stops an in-flight run — cooperatively by default so a run that owns external resources tears them down, or `--terminate --reason <text>` to hard-kill a wedged one; `--run <guid>` picks a run other than the newest, `--yes` is the confirmation (no prompt), and a run that is already terminal is refused before anything is sent. `run-show <slug>` prints a run stage by stage: order, kind, role, status, attempt, timings, and for a `human_gate` its gate state (pending / approved / rejected / closed) plus the approvers the stage declares, so "waiting on approval, and on whom" is read from the platform. Deciding a gate is not a CLI operation. Repository registration separately reconciles `workflows/**/*.toml`. |
+| `astro workflow` | Author, validate, import, and export workflow TOML; browse/clone definitions; configure, run, watch, control, and delete organization workflows. `validate --server` is authoritative for the selected install. `run-manifest <file.toml>` collapses `import` → `create --bind` → activation → `run` into one call, resolving each `agent_dispatch` stage's declared agent against the org's registered workloads (`--dry-run` shows the resolved bindings; `--no-run` leaves the imported definition disabled for review). `import --replace` upserts the org's own definition sharing the manifest's slug instead of always creating a new one: in place when the stage kinds are unchanged, so configured Workflows, bindings and schedules keep working untouched, otherwise as a new version with every configured Workflow repointed to it, or a clear refusal (nothing changed) when a repoint would break one's bindings. Launching enables only the newly imported definition through the platform update API and requires workflow update permission. Use `definition <slug>` to review an import and `definition-enable <slug>` to enable it explicitly; `workflow run` never enables existing definitions implicitly. `run-cancel <slug>` stops an in-flight run — cooperatively by default so a run that owns external resources tears them down, or `--terminate --reason <text>` to hard-kill a wedged one; `--run <guid>` picks a run other than the newest, `--yes` is the confirmation (no prompt), and a run that is already terminal is refused before anything is sent. `run-show <slug>` prints a run stage by stage: order, kind, role, status, attempt, timings, and for a `human_gate` its gate state (pending / approved / rejected / closed) plus the approvers the stage declares, so "waiting on approval, and on whom" is read from the platform. `gates` pages through eligible pending gates and exposes their exact identities. `gate --run <guid> --stage <guid> --temporal-run <id> --decision approve|reject --yes` relays an explicit user decision. `gate-status --run <guid> --stage <guid>` recovers it read-only after a lost response; requested and recorded outcomes remain distinct. Slug/newest-gate selection and generic-signal fallback are no longer supported. Repository registration separately reconciles `workflows/**/*.toml`. |
 | `astro ci` | CI-mode commands (`deploy`, `status`, `render`) — no interactive prompts; reads token + slug from env. `render` prints the manifests the platform would apply (`astroliftRenderedManifest`) for pre-merge review. |
 | `astro org` / `astro team` / `astro project` | Org-scoped resource management. `project resources` discovers the selected cluster's full provider catalogue and manages project-owned shared services and their app/agent attachments. |
 | `astro operator` | Cluster, provider, and federation management, plus `domains list/create/update/verify` for organization-owned and visible platform-shared managed DNS zones. Shared writes require platform-operator permission. |
@@ -394,6 +398,48 @@ Every command supports `--json` for machine-readable output, plus
 `--server`, `--api-url`, `--token`, `--org`, `--team`, `--project`, `--app`,
 `--no-color`, `--no-prompt`, and `--debug` as global flags. Errors go
 to stderr; data goes to stdout.
+
+### Native workflow schedule recovery
+
+A saved workflow configuration does not prove its Temporal schedule is active or
+removed. Create, update and delete report `configurationSaved` separately from
+`schedule.confirmed`. `--json` preserves the full selected native result even when
+an operation exits nonzero. Keep `schedule.workflowId` on partial failure; recover
+that configuration instead of creating another one.
+
+```bash
+astro workflow create --definition-id <definition-guid> --name "Weekly research" --trigger schedule --cron "0 9 * * 1" --enabled=false --json
+astro workflow update <workflow-guid> --enabled=true --json
+astro workflow schedule inspect <workflow-guid> --json
+astro workflow schedule reconcile <workflow-guid> --expected-version 7 --expected-active=true --json
+astro workflow update <workflow-guid> --enabled=false --json
+astro workflow delete --workflow-id <workflow-guid> --yes --json
+```
+
+Use the `configurationVersion` and `desiredActive` values from your reviewed
+inspection in `reconcile`; both flags are required, including an explicit
+`--expected-active=false` for cleanup. The server rejects stale reviews. Recovery
+updates the existing native schedule and does not start an immediate run. A
+successful active receipt requires `confirmed: true, observedState: "active"`;
+cleanup requires confirmed `"missing"`. `"not_requested"` describes an inactive
+draft with no requested engine operation. `"unknown"`, `"drifted"` and `"paused"`
+are not confirmed success. Inspection exits nonzero when engine observation fails
+but still emits the returned state and recovery identity.
+
+`update` accepts `--enabled`, `--cron` and `--trigger manual|schedule`; omitted
+flags leave the corresponding fields unchanged. An explicit empty `--cron=` clears
+it, subject to native validation. Event activation is not offered here. Existing
+`create --definition <slug>` and `delete <slug> --yes` remain available; supplying
+both a definition GUID and slug asserts that they match. A supplied workflow GUID
+never falls back to slug resolution.
+
+The selected server must support the native schedule lifecycle GraphQL contract,
+including `workflowSchedule`, `reconcileWorkflowSchedule` and configuration
+mutation receipts. An older schema fails explicitly, without dropping receipt
+fields or retrying a mutation. Creation through `run-manifest` uses the same
+receipt contract. Active schedule writes require native trigger authority in
+addition to create/update authority; cleanup after deletion requires delete
+authority. Organization and bearer scope restrictions are enforced by the server.
 
 ### Exact workflow executions
 
@@ -521,6 +567,7 @@ astro docs show manifest
 astro docs show callbacks
 astro docs show capabilities
 astro docs show shared-services
+astro docs show install-alert-mail
 astro docs export ./astrolift-docs
 astro docs man ./man/man1
 ```

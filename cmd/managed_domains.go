@@ -29,6 +29,7 @@ const managedDomainVerifyMutation = `mutation($input: VerifyManagedDomainInput!)
 
 type managedDomain struct {
 	ID                         string          `json:"id"`
+	Version                    int             `json:"version,omitempty"`
 	Zone                       string          `json:"zone"`
 	OrganizationSlug           *string         `json:"organizationSlug"`
 	DNSDriver                  string          `json:"dnsDriver"`
@@ -98,6 +99,7 @@ Provisioning, DNS proof of control and domain selection are enforced by the API.
 		}),
 	}
 	group.AddCommand(list, create, update, verify)
+	addManagedDomainDiagnosticCommands(group)
 	return group
 }
 

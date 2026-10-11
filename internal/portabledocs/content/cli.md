@@ -214,6 +214,17 @@ older build/deploy irrelevant.
 
 ## Offline documentation and man pages
 
+### Domain checks
+
+`astro operator domains list` discovers visible zones; `show <id>` reads an
+exact GUID. `check <id>` reports provider records, public delegation and recorded
+app routes. `lookup <id>` (alias `dig`) accepts `--hostname` and `--record-type`;
+`probe <id>` accepts `--hostname` and `--tool https|ping|traceroute`. Each check
+uses the selected organization/server and a fresh domain version. Observations
+come from the server, and unsupported tools or mismatches remain explicit.
+No diagnostic changes DNS. See [Domains and DNS](../guides/domains-dns.md) or
+`astro docs show domains` for the full contract.
+
 Released binaries embed a release-matched Markdown snapshot:
 
 ```bash
@@ -274,6 +285,8 @@ astro agent callbacks redeliver <task-guid> --json
 astro docs show callbacks
 astro docs show capabilities
 astro docs show organization
+astro docs show domains
+astro docs show email-delivery
 astro docs show app-setup
 astro docs show agent-setup
 astro docs show workflow-setup
@@ -386,3 +399,13 @@ management commands. Submit bounded metadata reads through existing
 `astro api graphql --file query.graphql --vars-file vars.json --org YOUR_ORG --json`.
 See [model hosting](../guides/model-hosting.md) for tested document shapes and
 secret-free selections; do not print connection tokens or upload capabilities.
+
+## Human gate decisions
+
+Use `astro workflow gates --json` for public run/gate GUIDs and the gate's captured
+Temporal identity. `astro workflow gate --run <guid> --stage <guid>
+--temporal-run <id> --decision approve|reject --yes` submits the user's explicit
+choice. `astro workflow gate-status --run <guid> --stage <guid> --json` recovers
+read-only. Requested and recorded outcomes are distinct; retain the exact target
+from JSON/error output after a lost response. The former slug/newest-gate flow
+is replaced. See [workflow setup](../guides/workflow-setup.md).
