@@ -780,6 +780,6 @@ func init() {
 	boxAttachCmd.Flags().StringVar(&boxAttachImage, "image", "", "Container image, when ensuring a one-off box to attach to")
 	boxAttachCmd.Flags().StringVar(&boxAttachIdle, "idle-timeout", "", "Reap after this much inactivity: 90m, seconds, or never")
 
-	boxCmd.AddCommand(boxEnsureCmd, boxListCmd, boxRmCmd, boxAttachCmd)
+	boxCmd.AddCommand(boxEnsureCmd, boxListCmd, boxRmCmd, boxAttachCmd, boxImagesCmd)
 	rootCmd.AddCommand(boxCmd)
 }
