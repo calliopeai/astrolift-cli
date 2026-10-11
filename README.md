@@ -532,6 +532,24 @@ reference; servers that advertise `boxes.custom_image_permission` require the
 false) when the server enforces that permission and the working org is known
 without a prompt. When the key is absent, the answer is unknown, not denied.
 
+### Zentinelle connection and gateways
+
+```bash
+astro zentinelle status                                   # connection and each cluster's gateway
+echo "$CODE" | astro zentinelle connect --url https://zentinelle.example --code-stdin
+astro zentinelle cluster register prod                    # deploys the cluster's model gateway
+astro zentinelle cluster disable prod                     # or enable
+astro zentinelle cluster rotate prod --overlap-seconds 600
+astro zentinelle cluster unregister prod --yes
+astro zentinelle disconnect --yes                         # --force if Zentinelle is unreachable
+```
+
+Each command needs its Zentinelle permission on the server (status needs
+`zentinelle.status_view`; connect and the cluster verbs need connect or gateway
+management) and shows the server's reason when refused. `status` prints
+"Zentinelle is not connected on <server>" when the organization has no
+connection. Every command takes `--json`.
+
 ### Signed task completion callbacks
 
 With a compatible server, configure organization callback destinations and a
