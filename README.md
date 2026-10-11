@@ -520,6 +520,18 @@ place) and the server has no preview, so review the repository first. An
 invalid manifest, such as an unknown tool adapter, imports nothing. Every
 command takes `--json`.
 
+### Box images and the custom-image permission
+
+`astro box images` lists the images the working organization's environment
+specs run, one row per image with the specs that name it. Start one with
+`astro box ensure --env-spec <slug>`. `--image <ref>` starts a box on any other
+reference; servers that advertise `boxes.custom_image_permission` require the
+`agent_box.custom_image` permission for that and refuse otherwise.
+
+`astro auth status --json` reports `capabilities.box.customImage` (true or
+false) when the server enforces that permission and the working org is known
+without a prompt. When the key is absent, the answer is unknown, not denied.
+
 ### Signed task completion callbacks
 
 With a compatible server, configure organization callback destinations and a
