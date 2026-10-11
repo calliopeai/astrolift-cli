@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -181,6 +182,54 @@ func TestRegisterSendsExactManifestOnlyWhenRequested(t *testing.T) {
 			}
 			if !json.Valid(out.Bytes()) {
 				t.Fatalf("invalid JSON response: %s", out.String())
+			}
+		})
+	}
+}
+
+func TestRegisterPrintsOwnerConnectionWarningOnlyFromAdvertisingServers(t *testing.T) {
+	const warning = "No GitHub App installation in this organization is recorded on ragelink."
+	for _, advertised := range []bool{true, false} {
+		t.Run(map[bool]string{true: "advertised", false: "older server"}[advertised], func(t *testing.T) {
+			resetRegisterWireFlags()
+			t.Cleanup(resetRegisterWireFlags)
+			path := filepath.Join(t.TempDir(), "astrolift.toml")
+			if err := os.WriteFile(path, []byte("[app]\nslug = \"brain\"\ndisplay_name = \"Brain\"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			appRegisterFile = path
+			appRegisterProjectID = "project-guid"
+			appRegisterSourceRepo = "ragelink/leo-brain"
+			var registerQuery string
+			srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+				if strings.Contains(req.Query, "astroliftServerInfo") {
+					capabilities := []string{"server_info.handshake"}
+					if advertised {
+						capabilities = append(capabilities, "scm.registration_owner_warning")
+					}
+					return map[string]interface{}{"astroliftServerInfo": map[string]interface{}{"capabilities": capabilities}}
+				}
+				registerQuery = req.Query
+				data := map[string]interface{}{"id": "guid", "slug": "brain", "name": "Brain"}
+				if advertised {
+					data["sourceConnectionWarning"] = warning
+				}
+				return map[string]interface{}{"registerApp": map[string]interface{}{"ok": true, "data": data}}
+			})
+			defer srv.Close()
+			appWireCredentials(t, srv.URL)
+			cmd, _ := appTestCmd()
+			stderr := &bytes.Buffer{}
+			cmd.SetErr(stderr)
+			cmd.SetContext(context.Background())
+			if err := appRegisterCmd.RunE(cmd, nil); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(registerQuery, "sourceConnectionWarning") != advertised {
+				t.Fatalf("warning field selection must follow the capability: %s", registerQuery)
+			}
+			if strings.Contains(stderr.String(), warning) != advertised {
+				t.Fatalf("unexpected warning output: %q", stderr.String())
 			}
 		})
 	}
