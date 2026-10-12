@@ -30,7 +30,8 @@ func (e *GraphQLResponseError) Error() string {
 		if item.Code != "" {
 			messages[i] = item.Code + ": " + messages[i]
 		}
-		if item.Reason != "" && item.Reason != item.Message {
+		// A refusal's message already quotes its reason ("<reason>: <permission>").
+		if item.Reason != "" && !strings.Contains(item.Message, item.Reason) {
 			messages[i] += " (" + item.Reason + ")"
 		}
 	}
