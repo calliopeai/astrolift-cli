@@ -124,3 +124,15 @@ func TestGraphQLMalformedVersionMetadataIsNotInvented(t *testing.T) {
 		t.Fatalf("invented invalid metadata: %v", err)
 	}
 }
+
+func TestGraphQLPermissionRefusalQuotesItsReasonOnce(t *testing.T) {
+	err := &GraphQLResponseError{Errors: []GraphQLError{{
+		Message: "no role binding grants this permission: org.read",
+		Code:    "PERMISSION_DENIED",
+		Reason:  "no role binding grants this permission",
+	}}}
+	want := "graphql errors: PERMISSION_DENIED: no role binding grants this permission: org.read"
+	if got := err.Error(); got != want {
+		t.Fatalf("Error() = %q, want %q", got, want)
+	}
+}
