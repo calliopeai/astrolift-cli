@@ -131,6 +131,8 @@ Secret values can be revealed only when all of the following are true:
 
 Reveal, write, rotate, bundle attach/detach, and delete are separate audited operations. GitHub Actions secrets are a common write-only exception.
 
+Secret reveal and change ask for a confirmation and a fresh sign-in by default. See [Action safety](guides/action-safety.md) for those gates and for approval on destructive deletes.
+
 ## CLI equivalents
 
 Useful discovery commands include:
