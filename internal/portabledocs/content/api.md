@@ -336,6 +336,19 @@ trace exposure; a missing collector is not a zero-traffic or successful empty
 response. These read-only queries can be submitted through `astro api graphql`;
 their fields require a compatible server and do not add CLI live/export commands.
 
+## Permission refusals
+
+A GraphQL error raised by a permission check carries
+`extensions.code = "PERMISSION_DENIED"`, `extensions.reason` and
+`extensions.permission` (the permission key, for example `org.read`). The
+message is unchanged (`<reason>: <permission>`). Mutation envelopes use the
+same `PERMISSION_DENIED` code. Apps and clusters expose `viewerPermissions` so
+clients can offer only what the viewer may do there; the mutation still decides.
+
+Gated sensitive actions can also return `STEP_UP_REQUIRED` or
+`APPROVAL_REQUIRED`, which carries `approvalRequestId`. See
+[Action safety](../guides/action-safety.md).
+
 ## Server-owned cluster keep-alive installation
 
 The prepared `astroliftClusterAgentInstallReview(clusterId)`,
