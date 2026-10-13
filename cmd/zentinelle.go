@@ -56,6 +56,8 @@ var (
 	zentinelleForce      bool
 	zentinelleYes        bool
 	zentinelleOverlapSec int
+	zentinelleGatewayURL string
+	zentinelleClearURL   bool
 )
 
 var zentinelleCmd = &cobra.Command{
@@ -82,6 +84,22 @@ var zentinelleDisconnectCmd = &cobra.Command{
 	Use:   "disconnect",
 	Short: "Revoke the install in Zentinelle and remove every gateway it registered",
 	RunE:  zentinelleRun(runZentinelleDisconnect),
+}
+
+var zentinelleGatewayURLCmd = &cobra.Command{
+	Use:   "gateway-url [<url>]",
+	Short: "Point cluster gateways at a private, in-cluster Zentinelle URL",
+	Long: `Set where the cluster gateways reach Zentinelle when that is not the
+connection's URL: a private, in-cluster address such as
+http://zentinelle.zentinelle.svc.cluster.local:8000. Plain http is accepted
+only for an in-cluster Service name. Running gateways are redeployed with it.
+--clear puts them back on the connection's URL.`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return zentinelleRun(func(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg *config.Config, server string) error {
+			return runZentinelleGatewayURL(cmd, ctx, client, cfg, args)
+		})(cmd, args)
+	},
 }
 
 var zentinelleClusterCmd = &cobra.Command{
@@ -240,6 +258,11 @@ func runZentinelleConnect(cmd *cobra.Command, ctx context.Context, client *api.C
   connectZentinelle(input: $input) { ok errors { code message field } data { ` + zentinelleConnectionFields + ` } }
 }`
 	input := map[string]interface{}{"url": strings.TrimSpace(zentinelleURL), "enrollmentCode": code}
+	// Sent only when asked for, so connect still works against a server
+	// that predates in-cluster gateway URLs (astrolift-app #1905).
+	if u := strings.TrimSpace(zentinelleGatewayURL); u != "" {
+		input["gatewayUrl"] = u
+	}
 	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": input}, &resp); err != nil {
 		return fmt.Errorf("connecting to Zentinelle: %w", err)
 	}
@@ -293,6 +316,62 @@ func runZentinelleDisconnect(cmd *cobra.Command, ctx context.Context, client *ap
 	return nil
 }
 
+func runZentinelleGatewayURL(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg *config.Config, args []string) error {
+	url := ""
+	if len(args) == 1 {
+		url = strings.TrimSpace(args[0])
+	}
+	if (url == "") == !zentinelleClearURL {
+		return errors.New("give the in-cluster URL, or --clear to use the connection's URL")
+	}
+	if _, err := resolveOrg(cmd, ctx, client, cfg); err != nil {
+		return err
+	}
+	var resp struct {
+		Result struct {
+			Ok     bool            `json:"ok"`
+			Errors []mutationError `json:"errors"`
+			Data   *struct {
+				BaseURL    string              `json:"baseUrl"`
+				GatewayURL string              `json:"gatewayUrl"`
+				Clusters   []zentinelleGateway `json:"clusters"`
+			} `json:"data"`
+		} `json:"setZentinelleGatewayUrl"`
+	}
+	mutation := `mutation($input: SetZentinelleGatewayUrlInput!) {
+  setZentinelleGatewayUrl(input: $input) {
+    ok errors { code message field }
+    data { baseUrl gatewayUrl clusters { ` + zentinelleGatewayFields + ` } }
+  }
+}`
+	var value interface{}
+	if url != "" {
+		value = url
+	}
+	if err := client.GraphQL(ctx, mutation, map[string]interface{}{"input": map[string]interface{}{"gatewayUrl": value}}, &resp); err != nil {
+		return fmt.Errorf("setting the Zentinelle gateway URL: %w", err)
+	}
+	if !resp.Result.Ok || resp.Result.Data == nil {
+		return fmt.Errorf("gateway-url refused: %s", firstDeployError(resp.Result.Errors))
+	}
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, resp.Result.Data)
+	}
+	out := cmd.OutOrStdout()
+	d := resp.Result.Data
+	if d.GatewayURL == "" {
+		fmt.Fprintf(out, "Cluster gateways reach Zentinelle at the connection's URL, %s.\n", d.BaseURL)
+	} else {
+		fmt.Fprintf(out, "Cluster gateways reach Zentinelle at %s.\n", d.GatewayURL)
+	}
+	for _, g := range d.Clusters {
+		if !g.Unregistered && g.LastError != "" {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s was not redeployed: %s\n", g.ClusterSlug, g.LastError)
+		}
+	}
+	return nil
+}
+
 func runGatewayMutation(cmd *cobra.Command, ctx context.Context, client *api.Client, field, inputType string, input map[string]interface{}, verb string) error {
 	var resp map[string]struct {
 		Ok     bool               `json:"ok"`
@@ -320,12 +399,14 @@ func init() {
 	zentinelleConnectCmd.Flags().StringVar(&zentinelleURL, "url", "", "Zentinelle base URL")
 	zentinelleConnectCmd.Flags().StringVar(&zentinelleCode, "code", "", "Enrollment code from Zentinelle (prefer --code-stdin)")
 	zentinelleConnectCmd.Flags().BoolVar(&zentinelleCodeStdin, "code-stdin", false, "Read the enrollment code from stdin")
+	zentinelleConnectCmd.Flags().StringVar(&zentinelleGatewayURL, "gateway-url", "", "Where cluster gateways reach Zentinelle, when not at --url (an in-cluster Service)")
+	zentinelleGatewayURLCmd.Flags().BoolVar(&zentinelleClearURL, "clear", false, "Put the gateways back on the connection's URL")
 	zentinelleDisconnectCmd.Flags().BoolVar(&zentinelleForce, "force", false, "Disconnect even if Zentinelle cannot be reached")
 	zentinelleDisconnectCmd.Flags().BoolVar(&zentinelleYes, "yes", false, "Confirm the disconnect")
 	zentinelleUnregisterCmd.Flags().BoolVar(&zentinelleYes, "yes", false, "Confirm the unregister")
 	zentinelleRotateCmd.Flags().IntVar(&zentinelleOverlapSec, "overlap-seconds", 0, "Keep the old credential valid this long (server default when unset)")
 
 	zentinelleClusterCmd.AddCommand(zentinelleRegisterCmd, zentinelleUnregisterCmd, zentinelleEnableCmd, zentinelleDisableCmd, zentinelleRotateCmd)
-	zentinelleCmd.AddCommand(zentinelleStatusCmd, zentinelleConnectCmd, zentinelleDisconnectCmd, zentinelleClusterCmd)
+	zentinelleCmd.AddCommand(zentinelleStatusCmd, zentinelleConnectCmd, zentinelleDisconnectCmd, zentinelleGatewayURLCmd, zentinelleClusterCmd)
 	rootCmd.AddCommand(zentinelleCmd)
 }
