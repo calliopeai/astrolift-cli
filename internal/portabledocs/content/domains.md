@@ -26,9 +26,11 @@ ceilings. Organization administration or staff status alone is insufficient.
 Support flags describe current availability; every read and write rechecks the
 actual actor, session or bearer and exact connection/domain versions.
 
-1. **Provider:** choose Cloudflare. The Route53 option currently opens registered
-   Route53 domain inventory using the installed provider identity; it has no AWS
-   credential form or arbitrary existing-zone adoption flow.
+1. **Provider:** choose Cloudflare. Without a reviewed domain, the Route53 option
+   opens registered Route53 domain inventory using the installed provider
+   identity; it has no AWS credential form. Started from a domain's detail, it
+   lists hosted zones with a cluster's AWS credential instead; see
+   [Route 53 zones and zone certificates](../operators/runbooks.md#bind-a-route-53-hosted-zone-through-a-cluster).
 2. **Connection:** give the connection a name. Use configured **Connect with
    Cloudflare** OAuth in the same selected-org browser session, or paste a
    zone-restricted API token with **Zone Read** and **DNS Read**. The token is
