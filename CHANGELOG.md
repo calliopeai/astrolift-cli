@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `astro zentinelle gateway-url <url>` (and `--clear`) and `astro zentinelle connect --gateway-url` to point cluster gateways at a private, in-cluster Zentinelle address; running gateways are redeployed. The field is sent only when used, so older control planes are unaffected (platform #1905).
+
 - `astro app register` prints the server's advisory when no organization GitHub connection is recorded on the source repository's owner. The field is requested only from servers advertising `scm.registration_owner_warning` (platform #2297).
 
 - Add `astro zentinelle status|connect|disconnect` and `astro zentinelle cluster register|unregister|enable|disable|rotate` over the control plane's Zentinelle API, with `--json` and confirmation for the destructive verbs (#113).
