@@ -13,6 +13,7 @@ func resetZentinelleFlags() {
 	zentinelleURL, zentinelleCode = "", ""
 	zentinelleCodeStdin, zentinelleForce, zentinelleYes = false, false, false
 	zentinelleOverlapSec = 0
+	zentinelleGatewayURL, zentinelleClearURL = "", false
 }
 
 var zentinelleOrg = map[string]interface{}{
@@ -139,5 +140,60 @@ func TestZentinelleGatewayVerbsSendTheResolvedCluster(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Disabled the gateway on prod (active)") {
 		t.Fatalf("output: %s", out.String())
+	}
+}
+
+func TestZentinelleGatewayURLSetsAndClears(t *testing.T) {
+	resetZentinelleFlags()
+	var sent []interface{}
+	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+		if strings.Contains(req.Query, "astroliftOrganizations") {
+			return zentinelleOrg
+		}
+		input := req.Variables["input"].(map[string]interface{})
+		sent = append(sent, input["gatewayUrl"])
+		url, _ := input["gatewayUrl"].(string)
+		return map[string]interface{}{"setZentinelleGatewayUrl": map[string]interface{}{
+			"ok": true, "errors": []interface{}{},
+			"data": map[string]interface{}{
+				"baseUrl": "https://zentinelle.example", "gatewayUrl": url,
+				"clusters": []map[string]interface{}{{"clusterSlug": "prod", "lastError": "boom"}},
+			},
+		}}
+	})
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "token", false)
+
+	cmd, out := appTestCmd()
+	inCluster := "http://zentinelle.zentinelle.svc.cluster.local:8000"
+	if err := runZentinelleGatewayURL(cmd, context.Background(), client, &config.Config{}, []string{inCluster}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), inCluster) {
+		t.Fatalf("output: %s", out.String())
+	}
+
+	zentinelleClearURL = true
+	cmd, out = appTestCmd()
+	if err := runZentinelleGatewayURL(cmd, context.Background(), client, &config.Config{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "connection's URL, https://zentinelle.example") {
+		t.Fatalf("output: %s", out.String())
+	}
+	if len(sent) != 2 || sent[0] != inCluster || sent[1] != nil {
+		t.Fatalf("sent: %#v", sent)
+	}
+}
+
+func TestZentinelleGatewayURLNeedsAURLOrClearButNotBoth(t *testing.T) {
+	resetZentinelleFlags()
+	cmd, _ := appTestCmd()
+	if err := runZentinelleGatewayURL(cmd, context.Background(), nil, &config.Config{}, nil); err == nil {
+		t.Fatal("no URL and no --clear was accepted")
+	}
+	zentinelleClearURL = true
+	if err := runZentinelleGatewayURL(cmd, context.Background(), nil, &config.Config{}, []string{"http://x.svc"}); err == nil {
+		t.Fatal("a URL with --clear was accepted")
 	}
 }
