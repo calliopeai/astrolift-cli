@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `astro app environments list|create` (alias `env`). `create <name> [app] [--cluster <slug>]` adds an environment to a registered app through `createAppEnvironment`, which needs a control plane with platform #2398; `list` works against any. Before, environments came only from registration and repo resync (SteadyMD DV-9250).
+
 - Add `astro zentinelle gateway-url <url>` (and `--clear`) and `astro zentinelle connect --gateway-url` to point cluster gateways at a private, in-cluster Zentinelle address; running gateways are redeployed. The field is sent only when used, so older control planes are unaffected (platform #1905).
 
 - `astro app register` prints the server's advisory when no organization GitHub connection is recorded on the source repository's owner. The field is requested only from servers advertising `scm.registration_owner_warning` (platform #2297).
