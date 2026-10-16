@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.13.0 — 2026-10-16
+
 - `astro app register` detects the build context of a monorepo app. A manifest in a sub-directory (`--manifest-path src/abbott-cgm/astrolift.toml`) builds from that directory with its `Dockerfile`; a manifest that sets `build_context` or `dockerfile_path` itself keeps the repository root, so its own paths apply. Interactively, register shows both and asks `Use this? [Y/n/edit]`; `--build-context` and the new `--dockerfile` (`--dockerfile-path` still works) set them without asking, and `--yes`, `--no-prompt` or a stdin that is not a terminal takes the detection. The confirmed context is always sent, so older control planes store the same one. `--build-context` no longer says "platform_build only": the managed GitHub CI workflow builds from it under `ci_pushed` too (SteadyMD DV-9250, #159).
 
 - Add `astro app set-build-context <app> <path> [--dockerfile <path>]` to change where an existing app is built from, through `updateApp` with the version it read. Apps registered before detection build from the repository root and keep doing so until changed. It prints how to push the CI workflow again (`astro ci setup <app> --skip-webhook --skip-secrets`, which leaves the deploy token alone) (#159).
