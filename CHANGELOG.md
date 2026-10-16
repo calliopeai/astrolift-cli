@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add `astro app manifest push [app]` and `astro app manifest pull [app]` to settle a staged manifest draft without the web Config page. `push` opens a pull request with the draft (`pushManifestToRepo`) and prints its URL; it never writes the top-level `[env]` app secrets to the repo, and a draft that only changes `[env]` has nothing to push (platform #2412). `pull` replaces the draft with the repo's manifest (`syncManifestFromRepo`) and keeps the staged `[env]` secrets (platform #2410). Both prompt unless `--yes` is given and refuse without it under `--no-prompt` (SteadyMD DV-9250, #159).
+
+- README matches the binary: it no longer shows `astro app tokens`, `astro operator provider` or `astro operator federation`, which have no usable commands, or release baselines such as v0.7.2 and v0.10.0. It documents `app environments`, `app manifest` and `ci setup`. A test now fails when the README shows a command or flag this build does not have (#159).
+
 ## 0.12.0 — 2026-10-15
 
 - `astro exec` and `astro app exec` open the auto-resolved pod's primary container. They took the first entry of `containerStatuses`, but the control plane lists init containers first and the kubelet orders the rest by name, so a pod with an init container, or a sidecar named before the app's container, got the wrong one. A session in a finished init container fails inside the cluster and came back as exit code 1 with nothing printed. Auto-resolution no longer falls back to a pod that is not ready and Running; it refuses, naming the app, environment and workload it looked in and listing the pods it found. A non-zero exit is now reported on stderr with its pod and container, and a session that closes without an exit status is an error instead of exit 0. `--environment` and `astro box attach` pick the primary container the same way (SteadyMD DV-9250).
