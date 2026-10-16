@@ -13,13 +13,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/calliopeai/astrolift-cli/internal/config"
+	"github.com/calliopeai/astrolift-cli/internal/privatefile"
 	"github.com/spf13/cobra"
 )
 
@@ -585,7 +585,7 @@ func runAuditExport(cmd *cobra.Command, ctx context.Context, client *api.Client,
 		_, err := fmt.Fprint(cmd.OutOrStdout(), data.Content)
 		return err
 	}
-	if err := os.WriteFile(zentinelleExportOut, []byte(data.Content), 0o600); err != nil {
+	if err := privatefile.Write(zentinelleExportOut, []byte(data.Content)); err != nil {
 		return fmt.Errorf("writing %s: %w", zentinelleExportOut, err)
 	}
 	if boolFlag(cmd, "json") {
