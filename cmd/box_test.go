@@ -499,7 +499,7 @@ func TestResolveBoxPodFallsBackToAgentBoxPods(t *testing.T) {
 			},
 			map[string]interface{}{
 				"name": "agent-box-live", "phase": "Running", "ready": true,
-				"containerStatuses": []interface{}{map[string]interface{}{"name": "agent-box"}},
+				"containerStatuses": []interface{}{map[string]interface{}{"name": "agent-box", "kind": "primary"}},
 			},
 		},
 	}, &captured)
@@ -520,6 +520,38 @@ func TestResolveBoxPodFallsBackToAgentBoxPods(t *testing.T) {
 	}
 	if container != "agent-box" {
 		t.Errorf("container = %q", container)
+	}
+}
+
+// The pod's first container status is not its main container: the control
+// plane lists init containers first and the kubelet orders the rest by name.
+// Attaching to the init container fails once it has finished (DV-9250).
+func TestResolveBoxPodPicksThePrimaryContainer(t *testing.T) {
+	var captured gqlRequest
+	srv := gqlServer(t, map[string]interface{}{
+		"agentBoxPods": []interface{}{
+			map[string]interface{}{
+				"name": "agent-box-live", "phase": "Running", "ready": true,
+				"containerStatuses": []interface{}{
+					map[string]interface{}{"name": "managed-directories", "kind": "init"},
+					map[string]interface{}{"name": "runtime", "kind": "primary"},
+					map[string]interface{}{"name": "workbench", "kind": "sidecar"},
+				},
+			},
+		},
+	}, &captured)
+	defer srv.Close()
+
+	box := &agentBox{Slug: "box-claude-dev", Status: "running"}
+	_, container, err := resolveBoxPod(context.Background(), api.NewClient(srv.URL, "tok", false), box)
+	if err != nil {
+		t.Fatalf("resolveBoxPod: %v", err)
+	}
+	if container != "runtime" {
+		t.Errorf("container = %q, want the primary %q", container, "runtime")
+	}
+	if !strings.Contains(captured.Query, "kind") {
+		t.Errorf("agentBoxPods lookup does not select containerStatuses.kind:\n%s", captured.Query)
 	}
 }
 
