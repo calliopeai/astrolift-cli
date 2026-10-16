@@ -190,6 +190,77 @@ sharp edge, and ingress-nginx has been narrowing `allow-snippet-annotations`.
 If your app needs something the mapping cannot express, that case is worth
 filing rather than working around.
 
+## Ingress and access
+
+```toml
+[ingress]
+class = "nginx"
+
+[ingress.auth]
+kind = "oidc"
+auth_proxy_host = "auth.apps.example.com"
+discovery_url = "https://login.example.com/.well-known/openid-configuration"
+client_id = "astrolift-edge"
+
+[ingress.access]
+groups = ["clinical-ops"]
+users = ["oncall@example.com"]
+```
+
+### `[ingress]` and `[ingress.auth]`
+
+The login gate is a cluster setting, not an app setting. A cluster on the ALB
+ingress class gates with Cognito; other classes gate with the cluster's central
+OIDC proxy. Every managed hostname on a gated cluster sits behind the gate.
+
+`[ingress]` and `[ingress.auth]` are the platform's record of that gate in the
+app's repo. When an operator changes a cluster's gate, Astrolift AI writes the
+matching table into the manifest of every app on that cluster, as a commit on
+the deploy branch, or as a pull request when the branch is protected. The
+renderer reads the cluster's configuration, not this table.
+
+| `kind` | Fields |
+|---|---|
+| `cognito` | `user_pool_arn`, `user_pool_client_id`, `user_pool_domain` |
+| `oidc` | `auth_proxy_host`, `discovery_url`, `client_id`, optional `logout_url` |
+
+`[ingress]` carries `class`, the cluster's ingress class. The OIDC cookie secret
+is never written to the manifest.
+
+Editing or removing `[ingress.auth]` does not change the gate. An app whose
+manifest has no `[ingress.auth]` is still gated while its cluster is, and the
+platform writes the table back the next time the cluster's gate changes. To
+take an app off the gate, change the cluster, not the manifest.
+
+### `[ingress.access]`
+
+`[ingress.access]` narrows who may enter once signed in. `groups` are identity
+provider groups, `users` are email addresses. A signed-in user outside both
+lists gets a no-access page, never the app. Empty lists restrict nobody.
+
+The rule is enforced on clusters using the Envoy edge. On any other edge the
+app is gated by login only, and `astro app access show` says the rule is not
+enforced yet.
+
+`astro app access` manages the same rule from the CLI:
+
+```bash
+astro app access show my-app
+astro app access allow my-app --group clinical-ops
+astro app access deny my-app --user former@example.com
+astro app access clear my-app
+```
+
+| Manifest state | Effect |
+|---|---|
+| `[ingress.access]` declared | The manifest's lists replace the rule on every sync. `show` reports it as set by the manifest; `allow`, `deny` and `clear` are refused |
+| Removed from a manifest that declared it | The rule is cleared on the next sync: every signed-in user may enter. `astro app access` can set a rule again |
+| Never declared | A rule set with `astro app access` or the dashboard is left alone |
+
+`allow` on an open app restricts it to what you name. `allow` and `deny`
+preview who would lose access and ask before saving; pass `--yes` to skip the
+question.
+
 ## Containers
 
 `[[workloads.containers]]` supports `name`, `is_primary`, `image_ref`,
@@ -262,11 +333,47 @@ variant = "rds"
 ```
 
 Choose a non-empty variant advertised by the target cluster catalogue; `rds`
-is an example and requires a configured AWS provider. Managed-service values
-are provisioned outside the manifest parser and exposed
-through stable environment envelopes such as `DATABASE_URL` and `REDIS_URL`.
-Do not put credentials in `[workloads.containers.env]`; use secret bundles,
-managed-service bindings, or agent secret references.
+is an example and requires a configured AWS provider.
+
+Declaring a service provisions it. When the manifest is applied (at
+`astro app register`, and on every later sync from the repo), each entry is
+reconciled into a managed service and a provisioning run starts. The parser
+itself provisions nothing; the reconcile that follows it does, once the app has
+an environment bound to a cluster. Provisioning is asynchronous, so a
+registration can return before the database exists.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `kind` | required | Service kind from the cluster catalogue, such as `postgres` or `redis` |
+| `name` | the kind | Name, unique per kind and environment |
+| `variant` | catalogue default | Provider variant, such as `rds` |
+| `owner_scope` | `app` | `app`: the app owns the service. `project`: a shared project resource the app attaches to |
+| `environment` | `production` | App environment the service belongs to. Registration creates it; a later sync refuses an environment that does not exist |
+| `bind_workloads` | `["*"]` | Workloads that receive the binding |
+| `size` | `small` | `small`, `medium`, `large`, `xlarge` or `custom` |
+| `deletion_policy` | `retain` | `delete` also requires `confirm_delete = true` |
+
+With `owner_scope = "app"` the service belongs to this app and environment, and
+appears under `astro app services`. Removing the entry from the manifest
+deprovisions it; provider data is deleted only under `deletion_policy =
+"delete"`. The manifest cannot take over a service of the same kind and name
+that was created outside it; the sync fails instead.
+
+With `owner_scope = "project"` the entry creates the project resource if the
+project has none of that kind and name, then attaches this app environment to
+it. An existing project resource must match the entry's variant and
+configuration; an app manifest cannot change a shared resource. Creating or
+attaching a project resource this way needs `project.update` on the project,
+the same permission `astro project resources attach` needs. Without it, a
+`--manifest-raw` registration is refused, and other registrations and syncs
+leave those changes out. Removing the entry detaches the app environment; the
+project resource stays. See [Shared services](../guides/shared-services.md) for
+the CLI path.
+
+Bound services reach workloads through stable environment envelopes such as
+`DATABASE_URL` and `REDIS_URL`. Do not put credentials in
+`[workloads.containers.env]`; use secret bundles, managed-service bindings, or
+agent secret references.
 
 ## Kind-specific fields
 
@@ -300,9 +407,16 @@ agents/<slug>/astrolift.toml
 workflows/**/*.toml
 ```
 
-An app manifest's build context starts at its manifest directory. Agent package
-`[package]` rules create a separate chrooted source slice. Use explicit
-`--manifest-path` selections to register only part of a large repo.
+Agent package `[package]` rules create a separate chrooted source slice. Use
+explicit `--manifest-path` selections to register only part of a large repo.
+
+The image build context is an app setting, and its default depends on how the
+app was registered. Whole-repo discovery sets it to the manifest's directory.
+`astro app register --manifest-path apps/web/astrolift.toml` leaves it at the
+repository root unless you also pass `--build-context apps/web`. A container's
+own `build_context` and `dockerfile_path` are read relative to the manifest's
+directory, and apply only while the app-level value is still the default. See
+[Build a monorepo app in CI](../guides/monorepo-ci.md).
 
 ## Validate and render
 
