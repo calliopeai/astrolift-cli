@@ -5,6 +5,19 @@ one resource and attach multiple app environments or agent environment specs.
 Their lifetime is independent of any one consumer. App-owned services have a
 separate list; an app slug does not identify a shared project's resources.
 
+A service comes from the app manifest or from these commands:
+
+| Path | Who owns the service | What creates it |
+|---|---|---|
+| `[[managed_services]]` with `owner_scope = "app"` (the default) | The app, per environment | `astro app register` and every later manifest sync |
+| `[[managed_services]]` with `owner_scope = "project"` | The project | The same manifest sync, which creates the resource if missing and attaches the app environment. Needs `project.update` |
+| `astro project resources add`, then `attach` | The project | The commands on this page. The app's manifest does not change these attachments |
+
+An app-owned service is deprovisioned when the app's manifest drops it. A
+project resource outlives every consumer; dropping it from a manifest only
+detaches that app environment. See the
+[manifest reference](../reference/astrolift-toml.md#managed-services).
+
 The paged metadata and reviewed-action commands below require a CLI release
 containing the managed-resource update and the corresponding installation SDL.
 CLI v0.8.0 predates these additions. Check `astro version`, `astro project
