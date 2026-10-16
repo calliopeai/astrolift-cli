@@ -4,7 +4,7 @@
 // query and the connect, disconnect, register, unregister, gateway on/off and
 // credential rotation mutations. The server gates each on its Zentinelle
 // permission; refusals are passed through with the server's reason. Usage,
-// policy and audit reads arrive when the control plane exposes them.
+// policy and audit reads are in zentinelle_reads.go.
 
 package cmd
 
