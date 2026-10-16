@@ -600,6 +600,25 @@ management) and shows the server's reason when refused. `status` prints
 "Zentinelle is not connected on <server>" when the organization has no
 connection. Every command takes `--json`.
 
+When the working organization is connected, the CLI also reads Zentinelle's
+usage, policies and audit stream. It asks the server once per run; until then
+these commands are hidden from help, and on a server without the reads or an
+organization that is not connected they refuse in one line.
+
+```bash
+astro agent usage triage --since 7d                       # model usage and cost per provider and model
+astro agent usage --project intake                        # or --team, or every agent you may see
+astro policy ls --agent triage                            # policies in effect; or --project
+astro policy show <policy-id> --agent triage
+astro audit tail --since 1h --follow                      # the agent evidence and audit stream
+astro audit export --since 2026-10-01 --until 2026-10-08 --format csv -o audit.csv
+```
+
+Each needs its permission (`zentinelle.usage_view`, `policy_view`,
+`audit_view`, `audit_export`) and covers only the agents you hold it on. The
+server records each export in the audit log. `audit tail --json` prints one
+JSON event per line.
+
 ### Signed task completion callbacks
 
 With a compatible server, configure organization callback destinations and a
