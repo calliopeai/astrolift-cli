@@ -130,6 +130,15 @@ func TestSetBuildModeRefusesMissingAppAndMalformedSuccess(t *testing.T) {
 	}
 }
 
+// noRegisterPrompt keeps a register test off the build-path prompt, which
+// would otherwise read a terminal stdin when go test streams one.
+func noRegisterPrompt(t *testing.T) {
+	t.Helper()
+	prev := promptInteractive
+	promptInteractive = func() bool { return false }
+	t.Cleanup(func() { promptInteractive = prev })
+}
+
 func resetRegisterWireFlags() {
 	appRegisterFile = "astrolift.toml"
 	appRegisterProjectID = ""
@@ -143,6 +152,7 @@ func resetRegisterWireFlags() {
 	appRegisterBuildStrategy = ""
 	appRegisterDockerfile = ""
 	appRegisterBuildContext = ""
+	appRegisterYes = false
 	appRegisterJSON = false
 }
 
@@ -152,6 +162,7 @@ func TestRegisterSendsExactManifestOnlyWhenRequested(t *testing.T) {
 		t.Run(map[bool]string{false: "repository", true: "inline"}[inline], func(t *testing.T) {
 			resetRegisterWireFlags()
 			t.Cleanup(resetRegisterWireFlags)
+			noRegisterPrompt(t)
 			path := filepath.Join(t.TempDir(), "astrolift.toml")
 			if err := os.WriteFile(path, []byte(manifest), 0o600); err != nil {
 				t.Fatal(err)
@@ -193,6 +204,7 @@ func TestRegisterPrintsOwnerConnectionWarningOnlyFromAdvertisingServers(t *testi
 		t.Run(map[bool]string{true: "advertised", false: "older server"}[advertised], func(t *testing.T) {
 			resetRegisterWireFlags()
 			t.Cleanup(resetRegisterWireFlags)
+			noRegisterPrompt(t)
 			path := filepath.Join(t.TempDir(), "astrolift.toml")
 			if err := os.WriteFile(path, []byte("[app]\nslug = \"brain\"\ndisplay_name = \"Brain\"\n"), 0o600); err != nil {
 				t.Fatal(err)

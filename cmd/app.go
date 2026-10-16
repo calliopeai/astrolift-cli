@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -48,6 +51,7 @@ var (
 	appRegisterBuildStrategy string
 	appRegisterDockerfile    string
 	appRegisterBuildContext  string
+	appRegisterYes           bool
 	appRegisterJSON          bool
 )
 
@@ -120,6 +124,8 @@ type registeredApp struct {
 	ProjectSlug      string `json:"projectSlug"`
 	K8sNamespace     string `json:"k8sNamespace"`
 	Subdomain        string `json:"subdomain"`
+	BuildContext     string `json:"buildContext"`
+	DockerfilePath   string `json:"dockerfilePath"`
 	// SourceConnectionWarning is selected only from servers advertising
 	// scm.registration_owner_warning; older schemas reject the field.
 	SourceConnectionWarning string `json:"sourceConnectionWarning,omitempty"`
@@ -145,6 +151,15 @@ the app slug and display name, and calls the registerApp GraphQL mutation.
 Use --manifest-raw to send the local manifest when the platform cannot fetch it
 from the repository (for example, before configuring a source connection).
 
+The build context is detected from --manifest-path: a manifest in a
+sub-directory builds from that directory, with its Dockerfile
+(src/web/astrolift.toml builds src/web). A manifest that sets build_context or
+dockerfile_path itself keeps the repository root, and those paths apply.
+register shows what it detected and asks "Use this? [Y/n/edit]": n registers
+nothing, edit asks for both paths. --build-context and --dockerfile set them
+without asking; --yes, --no-prompt and a non-interactive stdin take the
+detected ones. Change them later with astro app set-build-context.
+
 --build-mode selects who publishes the container image. The platform default
 is ci_pushed, where your CI builds and pushes and the platform only rolls out
 the tag. Use platform_build to hand the repo to the platform and have it build
@@ -155,115 +170,176 @@ in-cluster -- no CI to configure and nothing to build locally:
 
 which implies --build-strategy dockerfile unless you name another builder.
 
-Example:
-  astro app register --project-id <uuid> --source-repo myorg/my-app`,
+Examples:
+  astro app register --project-id <uuid> --source-repo myorg/my-app
+  astro app register -f src/web/astrolift.toml --manifest-path src/web/astrolift.toml \
+    --project-id <uuid> --source-repo myorg/monorepo --yes`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, _, _, err := loadActiveClient(cmd.Context(), false)
 		if err != nil {
 			return err
 		}
+		return runAppRegister(cmd, cmd.Context(), client)
+	},
+}
 
-		raw, err := os.ReadFile(appRegisterFile)
-		if err != nil {
-			return fmt.Errorf("reading %s: %w", appRegisterFile, err)
-		}
-		var manifest appManifest
-		if _, err := toml.Decode(string(raw), &manifest); err != nil {
-			return fmt.Errorf("parsing %s: %w", appRegisterFile, err)
-		}
-		if manifest.App.Slug == "" {
-			return fmt.Errorf("%s: [app] slug is required", appRegisterFile)
-		}
-		if manifest.App.DisplayName == "" {
-			return fmt.Errorf("%s: [app] display_name is required", appRegisterFile)
-		}
+// runAppRegister registers the local manifest through registerApp.
+func runAppRegister(cmd *cobra.Command, ctx context.Context, client *api.Client) error {
+	raw, err := os.ReadFile(appRegisterFile)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", appRegisterFile, err)
+	}
+	var manifest appManifest
+	if _, err := toml.Decode(string(raw), &manifest); err != nil {
+		return fmt.Errorf("parsing %s: %w", appRegisterFile, err)
+	}
+	if manifest.App.Slug == "" {
+		return fmt.Errorf("%s: [app] slug is required", appRegisterFile)
+	}
+	if manifest.App.DisplayName == "" {
+		return fmt.Errorf("%s: [app] display_name is required", appRegisterFile)
+	}
 
-		if appRegisterProjectID == "" {
-			return fmt.Errorf("--project-id is required")
-		}
-		if appRegisterSourceRepo == "" {
-			return fmt.Errorf("--source-repo is required")
-		}
+	if appRegisterProjectID == "" {
+		return fmt.Errorf("--project-id is required")
+	}
+	if appRegisterSourceRepo == "" {
+		return fmt.Errorf("--source-repo is required")
+	}
 
-		input := map[string]interface{}{
-			"projectId":  appRegisterProjectID,
-			"name":       manifest.App.DisplayName,
-			"slug":       manifest.App.Slug,
-			"sourceKind": appRegisterSourceKind,
-			"sourceRepo": appRegisterSourceRepo,
-		}
-		if appRegisterDescription != "" {
-			input["description"] = appRegisterDescription
-		}
-		if appRegisterManifestPath != "" {
-			input["manifestPath"] = appRegisterManifestPath
-		}
-		// Inline registration also works before a source connection is configured.
-		if appRegisterManifestRaw {
-			input["manifestRaw"] = string(raw)
-		}
-		if appRegisterDefaultBranch != "" {
-			input["defaultBranch"] = appRegisterDefaultBranch
-		}
-		if err := applyBuildFlags(input, appRegisterBuildMode, appRegisterBuildStrategy,
-			appRegisterDockerfile, appRegisterBuildContext); err != nil {
-			return err
-		}
+	input := map[string]interface{}{
+		"projectId":  appRegisterProjectID,
+		"name":       manifest.App.DisplayName,
+		"slug":       manifest.App.Slug,
+		"sourceKind": appRegisterSourceKind,
+		"sourceRepo": appRegisterSourceRepo,
+	}
+	if appRegisterDescription != "" {
+		input["description"] = appRegisterDescription
+	}
+	if appRegisterManifestPath != "" {
+		input["manifestPath"] = appRegisterManifestPath
+	}
+	// Inline registration also works before a source connection is configured.
+	if appRegisterManifestRaw {
+		input["manifestRaw"] = string(raw)
+	}
+	if appRegisterDefaultBranch != "" {
+		input["defaultBranch"] = appRegisterDefaultBranch
+	}
+	build, err := registerBuildPaths(cmd, string(raw))
+	if errors.Is(err, errRegisterCancelled) {
+		fmt.Fprintln(cmd.ErrOrStderr(), "Aborted; nothing was registered.")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := applyBuildFlags(input, appRegisterBuildMode, appRegisterBuildStrategy,
+		build.Dockerfile, build.Context); err != nil {
+		return err
+	}
 
-		warningField := ""
-		if serverAdvertises(cmd.Context(), client, "scm.registration_owner_warning") {
-			warningField = " sourceConnectionWarning"
-		}
-		m := `
+	warningField := ""
+	if serverAdvertises(ctx, client, "scm.registration_owner_warning") {
+		warningField = " sourceConnectionWarning"
+	}
+	m := `
 mutation RegisterApp($input: RegisterAppInput!) {
   registerApp(input: $input) {
     ok
     errors { message }
     data {
       id slug name organizationSlug projectSlug
-      k8sNamespace subdomain` + warningField + `
+      k8sNamespace subdomain buildContext dockerfilePath` + warningField + `
     }
   }
 }`
-		vars := map[string]interface{}{"input": input}
-		var result registerAppResult
-		if err := client.GraphQL(cmd.Context(), m, vars, &result); err != nil {
-			return fmt.Errorf("registerApp: %w", err)
+	vars := map[string]interface{}{"input": input}
+	var result registerAppResult
+	if err := client.GraphQL(ctx, m, vars, &result); err != nil {
+		return fmt.Errorf("registerApp: %w", err)
+	}
+	if !result.RegisterApp.Ok {
+		msgs := make([]string, 0, len(result.RegisterApp.Errors))
+		for _, e := range result.RegisterApp.Errors {
+			msgs = append(msgs, e.Message)
 		}
-		if !result.RegisterApp.Ok {
-			msgs := make([]string, 0, len(result.RegisterApp.Errors))
-			for _, e := range result.RegisterApp.Errors {
-				msgs = append(msgs, e.Message)
-			}
-			if len(msgs) > 0 {
-				return fmt.Errorf("registerApp failed: %s", msgs[0])
-			}
-			return fmt.Errorf("registerApp failed (no error detail returned)")
+		if len(msgs) > 0 {
+			return fmt.Errorf("registerApp failed: %s", msgs[0])
 		}
+		return fmt.Errorf("registerApp failed (no error detail returned)")
+	}
 
-		app := result.RegisterApp.Data
-		if appRegisterJSON {
-			enc := json.NewEncoder(cmd.OutOrStdout())
-			enc.SetIndent("", "  ")
-			return enc.Encode(app)
-		}
+	app := result.RegisterApp.Data
+	if appRegisterJSON {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		enc.SetIndent("", "  ")
+		return enc.Encode(app)
+	}
 
-		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "Registered app:   %s (%s)\n", app.Name, app.Slug)
-		fmt.Fprintf(out, "ID:               %s\n", app.ID)
-		fmt.Fprintf(out, "Org:              %s\n", app.OrganizationSlug)
-		fmt.Fprintf(out, "Project:          %s\n", app.ProjectSlug)
-		fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
-		if app.Subdomain != "" {
-			fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "Registered app:   %s (%s)\n", app.Name, app.Slug)
+	fmt.Fprintf(out, "ID:               %s\n", app.ID)
+	fmt.Fprintf(out, "Org:              %s\n", app.OrganizationSlug)
+	fmt.Fprintf(out, "Project:          %s\n", app.ProjectSlug)
+	fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
+	if app.Subdomain != "" {
+		fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
+	}
+	fmt.Fprintf(out, "Build context:    %s\n", app.BuildContext)
+	fmt.Fprintf(out, "Dockerfile:       %s\n", app.DockerfilePath)
+	if app.SourceConnectionWarning != "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "\nWarning: %s\n", app.SourceConnectionWarning)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Next step: run `astro app deploy` to trigger the first deployment.")
+	return nil
+}
+
+// registerBuildPaths decides the build context and Dockerfile to register
+// with. The context is always sent, so an older platform stores the same
+// one; the Dockerfile only when the operator named one, leaving the
+// platform's Dockerfile default (and the manifest's own path) otherwise.
+func registerBuildPaths(cmd *cobra.Command, raw string) (buildPaths, error) {
+	manifestPath := appRegisterManifestPath
+	if manifestPath == "" {
+		manifestPath = "astrolift.toml"
+	}
+	detected, err := detectBuildPaths(manifestPath, raw)
+	if err != nil {
+		return buildPaths{}, fmt.Errorf("parsing %s: %w", appRegisterFile, err)
+	}
+	contextSet := cmd.Flags().Changed("build-context")
+	dockerfileSet := cmd.Flags().Changed("dockerfile") || cmd.Flags().Changed("dockerfile-path")
+	if contextSet || dockerfileSet {
+		chosen := buildPaths{Context: detected.Context}
+		if contextSet {
+			chosen.Context = cleanBuildPath(appRegisterBuildContext)
+			if chosen.Context == "" {
+				return buildPaths{}, fmt.Errorf("--build-context is empty; use . for the repository root")
+			}
 		}
-		if app.SourceConnectionWarning != "" {
-			fmt.Fprintf(cmd.ErrOrStderr(), "\nWarning: %s\n", app.SourceConnectionWarning)
+		if dockerfileSet {
+			chosen.Dockerfile = cleanBuildPath(appRegisterDockerfile)
 		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Next step: run `astro app deploy` to trigger the first deployment.")
-		return nil
-	},
+		return chosen, nil
+	}
+	noPrompt, _ := cmd.Flags().GetBool("no-prompt")
+	if !noPrompt {
+		noPrompt, _ = cmd.Root().PersistentFlags().GetBool("no-prompt")
+	}
+	if appRegisterYes || noPrompt || !promptInteractive() {
+		return buildPaths{Context: detected.Context}, nil
+	}
+	chosen, err := confirmBuildPaths(cmd, detected)
+	if err != nil {
+		return buildPaths{}, err
+	}
+	if chosen.Dockerfile == defaultDockerfile {
+		chosen.Dockerfile = ""
+	}
+	return chosen, nil
 }
 
 // app deploy / rollback / promote / list / show are wired in
@@ -307,8 +383,12 @@ func init() {
 	appRegisterCmd.Flags().StringVar(&appRegisterDefaultBranch, "default-branch", "", "Default branch for deploys (default: the repo default)")
 	appRegisterCmd.Flags().StringVar(&appRegisterBuildMode, "build-mode", "", "Who publishes the image: ci_pushed (platform default), platform_build, none")
 	appRegisterCmd.Flags().StringVar(&appRegisterBuildStrategy, "build-strategy", "", "Builder the platform invokes under --build-mode platform_build: dockerfile (default), buildpacks, nixpacks, off")
-	appRegisterCmd.Flags().StringVar(&appRegisterDockerfile, "dockerfile-path", "", "Dockerfile path within the repo (platform_build only; default: Dockerfile)")
-	appRegisterCmd.Flags().StringVar(&appRegisterBuildContext, "build-context", "", "Build context within the repo (platform_build only; default: .)")
+	appRegisterCmd.Flags().StringVar(&appRegisterBuildContext, "build-context", "", "Build context, relative to the repo root (default: the manifest's directory); used by platform builds and the managed GitHub CI workflow. Skips the prompt")
+	appRegisterCmd.Flags().StringVar(&appRegisterDockerfile, "dockerfile", "", "Dockerfile path, relative to the build context (default: Dockerfile). Skips the prompt")
+	// The flag's earlier name, kept working for existing scripts.
+	appRegisterCmd.Flags().StringVar(&appRegisterDockerfile, "dockerfile-path", "", "Same as --dockerfile")
+	_ = appRegisterCmd.Flags().MarkHidden("dockerfile-path")
+	appRegisterCmd.Flags().BoolVarP(&appRegisterYes, "yes", "y", false, "Use the detected build context and Dockerfile without asking")
 	appRegisterCmd.Flags().BoolVar(&appRegisterJSON, "json", false, "Output the registered app as JSON")
 
 	appCmd.AddCommand(
