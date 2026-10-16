@@ -297,6 +297,9 @@ func TestAuditExportWritesTheFilePrivately(t *testing.T) {
 	}
 	zentinelleReadSince, zentinelleReadUntil, zentinelleExportFmt = "2026-10-01", "2026-10-02", "csv"
 	zentinelleExportOut = filepath.Join(t.TempDir(), "audit.csv")
+	if err := os.WriteFile(zentinelleExportOut, []byte("older export"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := runAuditExport(cmd, context.Background(), client, &config.Config{}, nil); err != nil {
 		t.Fatal(err)
 	}
