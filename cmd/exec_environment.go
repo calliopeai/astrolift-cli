@@ -15,7 +15,7 @@ const execEnvironmentsQuery = `query($app: String!) {
 
 const execEnvironmentPodsQuery = `query($app: String!, $environment: String!) {
   astroliftAppPods(appSlug: $app, environmentName: $environment) {
-    name workload phase ready containerStatuses { name }
+    name workload phase ready containerStatuses { name kind }
   }
 }`
 
@@ -82,6 +82,8 @@ func reviewExecEnvironment(ctx context.Context, client *api.Client) (*execEnviro
 	if err := client.GraphQL(ctx, execEnvironmentPodsQuery, map[string]interface{}{"app": execApp, "environment": name}, &pods); err != nil {
 		return nil, fmt.Errorf("listing selected environment pods: %w", err)
 	}
+	where := fmt.Sprintf("app %q, environment %q (%s)", execApp, name, execEnvironment)
+	var candidates []execPodInfo
 	var selected *execPodInfo
 	for i := range pods.Rows {
 		pod := &pods.Rows[i]
@@ -93,28 +95,36 @@ func reviewExecEnvironment(ctx context.Context, client *api.Client) (*execEnviro
 				selected = pod
 				break
 			}
+			candidates = append(candidates, *pod)
 			continue
 		}
-		if pod.Ready && strings.EqualFold(pod.Phase, "Running") {
+		if pod.readyAndRunning() {
 			selected = pod
 			break
 		}
+		candidates = append(candidates, *pod)
 	}
-	if selected == nil || selected.Workload == "" {
-		return nil, fmt.Errorf("no requested pod/workload in the selected environment; no primary fallback")
+	if selected == nil {
+		return nil, fmt.Errorf("%w; no primary fallback", noExecPodError(where, pods.Rows, candidates))
+	}
+	if selected.Workload == "" {
+		return nil, fmt.Errorf("pod %q in %s reports no workload, which a reviewed target needs; no primary fallback", selected.Name, where)
 	}
 	container := execContainer
-	if container == "" && len(selected.ContainerStatuses) > 0 {
-		container = selected.ContainerStatuses[0].Name
+	if container == "" {
+		container = selected.primaryContainer()
 	}
 	containerFound := false
+	var containers []string
 	for _, c := range selected.ContainerStatuses {
+		containers = append(containers, c.Name)
 		if c.Name == container {
 			containerFound = true
 		}
 	}
 	if !containerFound {
-		return nil, fmt.Errorf("selected container is unavailable; no container fallback")
+		return nil, fmt.Errorf("container %q is not in pod %q (containers: %s); no container fallback",
+			container, selected.Name, strings.Join(containers, ", "))
 	}
 	return requestExecEnvironmentReview(ctx, client, selected.Workload, selected.Name, container, name)
 }
