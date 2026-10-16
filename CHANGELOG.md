@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.12.0 — 2026-10-15
+
 - `astro exec` and `astro app exec` open the auto-resolved pod's primary container. They took the first entry of `containerStatuses`, but the control plane lists init containers first and the kubelet orders the rest by name, so a pod with an init container, or a sidecar named before the app's container, got the wrong one. A session in a finished init container fails inside the cluster and came back as exit code 1 with nothing printed. Auto-resolution no longer falls back to a pod that is not ready and Running; it refuses, naming the app, environment and workload it looked in and listing the pods it found. A non-zero exit is now reported on stderr with its pod and container, and a session that closes without an exit status is an error instead of exit 0. `--environment` and `astro box attach` pick the primary container the same way (SteadyMD DV-9250).
 
 - Add `astro app environments list|create` (alias `env`). `create <name> [app] [--cluster <slug>]` adds an environment to a registered app through `createAppEnvironment`, which needs a control plane with platform #2398; `list` works against any. Before, environments came only from registration and repo resync (SteadyMD DV-9250).
