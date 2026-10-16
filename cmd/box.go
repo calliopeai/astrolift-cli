@@ -97,7 +97,7 @@ const agentBoxPodsQuery = `query($slug: String!) {
     name
     phase
     ready
-    containerStatuses { name }
+    containerStatuses { name kind }
   }
 }`
 
@@ -687,11 +687,7 @@ func resolveBoxPod(ctx context.Context, client *api.Client, box *agentBox) (stri
 			break
 		}
 	}
-	container := ""
-	if len(pick.ContainerStatuses) > 0 {
-		container = pick.ContainerStatuses[0].Name
-	}
-	return pick.Name, container, nil
+	return pick.Name, pick.primaryContainer(), nil
 }
 
 // agentBoxVerbHint names the right verb when an exec target turns out to be an

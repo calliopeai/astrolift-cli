@@ -81,7 +81,7 @@ const astroliftAppPodsQuery = `query($appSlug: String!) {
     workload
     phase
     ready
-    containerStatuses { name }
+    containerStatuses { name kind }
   }
 }`
 
@@ -92,7 +92,91 @@ type execPodInfo struct {
 	Ready             bool   `json:"ready"`
 	ContainerStatuses []struct {
 		Name string `json:"name"`
+		// Kind is init, primary or sidecar, as the control plane classifies
+		// the container against the pod spec.
+		Kind string `json:"kind"`
 	} `json:"containerStatuses"`
+}
+
+// primaryContainer names the container a session opens when --container is
+// not given: the one the control plane classifies as the pod's primary.
+//
+// Not the first entry. The control plane lists init containers first and the
+// kubelet orders the rest by name, so the first entry is an init container
+// or a sidecar whenever the pod has one. Opening a session in a finished init
+// container fails inside the cluster after the WebSocket upgrade, and the
+// relay reports that as a bare exit code 1 (DV-9250).
+//
+// Empty when no container is marked primary, which leaves the choice to
+// Kubernetes: the only container of a single-container pod, or a refusal
+// that names the containers.
+func (p execPodInfo) primaryContainer() string {
+	for _, c := range p.ContainerStatuses {
+		if c.Kind == "primary" {
+			return c.Name
+		}
+	}
+	return ""
+}
+
+// readyAndRunning is the bar auto-resolution holds a pod to. Anything less
+// has no running container to open a session in.
+func (p execPodInfo) readyAndRunning() bool {
+	return p.Ready && strings.EqualFold(p.Phase, "Running")
+}
+
+// describeExecPods lists pods for an error message: name, phase and
+// readiness, so the reader sees why none qualified and has a name to pass
+// to --pod.
+func describeExecPods(pods []execPodInfo) string {
+	const shown = 10
+	parts := make([]string, 0, shown+1)
+	for i, p := range pods {
+		if i == shown {
+			parts = append(parts, fmt.Sprintf("and %d more", len(pods)-shown))
+			break
+		}
+		phase := p.Phase
+		if phase == "" {
+			phase = "phase unknown"
+		}
+		ready := "not ready"
+		if p.Ready {
+			ready = "ready"
+		}
+		parts = append(parts, fmt.Sprintf("%s (%s, %s)", p.Name, phase, ready))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// podCount is "1 pod" or "N pods".
+func podCount(n int) string {
+	if n == 1 {
+		return "1 pod"
+	}
+	return fmt.Sprintf("%d pods", n)
+}
+
+// execPodWorkloads names the workloads that do have pods, for the error that
+// says --workload matched none of them: "workload web" or "workloads web,
+// worker".
+func execPodWorkloads(pods []execPodInfo) string {
+	var names []string
+	seen := map[string]bool{}
+	for _, p := range pods {
+		name := p.Workload
+		if name == "" {
+			name = "(none)"
+		}
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	if len(names) == 1 {
+		return "workload " + names[0]
+	}
+	return "workloads " + strings.Join(names, ", ")
 }
 
 var execCmd = &cobra.Command{
@@ -107,9 +191,12 @@ With no trailing command, runs an interactive shell ('sh'). With a
 '-- <command...>' suffix, runs that command. A TTY is allocated when
 stdin is a terminal; pass --no-tty to force a non-interactive pipe.
 
-The target pod is auto-resolved (first ready/Running pod for the app);
-narrow it with --workload, or pin an exact pod with --pod. Use
---container for multi-container pods. With --environment <GUID>, all selections
+Without --pod the target is auto-resolved: the first ready, Running pod
+for the app in its default environment (narrow it with --workload), and
+that pod's primary container (choose another with --container). When
+nothing qualifies, exec says where it looked and lists the pods it found;
+--pod pins an exact pod, ready or not. A non-zero exit is reported on
+stderr with its pod and container. With --environment <GUID>, all selections
 belong to that exact environment and the API must provide a complete reviewed
 target. The client waits for the server to admit that target before reading stdin.
 Failures never fall back to the primary environment. A lost exit receipt returns
@@ -372,6 +459,15 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 	// process exit status so scripts can branch on it.
 	out := cmd.OutOrStdout()
 	errOut := cmd.ErrOrStderr()
+	target := "pod " + pod
+	if container != "" {
+		target += ", container " + container
+	}
+	// sawOutput separates a command that failed out loud from one that ended
+	// with nothing at all, which is also how a command that never started
+	// looks: Kubernetes reports that on a channel the relay reads for the
+	// exit code and does not forward.
+	sawOutput := false
 	var pendingExit *int
 	finishExit := func(code int) error {
 		if restore != nil {
@@ -379,6 +475,16 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 		}
 		if code != 0 {
 			_ = conn.Close()
+			// Forwarding the status is the contract; doing it without a word
+			// is not. Name where it came from, the way kubectl does.
+			if sawOutput {
+				fmt.Fprintf(errOut, "exec: command exited with code %d (%s)\n", code, target)
+			} else {
+				fmt.Fprintf(errOut, "exec: exit code %d and no output from %s. A command that "+
+					"cannot start in that container (not installed there, or the container is "+
+					"not running) ends the same way; choose another with --container\n",
+					code, target)
+			}
 			execExit(code)
 		}
 		return nil
@@ -389,7 +495,11 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 			if reviewed != nil {
 				return fmt.Errorf("exec session ended before an exit receipt; last input outcome may be unknown; no reconnect or input replay: %w", rerr)
 			}
-			return nil
+			// The relay sends an exit frame whenever the command ends. A
+			// socket that closes first was refused or broken (a permission
+			// recheck on open, an expired session, a failure on the relay's
+			// side), and returning nil here reported that as success.
+			return fmt.Errorf("exec session in %s ended before the command reported an exit status: %w", target, rerr)
 		}
 		var frame struct {
 			Type        string                 `json:"type"`
@@ -423,13 +533,16 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 				startIO()
 			}
 		case "stdout":
+			sawOutput = sawOutput || frame.Data != ""
 			fmt.Fprint(out, frame.Data)
 		case "stderr":
+			sawOutput = sawOutput || frame.Data != ""
 			fmt.Fprint(errOut, frame.Data)
 		case "error":
 			if reviewed != nil {
 				return fmt.Errorf("exec refused: %s", client.RedactDiagnostic(frame.Message))
 			}
+			sawOutput = true
 			fmt.Fprintln(errOut, "exec error: "+frame.Message)
 		case "exit":
 			if reviewed != nil && !started {
@@ -442,16 +555,16 @@ func runExec(cmd *cobra.Command, ctx context.Context, client *api.Client, comman
 	}
 }
 
-// resolveExecPod lists the app's pods and returns the best exec target
-// (name + primary container): a ready/Running pod wins; otherwise the
-// first pod. --workload narrows the set.
+// resolveExecPod lists the app's pods and returns the exec target: the first
+// ready, Running pod (narrowed by --workload) and its primary container.
+// When nothing qualifies, the error says where it looked and what it found.
 func resolveExecPod(ctx context.Context, client *api.Client) (string, string, error) {
 	var resp struct {
 		Pods []execPodInfo `json:"astroliftAppPods"`
 	}
 	if err := client.GraphQL(ctx, astroliftAppPodsQuery,
 		map[string]interface{}{"appSlug": execApp}, &resp); err != nil {
-		return "", "", fmt.Errorf("listing pods: %w", err)
+		return "", "", fmt.Errorf("listing pods for app %q: %w", execApp, err)
 	}
 
 	var candidates []execPodInfo
@@ -459,37 +572,49 @@ func resolveExecPod(ctx context.Context, client *api.Client) (string, string, er
 		if execWorkload != "" && p.Workload != execWorkload {
 			continue
 		}
+		if p.readyAndRunning() {
+			return p.Name, p.primaryContainer(), nil
+		}
 		candidates = append(candidates, p)
 	}
 	if len(candidates) == 0 {
 		// Before reporting an app with no pods, check whether the slug names
 		// an agent-box. A box is not a RegisteredApp, so it resolves to no
-		// pods here and "no running pods" is true about the wrong thing —
-		// someone following older docs would read it as their box being
-		// broken while it sits there running. One query, only on a path that
-		// is already failing.
+		// pods here and "no pods" is true about the wrong thing: someone
+		// following older docs would read it as their box being broken while
+		// it sits there running. One query, only on a path that is already
+		// failing.
 		if hint := agentBoxVerbHint(ctx, client, execApp); hint != "" {
 			return "", "", errors.New(hint)
 		}
-		suffix := ""
-		if execWorkload != "" {
-			suffix = fmt.Sprintf(" (workload %q)", execWorkload)
-		}
-		return "", "", fmt.Errorf("no running pods for app %q%s", execApp, suffix)
 	}
+	// No environmentName: the control plane answers from the app's default
+	// environment, which is where a session without --environment opens.
+	return "", "", noExecPodError(fmt.Sprintf("app %q, default environment", execApp), resp.Pods, candidates)
+}
 
-	pick := candidates[0]
-	for _, p := range candidates {
-		if p.Ready && strings.EqualFold(p.Phase, "Running") {
-			pick = p
-			break
-		}
+// noExecPodError explains why no pod qualified: where the lookup looked,
+// what the control plane listed there, and the state of every candidate.
+// where names the app and environment; the workload filter is added here.
+func noExecPodError(where string, listed, candidates []execPodInfo) error {
+	if len(listed) == 0 {
+		return fmt.Errorf("no pods for %s: the control plane listed none "+
+			"(not deployed there, or the control plane cannot reach its cluster)", where)
 	}
-	container := ""
-	if len(pick.ContainerStatuses) > 0 {
-		container = pick.ContainerStatuses[0].Name
+	if len(candidates) == 0 {
+		return fmt.Errorf("no pods in workload %q for %s: the control plane listed %s, all in %s",
+			execWorkload, where, podCount(len(listed)), execPodWorkloads(listed))
 	}
-	return pick.Name, container, nil
+	if execWorkload != "" {
+		where += fmt.Sprintf(", workload %q", execWorkload)
+	}
+	if execPod != "" {
+		return fmt.Errorf("pod %q is not in %s; the control plane listed %s: %s",
+			execPod, where, podCount(len(candidates)), describeExecPods(candidates))
+	}
+	return fmt.Errorf("no ready, Running pod for %s; the control plane listed %s: %s. "+
+		"To open a session in one anyway, pass --pod <name>",
+		where, podCount(len(candidates)), describeExecPods(candidates))
 }
 
 // execWSURL turns the HTTP API base into the ws(s):// exec endpoint for
