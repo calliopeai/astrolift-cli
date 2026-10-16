@@ -319,7 +319,7 @@ func init() {
 		appTokensCmd, appMembersCmd, appJobsCmd,
 		appEventsCmd, appAuditCmd,
 		appLogsCmd, appExecCmd,
-		appPreviewsCmd, appEnvironmentsCmd,
+		appPreviewsCmd, appEnvironmentsCmd, appManifestCmd,
 	)
 	rootCmd.AddCommand(appCmd)
 }
