@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `astro brain` to set up, host and manage semantic layers (Mimwell brains): `list`, `show`, `status`, `connect`, `create`, `share`, `unshare`, `host-app`, `rebuild`, `substrate` and `delete`. `connect` prints an MCP client config (`--format mcp|claude|env`) with a fresh 15-minute read token and writes it to a 0600 file with `--write`; `create` scaffolds a repository from the verified Mimwell edition, registers it and deploys it, and `--wait` follows it; `share --access editor` grants the app's deployer access and owners are never granted here; `share`, `substrate` and `delete` ask first unless `--yes`. A server older than platform #2424 says so in one line.
+
 ## 0.13.0 — 2026-10-16
 
 - `astro app register` detects the build context of a monorepo app. A manifest in a sub-directory (`--manifest-path src/abbott-cgm/astrolift.toml`) builds from that directory with its `Dockerfile`; a manifest that sets `build_context` or `dockerfile_path` itself keeps the repository root, so its own paths apply. Interactively, register shows both and asks `Use this? [Y/n/edit]`; `--build-context` and the new `--dockerfile` (`--dockerfile-path` still works) set them without asking, and `--yes`, `--no-prompt` or a stdin that is not a terminal takes the detection. The confirmed context is always sent, so older control planes store the same one. `--build-context` no longer says "platform_build only": the managed GitHub CI workflow builds from it under `ci_pushed` too (SteadyMD DV-9250, #159).

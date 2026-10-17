@@ -401,6 +401,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro operator` | Cluster management, plus `domains list/create/update/verify` for organization-owned and visible platform-shared managed DNS zones. Shared writes require platform-operator permission. |
 | `astro cluster bootstrap` | One-shot helm install of the `astrolift-prereqs` chart (cert-manager, ingress, storage, external-dns) against a registered cluster; the bundled chart + per-cloud values are vendored into the binary. |
 | `astro operator cluster install-agent` | Install the keep-alive agent through the control plane's private network. Exactly one of `--cluster-id <GUID>` or `--slug` plus `--request-file` is required; a known GUID skips operator inventory discovery, while slug discovery requires `cluster.register`; the private metadata file retains the original cluster/version/provider source proof and request UUID before dispatch. Keep that exact tuple for recovery after lost replies; a missing source proof refuses without replacement. No local kubeconfig or raw agent key is transferred. `agent-install-status --install-id <UUID>` reads the exact operation; optional `--cluster-id` refuses a receipt for another cluster; queued acceptance is distinct from authenticated heartbeat confirmation. Requires the server's `installClusterAgent` API; older servers refuse rather than falling back to local key rotation. |
+| `astro brain` | Semantic layers (Mimwell brains): `list`, `show`, `status`, `connect`, `create`, `share`, `unshare`, `host-app`, `rebuild`, `substrate` and `delete`, each naming the semantic layer by its app slug. See [Semantic layers](#semantic-layers). |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
 | `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
@@ -618,6 +619,51 @@ Each needs its permission (`zentinelle.usage_view`, `policy_view`,
 `audit_view`, `audit_export`) and covers only the agents you hold it on. The
 server records each export in the audit log. `audit tail --json` prints one
 JSON event per line.
+
+### Semantic layers
+
+A semantic layer is a Mimwell brain registered as an app of kind `mimwell`.
+`astro brain` sets one up, hosts it and manages it. Each command names it by
+its app slug; one you cannot read reads the same as one that does not exist.
+
+```bash
+astro brain list --search acme
+astro brain show acme-brain                               # team, project, environments, shares, hosted apps, substrate
+astro brain connect acme-brain                            # MCP client config with a fresh 15-minute token
+astro brain connect acme-brain --format claude            # a `claude mcp add-json` command
+astro brain connect acme-brain --format env --env staging # BRAIN_MCP_URL, BRAIN_TOKEN_HEADER, BRAIN_TOKEN
+astro brain connect acme-brain --write .acme-brain.mcp.json
+astro brain create acme-brain --project kb --connection acme-gh --repo acme/acme-brain --wait
+astro brain status acme-brain                             # running vs head commit, compile time, last ingest
+astro brain rebuild acme-brain --ingest                   # run knowledge-refresh.yml; its push deploys
+astro brain share acme-brain --team sales --access viewer # or editor: also edits and deploys
+astro brain unshare acme-brain --team sales
+astro brain host-app acme-brain --project kb --image ghcr.io/acme/bot:1 --deploy
+astro brain substrate acme-brain --authority postgres --persistence postgres
+astro brain delete acme-brain --yes                       # archive; the repository is kept
+```
+
+- Run `connect` again to refresh: tokens last 15 minutes. `--write` puts the
+  output in a file of its own with mode 0600 (for `claude --mcp-config`).
+- `create` scaffolds an empty or new repository from the verified Mimwell
+  edition in one commit (`--template-ref` pins an edition), registers it and
+  deploys it (`--no-deploy` to skip). The slug is the client slug plus
+  `-brain`. A GitHub App connection cannot create repositories: create the
+  empty repository first, or use a user OAuth or PAT connection. The
+  substrate flags (`--authority`, `--blobs`, `--vectors`, `--graph`,
+  `--persistence`, `--replicas`, `--image`) choose the Mimwell cell.
+- `share --access editor` is the app's deployer access, and you must hold it
+  yourself. Owners are not granted through `astro brain`. `unshare` stops new
+  read tokens at once; tokens already issued last up to 15 minutes.
+- `share` and `delete` ask first unless `--yes`, and refuse under
+  `--no-prompt` without it. An API token skips the browser step-up, but an
+  approval rule on `brain.share` or `brain.delete` still applies; the CLI
+  prints the approval request it opened.
+- `delete` archives: it scales to zero, drops the semantic layer from the
+  register and revokes every hosted app's binding and token. The repository,
+  databases and volumes are kept, and `restoreApp` brings it back.
+- A server without these operations (older than platform #2424) gets one line
+  saying so.
 
 ### Signed task completion callbacks
 
