@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.14.1 — 2026-10-16
+
+- The offline manifest guide (`astro docs show manifest`) covers `[ingress] max_body_size` and how each edge handles a request body, matching astrolift-docs main. v0.14.0 was tagged but never published: its release build stopped at this docs check, so 0.14.1 is the first release with `astro brain`.
+
 ## 0.14.0 — 2026-10-16
 
 - Add `astro brain` to set up, host and manage semantic layers (Mimwell brains): `list`, `show`, `status`, `connect`, `create`, `share`, `unshare`, `host-app`, `rebuild`, `substrate` and `delete`. `connect` prints an MCP client config (`--format mcp|claude|env`) with a fresh 15-minute read token and writes it to a 0600 file with `--write`; `create` scaffolds a repository from the verified Mimwell edition, registers it and deploys it, and `--wait` follows it; `share --access editor` grants the app's deployer access and owners are never granted here; `share`, `substrate` and `delete` ask first unless `--yes`. A server older than platform #2424 says so in one line.
