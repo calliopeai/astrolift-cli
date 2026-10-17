@@ -112,20 +112,22 @@ type appManifest struct {
 	App struct {
 		Slug        string `toml:"slug"`
 		DisplayName string `toml:"display_name"`
+		ExpiresIn   string `toml:"expires_in"`
 	} `toml:"app"`
 }
 
 // registeredApp is the data portion of AstroliftRegisteredAppMutationResult.
 type registeredApp struct {
-	ID               string `json:"id"`
-	Slug             string `json:"slug"`
-	Name             string `json:"name"`
-	OrganizationSlug string `json:"organizationSlug"`
-	ProjectSlug      string `json:"projectSlug"`
-	K8sNamespace     string `json:"k8sNamespace"`
-	Subdomain        string `json:"subdomain"`
-	BuildContext     string `json:"buildContext"`
-	DockerfilePath   string `json:"dockerfilePath"`
+	ExpiresAt        *string `json:"expiresAt"`
+	ID               string  `json:"id"`
+	Slug             string  `json:"slug"`
+	Name             string  `json:"name"`
+	OrganizationSlug string  `json:"organizationSlug"`
+	ProjectSlug      string  `json:"projectSlug"`
+	K8sNamespace     string  `json:"k8sNamespace"`
+	Subdomain        string  `json:"subdomain"`
+	BuildContext     string  `json:"buildContext"`
+	DockerfilePath   string  `json:"dockerfilePath"`
 	// SourceConnectionWarning is selected only from servers advertising
 	// scm.registration_owner_warning; older schemas reject the field.
 	SourceConnectionWarning string `json:"sourceConnectionWarning,omitempty"`
@@ -240,9 +242,15 @@ func runAppRegister(cmd *cobra.Command, ctx context.Context, client *api.Client)
 		return err
 	}
 
+	if err := applyCreationExpiry(cmd, ctx, client, input, manifest.App.ExpiresIn); err != nil {
+		return err
+	}
 	warningField := ""
+	if serverAdvertises(ctx, client, "apps.temporary_expiry") {
+		warningField = " expiresAt"
+	}
 	if serverAdvertises(ctx, client, "scm.registration_owner_warning") {
-		warningField = " sourceConnectionWarning"
+		warningField += " sourceConnectionWarning"
 	}
 	m := `
 mutation RegisterApp($input: RegisterAppInput!) {
@@ -286,6 +294,9 @@ mutation RegisterApp($input: RegisterAppInput!) {
 	fmt.Fprintf(out, "Namespace:        %s\n", app.K8sNamespace)
 	if app.Subdomain != "" {
 		fmt.Fprintf(out, "Subdomain:        %s\n", app.Subdomain)
+	}
+	if app.ExpiresAt != nil {
+		fmt.Fprintf(out, "Expires:          %s\n", *app.ExpiresAt)
 	}
 	fmt.Fprintf(out, "Build context:    %s\n", app.BuildContext)
 	fmt.Fprintf(out, "Dockerfile:       %s\n", app.DockerfilePath)
