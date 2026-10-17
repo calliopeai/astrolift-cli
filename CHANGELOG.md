@@ -4,7 +4,7 @@
 
 ## 0.14.1 — 2026-10-16
 
-- The offline manifest guide (`astro docs manifest`) covers `[ingress] max_body_size` and how each edge handles a request body, matching astrolift-docs main. v0.14.0 was tagged but never published: its release build stopped at this docs check, so 0.14.1 is the first release with `astro brain`.
+- The offline manifest guide (`astro docs show manifest`) covers `[ingress] max_body_size` and how each edge handles a request body, matching astrolift-docs main. v0.14.0 was tagged but never published: its release build stopped at this docs check, so 0.14.1 is the first release with `astro brain`.
 
 ## 0.14.0 — 2026-10-16
 
