@@ -647,9 +647,11 @@ astro brain delete acme-brain --yes                       # archive; the reposit
   output in a file of its own with mode 0600 (for `claude --mcp-config`).
 - `create` scaffolds an empty or new repository from the verified Mimwell
   edition in one commit (`--template-ref` pins an edition), registers it and
-  deploys it (`--no-deploy` to skip). The slug is the client slug plus
-  `-brain`. A GitHub App connection cannot create repositories: create the
-  empty repository first, or use a user OAuth or PAT connection. The
+  deploys it (`--no-deploy` to skip). The slug is the app's slug, with or
+  without `-brain` (`acme`, `acme-brain`); one without it is written to the
+  brain's config as `deploy.app_slug`, which the edition must have. A GitHub
+  App connection cannot create repositories: create the empty repository
+  first, or use a user OAuth or PAT connection. The
   substrate flags (`--authority`, `--blobs`, `--vectors`, `--graph`,
   `--persistence`, `--replicas`, `--image`) choose the Mimwell cell.
 - `share --access editor` is the app's deployer access, and you must hold it

@@ -1227,8 +1227,9 @@ var brainCreateCmd = &cobra.Command{
 	Short: "Create a semantic layer from the Mimwell edition, register it and deploy it",
 	Long: `Scaffold an empty or new repository from the verified Mimwell edition in
 one commit, register it as a semantic layer and deploy it. The slug is the
-client slug plus -brain (acme-brain). The server works in the background;
---wait follows it to the end.
+app's slug, with or without -brain (acme, acme-brain); one without it is
+written to the brain's config as deploy.app_slug, which the edition must
+have. The server works in the background; --wait follows it to the end.
 
 A GitHub App connection cannot create repositories: create the empty
 repository first, or use a user OAuth or PAT connection. The substrate flags
