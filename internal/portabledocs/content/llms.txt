@@ -49,6 +49,7 @@ Use these plain-Markdown references as the current public contract. The target i
 - [Action safety](https://astrolift.dev/guides/action-safety/): confirmation and fresh sign-in on sensitive actions, organization/team/app/person rules, approval for destructive deletes and `APPROVAL_REQUIRED`
 - [Operator quickstart](https://astrolift.dev/operators/quickstart/)
 - [Install Astrolift](https://astrolift.dev/operators/install/)
+- [Install by blueprint (AWS)](https://astrolift.dev/operators/blueprints/): the Deployment Manager, its setup screens, console apply and teardown, and known blockers; guides for Astrolift standalone, Zentinelle in Astrolift, Workbench on Astrolift and the Full loop
 
 ## Portable release-matched copy
 
