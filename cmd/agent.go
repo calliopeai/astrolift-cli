@@ -277,14 +277,24 @@ agentTaskLogs GraphQL query (--tail <n>, default 100).
 The control plane has no SSE log stream, so --follow (-f) instead polls
 the query on a fixed interval and prints only newly-appended lines until
 interrupted (Ctrl-C). An empty result means the task has produced no logs
-yet (or has no readable pod); it is not an error.`,
+yet (or has no readable pod); it is not an error.
+
+When the organization is connected to Zentinelle, the logs end with the
+agent's blocks, violations and approvals in the task's time window, each
+line marked [governance]. --follow does not print them.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, _, err := loadScopedAgentClient(cmd)
 		if err != nil {
 			return err
 		}
-		return runAgentLogs(cmd, cmd.Context(), client, args[0])
+		if err := runAgentLogs(cmd, cmd.Context(), client, args[0]); err != nil || agentLogsFollow {
+			return err
+		}
+		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+		defer cancel()
+		printLogGovernance(cmd.OutOrStdout(), cmd.ErrOrStderr(), readAgentGovernance(ctx, client, args[0], true, time.Now()))
+		return nil
 	},
 }
 
@@ -419,7 +429,11 @@ var agentInspectCmd = &cobra.Command{
 	Short: "Print the full AgentTask record",
 	Long: `Fetches one AgentTask by GUID via the agentTask GraphQL query and
 prints its record: status, timestamps, VNC relay path, and terminal result
-payload (if any). Use --json for the raw record.`,
+payload (if any). Use --json for the raw record.
+
+When the organization is connected to Zentinelle, it adds the agent's
+policies in effect and its last 24 hours of blocks, violations and
+approvals (a governance field with --json).`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, cfg, err := loadScopedAgentClient(cmd)
@@ -447,8 +461,12 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 	t := resp.AgentTask
 
 	out := cmd.OutOrStdout()
+	governance := readAgentGovernance(inspectCtx, client, taskID, false, time.Now())
 	if agentInspectJSON {
-		return renderJSON(cmd, t)
+		return renderJSON(cmd, struct {
+			agentTask
+			Governance *agentGovernance `json:"governance,omitempty"`
+		}{*t, governance})
 	}
 
 	fmt.Fprintf(out, "Task ID:       %s\n", t.ID)
@@ -489,6 +507,7 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 	if t.SnapshotURL != nil && *t.SnapshotURL != "" {
 		fmt.Fprintf(out, "Snapshot URL:  %s\n", *t.SnapshotURL)
 	}
+	printInspectGovernance(out, governance)
 	if t.Result != nil {
 		enc, err := json.MarshalIndent(t.Result, "", "  ")
 		if err == nil {
