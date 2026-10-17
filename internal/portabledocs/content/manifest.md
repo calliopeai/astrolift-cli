@@ -261,6 +261,32 @@ astro app access clear my-app
 preview who would lose access and ask before saving; pass `--yes` to skip the
 question.
 
+### `[ingress] max_body_size`
+
+The largest request body the edge passes to the app.
+
+```toml
+[ingress]
+max_body_size = "100m"
+```
+
+The value is a byte count with an optional `k`, `m` or `g` suffix, the way
+nginx writes a size, or `"0"` for no limit. Without the key there is no limit.
+A value nginx cannot read, such as `"100mb"` or `"1.5m"`, is refused when the
+manifest is parsed. The key is the app's own: when the platform writes
+`[ingress.auth]` back into the manifest, it leaves `max_body_size` in place.
+A change takes effect on the app's next deploy.
+
+On an ingress-nginx edge the value becomes the app Ingress's
+`nginx.ingress.kubernetes.io/proxy-body-size`, and a larger body gets a `413`
+from the edge. Whatever the limit, the body streams to the app as it arrives
+instead of being stored at the edge first (`proxy-request-buffering: "off"`),
+and the edge allows the app an hour between reads or writes on its connection
+(`proxy-read-timeout`, `proxy-send-timeout`) instead of nginx's 60 seconds, so
+a slow upload or a slow response is not cut off.
+
+The Envoy edge and the ALB set no body limit, and the key has no effect there.
+
 ## Containers
 
 `[[workloads.containers]]` supports `name`, `is_primary`, `image_ref`,
