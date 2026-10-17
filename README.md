@@ -403,6 +403,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro operator cluster install-agent` | Install the keep-alive agent through the control plane's private network. Exactly one of `--cluster-id <GUID>` or `--slug` plus `--request-file` is required; a known GUID skips operator inventory discovery, while slug discovery requires `cluster.register`; the private metadata file retains the original cluster/version/provider source proof and request UUID before dispatch. Keep that exact tuple for recovery after lost replies; a missing source proof refuses without replacement. No local kubeconfig or raw agent key is transferred. `agent-install-status --install-id <UUID>` reads the exact operation; optional `--cluster-id` refuses a receipt for another cluster; queued acceptance is distinct from authenticated heartbeat confirmation. Requires the server's `installClusterAgent` API; older servers refuse rather than falling back to local key rotation. |
 | `astro brain` | Semantic layers (Mimwell brains): `list`, `show`, `status`, `connect`, `create`, `share`, `unshare`, `host-app`, `rebuild`, `substrate` and `delete`, each naming the semantic layer by its app slug. See [Semantic layers](#semantic-layers). |
 | `astro scm` / `astro alert` | `scm list` (configured source-control connections), `scm disconnect <id>` (remove a connection by id from `scm list`), and `alert list` (alert rules; `--all` includes inactive). |
+| `astro inbox` | User-scoped agent messages: `list`, exact-GUID `show`, retry-safe `reply`, bounded polling `follow`. |
 | `astro status` | Platform status snapshot (`astroliftServerInfo`: version, install identity, region, server time, capabilities). |
 | `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
 | `astro onboard` | Set an AI coding agent up against the selected install in one call: writes an MCP server entry pointing at the install's gateway, installs the bundled skill catalogue, and drops the offline guides as agent context. Components are selectable with `--only mcp,skills,docs`, the layout with `--target claude\|codex\|both`, and `--dry-run` reports the plan without touching the filesystem. Existing files are reported and left alone unless `--force`. Authentication is reported, never performed. |
@@ -839,6 +840,66 @@ Copyright (c) 2026 Calliope Labs Inc. Calliope AI is a trademark of Calliope
 Labs Inc.
 
 Portions of the framework underlying this repo are derived from **[boilerworks](https://github.com/ConflictHQ/boilerworks)** (Copyright (c) Conflict LLC, MIT-licensed). Tip of the hat 🎩
+
+### Temporary apps and the agent inbox
+
+Offline API and usage guides: `astro docs show temporary-apps` and
+`astro docs show agent-inbox` (aliases `ttl`, `expiry`, and `inbox`).
+
+`astro app register --ttl 7d` and `astro brain host-app <brain-slug> --ttl 7d`
+create temporary apps. `--expires-at <RFC3339>` chooses an absolute time instead.
+Registration also honors `[app] expires_in = "7d"` in `astrolift.toml`; an explicit
+expiry flag overrides it. Durations accept minutes, hours, days, weeks and
+30-day months (`30m`, `4h`, `7d`, `6w`, `3mo`); the server enforces its minimum
+and organization maximum. `astro brain create` creates a permanent semantic
+layer; TTL applies to an app hosted on that layer.
+
+```bash
+astro app extend demo --by 2d
+astro app extend demo --until 2026-12-01T12:00:00Z
+astro app expiry demo --clear --yes
+astro app list --temporary
+astro app show demo --json
+```
+
+Clearing an expiry requires confirmation, `--yes` under `--no-prompt`, and the
+server's `app.update` permission plus its `app.expiry.clear` safety rules.
+Confirmation does not bypass fresh verification or organization policy. List
+shows `EXPIRES`; JSON list/show includes `expiresAt` and `expiryAvailable`.
+An older server reports that expiry is unavailable in one line, and the table
+shows `unavailable` instead of guessing permanence. Creation with TTL and expiry
+writes require the server's `apps.temporary_expiry` capability.
+
+The inbox uses your existing user credential and selected `--server` / `--org`.
+It requires `agents.messages`; the server decides which messages you may read
+and answer, including expired questions, approvals and lost agent access.
+
+```bash
+astro inbox list --unread --limit 25
+astro inbox list --thread <thread-guid> --after <opaque-cursor> --json
+astro inbox show <message-guid> --thread <thread-guid> --mark-read
+printf '%s' 'Continue with the reviewed plan' | astro inbox reply <message-guid> --stdin --request-id <uuid>
+astro inbox reply <message-guid> --choice continue --request-id <uuid>
+astro inbox reply <message-guid> --decision allow --request-id <uuid>
+astro inbox follow --thread <thread-guid> --json
+```
+
+`show` finds the exact message GUID, paging up to 40 pages; narrow an older
+lookup with `--thread`. Reads leave read state unchanged unless `--mark-read`
+is explicit. `reply` accepts `--body` or `--stdin` (up to 4000 characters and 16000 bytes), repeatable
+`--choice` IDs, and approval `--decision allow|deny`. It prints the request UUID
+before submission; preserve it and the exact reply to recover a lost response
+with `--request-id`. Writes are never automatically resent. The receipt carries
+the server's route, `deliveredAt` and `wakeTaskId`; acceptance does not establish
+that the agent received or executed it.
+
+`follow` polls every five seconds (`--interval`, at least one second), reconciles
+newest-first pages and emits each message once, oldest first, as JSON Lines
+under `--json`. It handles interrupt cancellation and retries temporary transport
+failures up to four times with bounded backoff. It stops on authorization errors,
+a repeated cursor, more than 40 pages without a known message boundary, or
+10000 emitted messages; it reports those bounds instead of silently dropping a
+gap. Attachment references are displayed in JSON and never fetched or opened.
 
 ### Agent log following
 

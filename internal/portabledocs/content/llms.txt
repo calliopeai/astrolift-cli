@@ -32,7 +32,9 @@ Use these plain-Markdown references as the current public contract. The target i
 
 - [Capabilities](https://astrolift.dev/guides/capabilities/): discover server version, API surface, provider support, and permissions
 - [App setup](https://astrolift.dev/guides/app-setup/): source registration, image deployment, health, and shared bindings
+- [Temporary apps](https://astrolift.dev/guides/temporary-apps/): creation deadlines, extensions, expiry policy, durable timers and retained data
 - [Agent setup](https://astrolift.dev/guides/agent-setup/): packages, environments, secret references, dispatch, and observation
+- [Agent inbox](https://astrolift.dev/guides/agent-inbox/): current recipient access, questions, approval replies, CLI follow and run-scoped messaging
 - [Workflow setup](https://astrolift.dev/guides/workflow-setup/): author, validate, bind, configure, and run ordered stages
 - [Bounded workflows](https://astrolift.dev/guides/bounded-workflows/): finite attempts, review return edges, serial collection bodies, exact identities and source-import limits
 - [Reviewed starts](https://astrolift.dev/guides/reviewed-starts/): exact workflow definitions and pipeline runs, typed JSON inputs, durable request identity, read-only recovery and cancellation state

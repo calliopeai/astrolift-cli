@@ -33,6 +33,15 @@ Astrolift's typed control-plane API is GraphQL. Focused REST, SSE, and WebSocket
 routes exist where device authentication, callbacks, streaming, or CI semantics
 do not fit GraphQL well.
 
+The [temporary-app guide](../guides/temporary-apps.md) covers `registerApp` and
+`hostAppOnBrain` creation deadlines, `setAppExpiry` and the organization's expiry
+policy. Require `apps.temporary_expiry` in server discovery before using those
+fields. [Agent conversations](../guides/agent-inbox.md) use
+`astroliftAgentMessages`, `astroliftAgentMessageThreads`,
+`markAgentMessagesRead`, `replyToAgentMessage` and
+`astroliftAgentMessageReceived`; require `agents.messages` and the caller's
+current agent access.
+
 ## Base URLs
 
 Given an install at `https://astrolift.example.com`:
@@ -40,10 +49,18 @@ Given an install at `https://astrolift.example.com`:
 | Surface | URL |
 |---|---|
 | GraphQL HTTP/explorer | `https://astrolift.example.com/app/gql/config/` |
+| Anonymous installation discovery | `https://astrolift.example.com/app/gql/config/public/` |
 | GraphQL subscriptions | `wss://astrolift.example.com/app/gql/config/ws/` |
 | CLI device flow | `https://astrolift.example.com/api/cli/v1/auth/...` |
 | MCP | `https://astrolift.example.com/api/mcp/v1/` |
 | Health | `https://astrolift.example.com/health/` |
+
+Before login, POST `query { astroliftServerInfo { version apiVersion capabilities } }`
+to the public discovery endpoint without bearer, organization or cookie headers.
+Its schema exposes only installation discovery and has no mutation or
+subscription root. The main GraphQL endpoint still requires authentication;
+do not probe it as an anonymous fallback. A capability advertises an API surface
+and grants no permission to use it.
 
 The server root returns a link map when requested as JSON:
 
