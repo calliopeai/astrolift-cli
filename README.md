@@ -843,6 +843,9 @@ Portions of the framework underlying this repo are derived from **[boilerworks](
 
 ### Temporary apps and the agent inbox
 
+Offline API and usage guides: `astro docs show temporary-apps` and
+`astro docs show agent-inbox` (aliases `ttl`, `expiry`, and `inbox`).
+
 `astro app register --ttl 7d` and `astro brain host-app <brain-slug> --ttl 7d`
 create temporary apps. `--expires-at <RFC3339>` chooses an absolute time instead.
 Registration also honors `[app] expires_in = "7d"` in `astrolift.toml`; an explicit
@@ -883,7 +886,7 @@ astro inbox follow --thread <thread-guid> --json
 
 `show` finds the exact message GUID, paging up to 40 pages; narrow an older
 lookup with `--thread`. Reads leave read state unchanged unless `--mark-read`
-is explicit. `reply` accepts `--body` or `--stdin` (up to 32768 bytes), repeatable
+is explicit. `reply` accepts `--body` or `--stdin` (up to 4000 characters and 16000 bytes), repeatable
 `--choice` IDs, and approval `--decision allow|deny`. It prints the request UUID
 before submission; preserve it and the exact reply to recover a lost response
 with `--request-id`. Writes are never automatically resent. The receipt carries

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/calliopeai/astrolift-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -272,5 +273,37 @@ func TestRegisterManifestTTLIsAtomicAndSelected(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "2099-01-01T00:00:00Z") {
 		t.Fatalf("JSON missing expiry: %s", out)
+	}
+}
+
+func TestBrainHostedAppExpiryIsAtomic(t *testing.T) {
+	resetBrainFlags()
+	t.Cleanup(resetBrainFlags)
+	brainHostImage = "ghcr.io/example/demo:1"
+	var input map[string]interface{}
+	srv := featureServer(t, []string{"apps.temporary_expiry"}, func(req gqlRequest) map[string]interface{} {
+		if strings.Contains(req.Query, "hostAppOnBrain") {
+			input = req.Variables["input"].(map[string]interface{})
+			if !strings.Contains(req.Query, "expiresAt") {
+				t.Error("host response did not select expiry")
+			}
+			return map[string]interface{}{"hostAppOnBrain": brainOK(map[string]interface{}{"brainSlug": "example-brain", "app": map[string]interface{}{"id": "a", "slug": "demo", "expiresAt": "2099-01-01T00:00:00Z"}})}
+		}
+		return map[string]interface{}{"astroliftProjects": []interface{}{map[string]interface{}{"id": "project-guid", "slug": "kb"}}}
+	})
+	defer srv.Close()
+	c, out, _ := brainTestCmd(true)
+	_ = c.Flags().Set("json", "true")
+	creationExpiryFlags(c)
+	_ = c.Flags().Set("project", "kb")
+	_ = c.Flags().Set("ttl", "3mo")
+	if err := runBrainHostApp(c, context.Background(), api.NewClient(srv.URL, "person", false), &config.Config{}, "example-brain"); err != nil {
+		t.Fatal(err)
+	}
+	if input["expiresIn"] != "3mo" {
+		t.Fatalf("host TTL not atomic: %#v", input)
+	}
+	if !strings.Contains(out.String(), "2099-01-01T00:00:00Z") {
+		t.Fatalf("host JSON missing expiry: %s", out)
 	}
 }
