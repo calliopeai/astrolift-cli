@@ -57,6 +57,12 @@ also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
 unavailable entries. Inspect its reason before selecting a kind and variant.
 
+Temporary apps require `apps.temporary_expiry`. See [temporary apps](temporary-apps.md)
+for creation deadlines, extensions, policy and retained data. Conversations with
+agents require `agents.messages`; see [the agent inbox](agent-inbox.md) for
+current recipient access, replies, approvals and client subscriptions. These
+markers grant no app, agent, dispatch or approval permissions.
+
 `models.bedrock_connections` identifies the prepared native Bedrock discovery
 and existing-connection APIs. It does not enable the default-off installation
 setting, grant operator/app authority or prove inference. Check
@@ -107,7 +113,9 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Inspect domain records, public delegation and app routes | `domains` | [Domains and DNS](domains-dns.md) |
 | Test an exact applied SES service and read delivery observations | `email-delivery` | [Email delivery](email-delivery.md) |
 | Register and operate an application | `app-setup` | [Set up an app](app-setup.md) |
+| Create or extend an app with a deadline | `temporary-apps` | [Temporary apps](temporary-apps.md) |
 | Package, register, and dispatch an agent | `agent-setup` | [Set up an agent](agent-setup.md) |
+| Read and answer an agent's messages | `agent-inbox` | [Agent inbox](agent-inbox.md) |
 | Compose and run stages | `workflow-setup` | [Set up a workflow](workflow-setup.md) |
 | Bound revisions, retries and record bodies | `bounded-workflows` | [Bounded workflows](bounded-workflows.md) |
 | Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |

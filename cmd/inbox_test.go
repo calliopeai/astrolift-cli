@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -179,9 +180,9 @@ func TestInboxReplyIdempotencyAndRouteReceipt(t *testing.T) {
 }
 
 func TestInboxReplyPreservesRequestIDAfterLostResponse(t *testing.T) {
-	calls := 0
+	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 		conn, _, err := w.(http.Hijacker).Hijack()
 		if err != nil {
 			t.Error(err)
@@ -195,8 +196,8 @@ func TestInboxReplyPreservesRequestIDAfterLostResponse(t *testing.T) {
 	if err := runInboxReply(c, context.Background(), api.NewClient(srv.URL, "person", false), inboxMessageID); err == nil {
 		t.Fatal("lost response claimed success")
 	}
-	if calls != 1 {
-		t.Fatalf("write automatically retried: %d", calls)
+	if calls.Load() != 1 {
+		t.Fatalf("write automatically retried: %d", calls.Load())
 	}
 	fields := strings.Fields(out.String())
 	if len(fields) < 4 {
@@ -208,7 +209,7 @@ func TestInboxReplyPreservesRequestIDAfterLostResponse(t *testing.T) {
 }
 
 func TestInboxReplyValidationAndRefusals(t *testing.T) {
-	for _, tc := range []struct{ flag, value string }{{"body", strings.Repeat("a", inboxMaxBody+1)}, {"decision", "approve"}, {"request-id", "invalid"}} {
+	for _, tc := range []struct{ flag, value string }{{"body", strings.Repeat("a", inboxMaxBody+1)}, {"body", strings.Repeat("é", inboxMaxReplyChars+1)}, {"decision", "approve"}, {"request-id", "invalid"}} {
 		c, _ := inboxTestCmd()
 		_ = c.Flags().Set("body", "reply")
 		_ = c.Flags().Set(tc.flag, tc.value)

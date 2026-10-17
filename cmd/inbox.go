@@ -12,6 +12,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode/utf8"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/google/uuid"
@@ -22,7 +23,8 @@ const inboxReplyFields = `id messageId authorLabel body choices decision route d
 const inboxMessageFields = `id threadId kind source title body agentSlug agentName taskId taskStatus replyToId requestSequence expiresAt createdAt deliveredAt readAt answerable options { id label description } attachments { kind ref label } replies { ` + inboxReplyFields + ` }`
 const inboxMessagesQuery = `query InboxMessages($threadId:GUID,$after:String,$first:Int!,$unreadOnly:Boolean!) { astroliftAgentMessages(threadId:$threadId,after:$after,first:$first,unreadOnly:$unreadOnly) { nextCursor totalCount unreadCount items { ` + inboxMessageFields + ` } } }`
 const inboxMaxPages = 40
-const inboxMaxBody = 32768
+const inboxMaxBody = 16000
+const inboxMaxReplyChars = 4000
 
 var inboxPollInterval = 5 * time.Second
 
@@ -153,7 +155,7 @@ func findInboxMessage(cmd *cobra.Command, ctx context.Context, client *api.Clien
 			return nil, err
 		}
 		for _, m := range page.Items {
-			if m.ID == id {
+			if strings.EqualFold(m.ID, id) {
 				return &m, nil
 			}
 		}
@@ -227,8 +229,8 @@ func inboxReplyInput(cmd *cobra.Command, id string) (map[string]interface{}, str
 		}
 		body = string(raw)
 	}
-	if len(body) > inboxMaxBody {
-		return nil, "", errors.New("reply exceeds 32768 bytes")
+	if len(body) > inboxMaxBody || utf8.RuneCountInString(body) > inboxMaxReplyChars {
+		return nil, "", errors.New("reply exceeds 4000 characters or 16000 bytes")
 	}
 	decision := stringFlag(cmd, "decision")
 	if decision != "" && decision != "allow" && decision != "deny" {
@@ -279,7 +281,7 @@ func runInboxReply(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 		return fmt.Errorf("replying: %s", firstDeployError(response.Result.Errors))
 	}
 	reply := response.Result.Data
-	if reply.MessageID != id || reply.ID == "" {
+	if !strings.EqualFold(reply.MessageID, id) || reply.ID == "" {
 		return errors.New("server returned no receipt for the exact message; preserve the request ID")
 	}
 	if boolFlag(cmd, "json") {
@@ -441,7 +443,7 @@ func init() {
 	list.Flags().String("after", "", "Opaque pagination cursor from a prior page")
 	show.Flags().Bool("mark-read", false, "Mark the exact message as read, then reread it")
 	reply.Flags().String("body", "", "Reply text (use --stdin for private or multi-line text)")
-	reply.Flags().Bool("stdin", false, "Read reply text from stdin (maximum 32768 bytes)")
+	reply.Flags().Bool("stdin", false, "Read reply text from stdin (maximum 4000 characters / 16000 bytes)")
 	reply.Flags().StringSlice("choice", nil, "Question option ID; repeat or comma-separate for multiple choices")
 	reply.Flags().String("decision", "", "Approval decision: allow or deny (server gates still apply)")
 	reply.Flags().String("request-id", "", "UUID retained across retries; generated and printed before submission if omitted")
