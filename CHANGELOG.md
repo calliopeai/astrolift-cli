@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `astro agent inspect` and `astro agent logs` gain governance lines when the working organization is connected to Zentinelle. Inspect adds the task's agent's policies in effect and its last 24 hours of blocks, violations and approvals (a `governance` field with `--json`); logs end with that agent's blocks, violations and approvals in the task's time window, each line marked `[governance]` (not under `--follow`). An older server shows nothing new; an unconnected organization or a refused read gives the same one-line reason as `astro policy` and `astro audit` (#113).
+
 ## 0.13.0 — 2026-10-16
 
 - `astro app register` detects the build context of a monorepo app. A manifest in a sub-directory (`--manifest-path src/abbott-cgm/astrolift.toml`) builds from that directory with its `Dockerfile`; a manifest that sets `build_context` or `dockerfile_path` itself keeps the repository root, so its own paths apply. Interactively, register shows both and asks `Use this? [Y/n/edit]`; `--build-context` and the new `--dockerfile` (`--dockerfile-path` still works) set them without asking, and `--yes`, `--no-prompt` or a stdin that is not a terminal takes the detection. The confirmed context is always sent, so older control planes store the same one. `--build-context` no longer says "platform_build only": the managed GitHub CI workflow builds from it under `ci_pushed` too (SteadyMD DV-9250, #159).

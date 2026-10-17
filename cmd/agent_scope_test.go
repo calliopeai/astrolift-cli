@@ -31,6 +31,8 @@ func TestAgentCommandsHonorOrganizationBeforeTaskRequests(t *testing.T) {
 					data := map[string]interface{}{}
 					if strings.Contains(request.Query, "astroliftOrganizations") {
 						data["astroliftOrganizations"] = []map[string]string{{"id": "default-id", "slug": "org"}, {"id": "selected-id", "slug": "selected-org"}}
+					} else if strings.Contains(request.Query, "astroliftZentinelleCapability") {
+						// A server that does not offer the Zentinelle reads.
 					} else {
 						operations++
 						if r.Header.Get("X-Astrolift-Organization") != "selected-id" {
