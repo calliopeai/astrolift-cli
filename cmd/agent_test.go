@@ -32,7 +32,8 @@ func gqlServer(t *testing.T, data map[string]interface{}, capture *gqlRequest) *
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		if capture != nil {
+		// The Zentinelle capability probe (agent inspect, logs) is not the request under test.
+		if capture != nil && !strings.Contains(string(body), "astroliftZentinelleCapability") {
 			if err := json.Unmarshal(body, capture); err != nil {
 				t.Errorf("decoding request body: %v", err)
 			}

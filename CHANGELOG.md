@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `astro agent inspect` and `astro agent logs` gain governance lines when the working organization is connected to Zentinelle. Inspect adds the task's agent's policies in effect and its last 24 hours of blocks, violations and approvals (a `governance` field with `--json`); logs end with that agent's blocks, violations and approvals in the task's time window, each line marked `[governance]` (not under `--follow`). An older server shows nothing new; an unconnected organization or a refused read gives the same one-line reason as `astro policy` and `astro audit` (#113).
+
 ## 0.14.1 — 2026-10-16
 
 - The offline manifest guide (`astro docs show manifest`) covers `[ingress] max_body_size` and how each edge handles a request body, matching astrolift-docs main. v0.14.0 was tagged but never published: its release build stopped at this docs check, so 0.14.1 is the first release with `astro brain`.

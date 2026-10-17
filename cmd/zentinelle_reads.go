@@ -207,7 +207,12 @@ func requireZentinelle(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	if err != nil {
 		return err
 	}
-	state, err := zentinelleCapability(ctx, client, org.ID)
+	return zentinelleRefusal(ctx, client, org.ID, server)
+}
+
+// zentinelleRefusal is the one-line reason the reads cannot run for org, or nil.
+func zentinelleRefusal(ctx context.Context, client *api.Client, org, server string) error {
+	state, err := zentinelleCapability(ctx, client, org)
 	if err != nil {
 		return err
 	}
