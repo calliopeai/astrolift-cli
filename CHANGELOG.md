@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retire monetary CLI surfaces (platform #2464): remove organization and project-resource cost commands and monetary model-usage fields. Preview `show --resources` requests only CPU, memory and pod measurements and replaces `--cost`; upgrade with the matching resource-only server schema. Zentinelle usage retains requests and per-model token counts where the actual server API and connection are available.
+
 - Temporary apps (#168): registration and brain-hosted apps accept `--ttl` or `--expires-at`, and registration honors manifest `[app] expires_in`. Add `app extend --by|--until`, confirmed `app expiry --clear`, an EXPIRES column, `app list --temporary`, and JSON expiry/capability state. Expiry writes require `apps.temporary_expiry`; server permissions, fresh verification and organization policy remain authoritative.
 - Embed the canonical `temporary-apps` and `agent-inbox` API and usage guides for offline `astro docs` search/show/export.
 - Add `astro inbox list|show|reply|follow` for agents' messages addressed to the current person (platform #2434). Reads retain thread/message identity and pagination; explicit `show --mark-read` marks only that message. Replies preserve a request UUID for recovery and distinguish route acceptance from delivery/execution. Follow reconciles paged HTTP reads with deduplication, bounded transient retries, cancellation and explicit window limits. Requires `agents.messages` and the person's existing Astrolift credentials.

@@ -74,7 +74,7 @@ It walks 251 project resources and 251 independently visible consumers, checks
 the compatible default JSON array, reads exact app/project GUID context,
 attaches one disposable local consumer with a reviewed revision, then refuses
 a changed cluster, deleted same-name target, foreign/malformed cursor and
-revoked role. Basic reads perform no pricing query and expose no configuration
+revoked role. Basic reads expose no configuration
 markers. This suite does not contact a provider or dispatch a Temporal worker;
 worker fencing and provider lifecycle acceptance are covered by the app's
 separate real PostgreSQL/Temporal tests.

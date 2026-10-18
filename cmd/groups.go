@@ -97,7 +97,6 @@ var orgTokensCmd = &cobra.Command{Use: "tokens", Short: "Manage org service toke
 var orgEventsCmd = &cobra.Command{Use: "events", Short: "Org event log"}
 var orgAuditCmd = &cobra.Command{Use: "audit", Short: "Org audit log"}
 var orgAlertsCmd = &cobra.Command{Use: "alerts", Short: "Org alert rules (#14)"}
-var orgCostCmd = &cobra.Command{Use: "cost", Short: "Org cost summary"}
 
 // ---- #10: operator commands ----
 
@@ -176,7 +175,7 @@ var statusCmd = &cobra.Command{
 func init() {
 	orgCmd.AddCommand(orgListCmd, orgShowCmd, orgSecretBundlesCmd,
 		orgWebhooksCmd, orgTokensCmd, orgEventsCmd, orgAuditCmd,
-		orgAlertsCmd, orgCostCmd)
+		orgAlertsCmd)
 	teamCmd.AddCommand(teamListCmd, teamCreateCmd)
 	teamCreateCmd.Flags().StringVar(&teamCreateName, "name", "", "Display name (defaults to the slug)")
 	teamCreateCmd.Flags().StringVar(&teamCreateDesc, "description", "", "Optional description")

@@ -443,7 +443,7 @@ to the selected app's environments while remaining organization-owned.
 `astroliftModelSubscriptionMetrics` reads one authenticated subscription under
 current `app.read_metrics` and organization visibility. Its declared placement
 and subscription identities must match. It exposes measured traffic, accepted
-ASGI response bytes and request duration; token use and cost are unsupported.
+ASGI response bytes and request duration; token use is unsupported by this metrics contract.
 Use `models.authenticated_subscription_metrics` for API discovery and the hosting
 guide's exact read-only query. A capability marker does not grant app access.
 

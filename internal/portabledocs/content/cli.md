@@ -191,7 +191,7 @@ CLI v0.8.0 predates the additive resource-page and reviewed-context flags.
 In a release containing those commands, `list --page --json` returns
 `{items,totalCount,nextCursor}`; default JSON remains an array and refuses an
 incomplete walk. `show` rereads the exact GUID; `attachments` pages visible
-consumer identities. Cost is explicit. Existing-resource writes carry the
+consumer identities. Existing-resource writes carry the
 reviewed context revision. `detach <attachment-guid>` resolves its exact visible
 owner and rereads that resource with the captured revision; `--resource <GUID>`
 can pin the owner explicitly. Missing or inaccessible attachments are refused.

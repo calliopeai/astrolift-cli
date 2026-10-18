@@ -152,43 +152,6 @@ func TestProjectResourceReviewedWritesCarryContextAndHideFailureBodies(t *testin
 		})
 	}
 }
-func TestProjectResourceCostRejectsMissingOrUnsafeEvidence(t *testing.T) {
-	for _, change := range []string{"amount", "source", "timestamp", "currency", "negative"} {
-		t.Run(change, func(t *testing.T) {
-			price := map[string]interface{}{"managedServiceId": resourceTestID, "available": true, "monthlyTotal": 0, "currency": "USD", "pricingSourceUrl": "https://prices.example.test", "pricingFetchedAt": "2026-10-02T00:00:00Z"}
-			switch change {
-			case "amount":
-				price["monthlyTotal"] = nil
-			case "source":
-				price["pricingSourceUrl"] = "javascript:PRIVATE_CONFIG_MARKER"
-			case "timestamp":
-				price["pricingFetchedAt"] = "invalid"
-			case "currency":
-				price["currency"] = "invalid"
-			case "negative":
-				price["monthlyTotal"] = -1
-			}
-			srv := gqlServer(t, map[string]interface{}{"astroliftProjectManagedService": resourceReadFixture(), "astroliftManagedServiceCostPreview": price}, nil)
-			defer srv.Close()
-			cmd, out := resourceReadCmd()
-			_ = cmd.Flags().Set("json", "true")
-			if err := runProjectResourceCost(cmd, context.Background(), api.NewClient(srv.URL, "token", false), projectRef{ID: "p-1"}, resourceTestID); err != nil {
-				t.Fatal(err)
-			}
-			if strings.Contains(out.String(), "PRIVATE_CONFIG_MARKER") {
-				t.Fatal("unsafe price source leaked")
-			}
-			var parsed projectResourceCostPreview
-			if err := json.Unmarshal(out.Bytes(), &parsed); err != nil {
-				t.Fatal(err)
-			}
-			if parsed.Available || parsed.MonthlyTotal != nil {
-				t.Fatalf("missing price converted to estimate: %+v", parsed)
-			}
-		})
-	}
-}
-
 func TestProjectResourceDetachLegacyInvocationResolvesExactOwnerThenPinsRevision(t *testing.T) {
 	requests := []gqlRequest{}
 	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
