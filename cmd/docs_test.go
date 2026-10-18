@@ -34,7 +34,6 @@ func TestExportPortableDocs(t *testing.T) {
 		"guides/install-alert-mail.md",
 		"guides/callbacks.md",
 		"guides/environment-actions.md",
-		"guides/task-usage.md",
 		"guides/platform-notifications.md",
 		"guides/source-to-brain.md",
 		"guides/atomic-workflow-review.md",

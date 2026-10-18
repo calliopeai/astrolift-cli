@@ -77,11 +77,6 @@ the engine or satisfy run-specific human gates. See
 digests, separate definition activation, revocable approval and rollout rules.
 These API capabilities add no dedicated CLI commands.
 
-`agents.task_usage_snapshot` adds `agentTaskUsageSnapshot(id)` for exact-task
-usage with per-field provenance. Reported cost remains unreconciled; actual billed
-cost is unavailable. See [task usage](task-usage.md) for decimal strings, source
-precedence, partial observations and current target authority.
-
 `notifications.structured_inbox` adds bounded catch-up and a resumable stream of
 the person's platform notifications. See [platform notifications](platform-notifications.md)
 for signed cursors, current app visibility and historical expiry warnings.
