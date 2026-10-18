@@ -1131,7 +1131,7 @@ reports cleanup separately from engine completion. Existing app-bound
 ### Search release-matched guides offline
 
 The embedded documentation snapshot comes from canonical `astrolift-docs`
-commit [`0756b6b36825510e3fd10c25bafad1531b62ea54`](https://github.com/calliopeai/astrolift-docs/commit/0756b6b36825510e3fd10c25bafad1531b62ea54).
+commit [`dcab33d79b940ed0d0443874ece1c9bdac2068b3`](https://github.com/calliopeai/astrolift-docs/commit/dcab33d79b940ed0d0443874ece1c9bdac2068b3).
 Check out that exact source revision and run
 `make vendor-docs-check DOCS_SRC=/path/to/astrolift-docs/docs` to verify every
 mapped file against it.
@@ -1143,6 +1143,8 @@ astro docs search 'environment exec'
 astro docs show reviewed-starts
 astro docs show task-usage
 astro docs show platform-notifications
+astro docs show source-to-brain
+astro docs show atomic-workflow-review
 ```
 
 Search reads this binary's embedded public Markdown guides without network,
@@ -1162,6 +1164,14 @@ existing `astro api graphql` command for their read queries. These topics add no
 API command or CLI notification stream. The bundled agent-inbox guide also
 includes personal quiet hours for agent-message email/push; expiry warnings keep
 their own delivery preferences.
+
+The `source-to-brain` guide separates the immutable Builder artifact from a fresh
+person's hosting request, including project-isolated operator targets and
+ephemeral SQLite. The `atomic-workflow-review` guide covers complete native graph
+review, separate definition activation and exact schedule consent with unconfirmed
+engine state. These are API guides, with no new CLI API commands or runtime
+acceptance claim. Use the documented bearer REST calls for Builder and existing
+`astro api graphql` for supported workflow operations.
 
 ### Scoped managed resource reads
 

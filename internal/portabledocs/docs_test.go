@@ -89,8 +89,8 @@ func TestPortableGuideLinks(t *testing.T) {
 
 func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	topics := Topics()
-	if len(topics) != 32 {
-		t.Fatalf("release snapshot has %d topics, want 32", len(topics))
+	if len(topics) != 34 {
+		t.Fatalf("release snapshot has %d topics, want 34", len(topics))
 	}
 	files, err := Files()
 	if err != nil {
@@ -100,7 +100,7 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 33 || len(entries) != len(files) {
+	if len(files) != 35 || len(entries) != len(files) {
 		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
 	}
 	for _, entry := range entries {
@@ -125,6 +125,26 @@ func TestTaskUsageAndNotificationsPortableLinks(t *testing.T) {
 		"api":                    {"(task-usage.md)", "(platform-notifications.md)"},
 		"task-usage":             {"(callbacks.md)"},
 		"platform-notifications": {"(agent-inbox.md)"},
+	} {
+		body, topic, err := Read(slug)
+		if err != nil {
+			t.Fatalf("Read(%q): %v", slug, err)
+		}
+		portable := PortableMarkdown(topic, body)
+		for _, target := range targets {
+			if !strings.Contains(portable, target) {
+				t.Errorf("portable %s guide lacks %s", slug, target)
+			}
+		}
+	}
+}
+
+func TestSourceHostingAndAtomicReviewPortableLinks(t *testing.T) {
+	for slug, targets := range map[string][]string{
+		"api":                    {"(source-to-brain.md)", "(atomic-workflow-review.md)"},
+		"capabilities":           {"(source-to-brain.md)", "(atomic-workflow-review.md)"},
+		"source-to-brain":        {"(temporary-apps.md)", "(api.md)"},
+		"atomic-workflow-review": {"(reviewed-starts.md)", "(reviewed-starts.md#browser-sso-setup-for-sensitive-operations)", "(api.md)"},
 	} {
 		body, topic, err := Read(slug)
 		if err != nil {
