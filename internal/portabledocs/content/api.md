@@ -56,6 +56,13 @@ cursor-based [platform notification](../guides/platform-notifications.md) reads.
 
 ## Base URLs
 
+Builder source-to-brain hosting uses bearer REST under `/api/builder/v1/`.
+Require `builder.brain_source_artifacts`, then inspect authenticated Builder
+capabilities and the operator-prepared project target. Build admission freezes
+source into a verified artifact; a fresh original-person `host/` request creates
+the app/binding/deployment. See [source-to-brain hosting](../guides/source-to-brain.md)
+for exact routes, request fields, ephemeral SQLite and recovery boundaries.
+
 Given an install at `https://astrolift.example.com`:
 
 | Surface | URL |
@@ -313,6 +320,15 @@ all agent results succeeded. Run-control acceptance remains separate from
 closure and resource cleanup.
 
 ## Reviewed workflow and pipeline starts
+
+With `workflows.atomic_full_review`, `workflowDefinitionFullReview` and
+`workflowScheduleFullReview` return atomic complete graph/configuration
+captures. `setWorkflowDefinitionEnabled` performs separate revision-bound
+definition activation. `activateReviewedWorkflowSchedule` records explicit
+person consent for the exact configured schedule digest; its saved receipt has
+`engineState: UNCONFIRMED`. See [complete workflow review](../guides/atomic-workflow-review.md)
+for permissions, original versus post-enable digests, current authority and
+the required worker/API rollout. Schedule consent does not bypass human gates.
 
 `workflowDefinitionById(id: GUID!)` reads an exact visible definition, execution
 revision and JSON Schema 2020-12 input contract. `startWorkflowDefinition` binds

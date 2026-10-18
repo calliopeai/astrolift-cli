@@ -63,6 +63,20 @@ agents require `agents.messages`; see [the agent inbox](agent-inbox.md) for
 current recipient access, replies, approvals and client subscriptions. These
 markers grant no app, agent, dispatch or approval permissions.
 
+`builder.brain_source_artifacts` advertises the two-step
+`builder-brain-source-v1` REST protocol. An authenticated Builder capabilities
+read separately describes its build/host phases. An operator-prepared,
+project-isolated AWS target is required; discovery does not certify IAM,
+registry or runtime health. See [source-to-brain hosting](source-to-brain.md)
+for immutable artifact admission and the fresh original-person hosting request.
+
+`workflows.atomic_full_review` adds complete definition/configured-schedule
+review and explicit schedule consent. It does not enable a definition, activate
+the engine or satisfy run-specific human gates. See
+[complete workflow review](atomic-workflow-review.md) for canonical graph
+digests, separate definition activation, revocable approval and rollout rules.
+These API capabilities add no dedicated CLI commands.
+
 `agents.task_usage_snapshot` adds `agentTaskUsageSnapshot(id)` for exact-task
 usage with per-field provenance. Reported cost remains unreconciled; actual billed
 cost is unavailable. See [task usage](task-usage.md) for decimal strings, source
