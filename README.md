@@ -638,6 +638,8 @@ astro brain status acme-brain                             # running vs head comm
 astro brain rebuild acme-brain --ingest                   # run knowledge-refresh.yml; its push deploys
 astro brain share acme-brain --team sales --access viewer # or editor: also edits and deploys
 astro brain unshare acme-brain --team sales
+astro brain share acme-brain --agent triage               # viewer only: the agent's unattended runs read it
+astro brain unshare acme-brain --agent triage
 astro brain host-app acme-brain --project kb --image ghcr.io/acme/bot:1 --deploy
 astro brain substrate acme-brain --authority postgres --persistence postgres
 astro brain delete acme-brain --yes                       # archive; the repository is kept

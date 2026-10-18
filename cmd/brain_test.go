@@ -47,6 +47,7 @@ func resetBrainFlags() {
 	brainConnectionSel, brainRepo, brainName, brainVisibility, brainTemplateRef = "", "", "", "private", ""
 	brainNoDeploy, brainWait, brainYes, brainIngest, brainHostDeploy = false, false, false, false, false
 	brainAccess, brainHostImage, brainHostName, brainHostSlug, brainHostPort = "viewer", "", "", "", 0
+	brainAgent = ""
 	brainPollInterval = time.Millisecond
 }
 
