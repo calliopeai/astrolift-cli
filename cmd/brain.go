@@ -10,7 +10,7 @@
 //   - status     -> astroliftBrainStatus(slug, environmentName)
 //   - connect    -> astroliftBrain + issueBrainReadToken (15-minute token)
 //   - create     -> createBrain, then astroliftBrainCreation with --wait
-//   - share      -> shareBrain (viewer = VIEWER, editor = DEPLOYER)
+//   - share      -> shareBrain (viewer = VIEWER, editor = DEPLOYER; --agent viewer only, #2449)
 //   - unshare    -> unshareBrain
 //   - host-app   -> hostAppOnBrain (+ startDeployment with --deploy)
 //   - rebuild    -> rebuildBrain
@@ -54,6 +54,16 @@ const (
   astroliftBrains(search: $search) { ` + brainFields + ` }
 }`
 	brainShowQuery = `query($slug: String!) {
+  astroliftBrain(slug: $slug) {
+    ` + brainFields + `
+    hostedApps { slug environment }
+    substrate { ` + brainSubstrateFields + ` }
+    agentShares { agent app grantedAt }
+  }
+}`
+	// brainShowLegacyQuery is brainShowQuery for a server older than platform
+	// #2449, which has no agent shares.
+	brainShowLegacyQuery = `query($slug: String!) {
   astroliftBrain(slug: $slug) {
     ` + brainFields + `
     hostedApps { slug environment }
@@ -102,6 +112,18 @@ const (
     data { ` + brainFields + ` }
   }
 }`
+	brainShareAgentMutation = `mutation($input: ShareBrainInput!) {
+  shareBrain(input: $input) {
+    ok errors { code message field approvalRequestId }
+    data { ` + brainFields + ` agentShares { agent app grantedAt } }
+  }
+}`
+	brainUnshareAgentMutation = `mutation($input: UnshareBrainInput!) {
+  unshareBrain(input: $input) {
+    ok errors { code message field }
+    data { ` + brainFields + ` agentShares { agent app grantedAt } }
+  }
+}`
 	brainHostAppMutation = `mutation($input: HostAppOnBrainInput!) {
   hostAppOnBrain(input: $input) {
     ok errors { code message field }
@@ -138,6 +160,14 @@ type brainEnvironment struct {
 type brainShare struct {
 	Team   string `json:"team"`
 	Access string `json:"access"`
+}
+
+// brainAgentShare is an agent the semantic layer is shared with (#2449),
+// viewer only; app is the agent's app.
+type brainAgentShare struct {
+	Agent     string `json:"agent"`
+	App       string `json:"app"`
+	GrantedAt string `json:"grantedAt"`
 }
 
 type brainHostedApp struct {
@@ -179,6 +209,9 @@ type brain struct {
 	SharedWith   []brainShare       `json:"sharedWith"`
 	HostedApps   []brainHostedApp   `json:"hostedApps,omitempty"`
 	Substrate    *brainSubstrate    `json:"substrate,omitempty"`
+	// AgentShares is nil where the server does not report them (lists, and
+	// servers older than platform #2449).
+	AgentShares *[]brainAgentShare `json:"agentShares,omitempty"`
 }
 
 type brainStatus struct {
@@ -285,6 +318,7 @@ var (
 	brainWait          bool
 	brainYes           bool
 	brainAccess        string
+	brainAgent         string
 	brainIngest        bool
 	brainHostImage     string
 	brainHostName      string
@@ -344,7 +378,15 @@ func fetchBrain(ctx context.Context, client *api.Client, slug string) (*brain, e
 	var resp struct {
 		Brain *brain `json:"astroliftBrain"`
 	}
-	if err := brainGraphQL(ctx, client, brainShowQuery, map[string]interface{}{"slug": slug}, &resp, "reading "+slug); err != nil {
+	vars := map[string]interface{}{"slug": slug}
+	err := client.GraphQL(ctx, brainShowQuery, vars, &resp)
+	if errors.Is(err, api.ErrSchemaMismatch) {
+		// Older than platform #2449: no agent shares; AgentShares stays nil.
+		err = brainGraphQL(ctx, client, brainShowLegacyQuery, vars, &resp, "reading "+slug)
+	} else if err != nil {
+		err = fmt.Errorf("reading %s: %w", slug, err)
+	}
+	if err != nil {
 		return nil, err
 	}
 	if resp.Brain == nil {
@@ -524,6 +566,11 @@ func renderBrain(cmd *cobra.Command, b *brain) error {
 	}
 	for _, s := range b.SharedWith {
 		fmt.Fprintf(w, "Shared with:\t%s (%s)\n", s.Team, brainAccessLabel(s.Access))
+	}
+	if b.AgentShares != nil {
+		for _, a := range *b.AgentShares {
+			fmt.Fprintf(w, "Shared with agent:\t%s (viewer, app %s)\n", a.Agent, a.App)
+		}
 	}
 	for _, h := range b.HostedApps {
 		fmt.Fprintf(w, "Hosted app:\t%s [%s]\n", h.Slug, h.Environment)
@@ -958,10 +1005,36 @@ func brainShareAccess(access string) (string, error) {
 	return "", errors.New("--access must be viewer or editor")
 }
 
+// brainShareTarget reads --team or --agent; exactly one is required.
+func brainShareTarget(cmd *cobra.Command) (team, agent string, err error) {
+	team, agent = stringFlag(cmd, "team"), strings.TrimSpace(brainAgent)
+	if (team == "") == (agent == "") {
+		return "", "", errors.New("name a team (--team) or an agent (--agent)")
+	}
+	return team, agent, nil
+}
+
+// requireBrainAgentShares refuses before any write on a server older than
+// platform #2449: one that does not report agentShares cannot share with an
+// agent either. It also refuses a semantic layer the caller cannot read.
+func requireBrainAgentShares(ctx context.Context, client *api.Client, slug string) error {
+	b, err := fetchBrain(ctx, client, slug)
+	if err != nil {
+		return err
+	}
+	if b.AgentShares == nil {
+		return errors.New("this server cannot share a semantic layer with an agent; it needs an Astrolift control plane with platform #2449")
+	}
+	return nil
+}
+
 func runBrainShare(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
-	team := stringFlag(cmd, "team")
-	if team == "" {
-		return errors.New("--team is required")
+	team, agent, err := brainShareTarget(cmd)
+	if err != nil {
+		return err
+	}
+	if agent != "" {
+		return runBrainShareAgent(cmd, ctx, client, slug, agent)
 	}
 	access, err := brainShareAccess(brainAccess)
 	if err != nil {
@@ -984,10 +1057,57 @@ func runBrainShare(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 	return renderBrain(cmd, resp.Result.Data)
 }
 
+func runBrainShareAgent(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, agent string) error {
+	if !strings.EqualFold(strings.TrimSpace(brainAccess), "viewer") {
+		return errors.New("an agent reads a semantic layer; share it with --access viewer")
+	}
+	if err := requireBrainAgentShares(ctx, client, slug); err != nil {
+		return err
+	}
+	ok, err := brainConfirm(cmd, fmt.Sprintf("Share %s with agent %s as viewer? Its runs that nobody launched can read it when the agent also lists it in brains or brains_allowed.", slug, agent))
+	if err != nil || !ok {
+		return err
+	}
+	var resp struct {
+		Result brainResult[brain] `json:"shareBrain"`
+	}
+	input := map[string]interface{}{"slug": slug, "agentSlug": agent, "access": "VIEWER"}
+	if err := brainGraphQL(ctx, client, brainShareAgentMutation, map[string]interface{}{"input": input}, &resp, "sharing "+slug); err != nil {
+		return err
+	}
+	if !resp.Result.OK || resp.Result.Data == nil {
+		return brainFailure("sharing "+slug, resp.Result.Errors)
+	}
+	return renderBrain(cmd, resp.Result.Data)
+}
+
+func runBrainUnshareAgent(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, agent string) error {
+	if err := requireBrainAgentShares(ctx, client, slug); err != nil {
+		return err
+	}
+	var resp struct {
+		Result brainResult[brain] `json:"unshareBrain"`
+	}
+	input := map[string]interface{}{"slug": slug, "agentSlug": agent}
+	if err := brainGraphQL(ctx, client, brainUnshareAgentMutation, map[string]interface{}{"input": input}, &resp, "unsharing "+slug); err != nil {
+		return err
+	}
+	if !resp.Result.OK || resp.Result.Data == nil {
+		return brainFailure("unsharing "+slug, resp.Result.Errors)
+	}
+	if !boolFlag(cmd, "json") {
+		fmt.Fprintf(cmd.OutOrStdout(), "Agent %s no longer reads %s; its runs' next token refresh is refused.\n", agent, slug)
+	}
+	return renderBrain(cmd, resp.Result.Data)
+}
+
 func runBrainUnshare(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string) error {
-	team := stringFlag(cmd, "team")
-	if team == "" {
-		return errors.New("--team is required")
+	team, agent, err := brainShareTarget(cmd)
+	if err != nil {
+		return err
+	}
+	if agent != "" {
+		return runBrainUnshareAgent(cmd, ctx, client, slug, agent)
 	}
 	var resp struct {
 		Result brainResult[brain] `json:"unshareBrain"`
@@ -1242,12 +1362,17 @@ persistence.`,
 }
 
 var brainShareCmd = &cobra.Command{
-	Use:   "share <slug> --team <t> --access viewer|editor",
-	Short: "Share a semantic layer with a team: viewer reads, editor also edits and deploys",
+	Use:   "share <slug> --team <t> --access viewer|editor | --agent <a>",
+	Short: "Share a semantic layer with a team (viewer or editor) or an agent (viewer)",
 	Long: `Share a semantic layer with a team. viewer reads it; editor also edits and
 deploys it (the app's deployer access, which you must hold yourself). Owners
 are not granted here. Asks first unless --yes; an approval rule on
-brain.share still applies.`,
+brain.share still applies.
+
+With --agent instead of --team, the agent's runs that nobody launched
+(schedule, loop, webhook, workflow stage) read the layer as the agent, viewer
+only, when the agent also lists it in brains or brains_allowed. Runs a person
+launches still read as that person. Needs platform #2449.`,
 	Args: cobra.ExactArgs(1),
 	RunE: brainRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, args []string) error {
 		return runBrainShare(cmd, ctx, client, args[0])
@@ -1255,8 +1380,8 @@ brain.share still applies.`,
 }
 
 var brainUnshareCmd = &cobra.Command{
-	Use:   "unshare <slug> --team <t>",
-	Short: "Stop sharing a semantic layer with a team",
+	Use:   "unshare <slug> --team <t> | --agent <a>",
+	Short: "Stop sharing a semantic layer with a team or an agent",
 	Args:  cobra.ExactArgs(1),
 	RunE: brainRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, args []string) error {
 		return runBrainUnshare(cmd, ctx, client, args[0])
@@ -1343,6 +1468,8 @@ func init() {
 
 	brainShareCmd.Flags().StringVar(&brainAccess, "access", "viewer", "viewer (reads) or editor (also edits and deploys)")
 	brainShareCmd.Flags().BoolVar(&brainYes, "yes", false, "Don't ask for confirmation")
+	brainShareCmd.Flags().StringVar(&brainAgent, "agent", "", "Share with this agent instead of a team (viewer only)")
+	brainUnshareCmd.Flags().StringVar(&brainAgent, "agent", "", "Stop sharing with this agent instead of a team")
 
 	brainHostAppCmd.Flags().StringVar(&brainHostImage, "image", "", "Image the app runs")
 	brainHostAppCmd.Flags().StringVar(&brainHostName, "name", "", "Display name")
