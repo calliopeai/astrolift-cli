@@ -34,8 +34,6 @@ func resetPreviewsFlags() {
 
 func strptr(s string) *string { return &s }
 
-func f64ptr(f float64) *float64 { return &f }
-
 // prPreview is a healthy running PR-triggered preview.
 func prPreview(pr int, branch string) previewEnvironment {
 	n := strconv.Itoa(pr)
@@ -333,20 +331,6 @@ func TestPreviewResourcesLabel(t *testing.T) {
 	}
 }
 
-// A null cost means the cluster has no pricing wired up. Rendering it as
-// $0.00 would read as "this preview is free".
-func TestPreviewCostLabelDistinguishesNullFromZero(t *testing.T) {
-	if got := previewCostLabel(nil); got != "-" {
-		t.Errorf("nil cost = %q, want -", got)
-	}
-	if got := previewCostLabel(f64ptr(0)); got != "$0.00/day" {
-		t.Errorf("zero cost = %q, want $0.00/day", got)
-	}
-	if got := previewCostLabel(f64ptr(1.234)); got != "$1.23/day" {
-		t.Errorf("cost = %q, want $1.23/day", got)
-	}
-}
-
 // ---- astro app previews list -------------------------------------------------
 
 func TestAppPreviewsListRendersRows(t *testing.T) {
@@ -476,13 +460,12 @@ func TestAppPreviewsListLimitTruncates(t *testing.T) {
 }
 
 // The IDE integration this unblocks reads the JSON, so the field set is a
-// contract: the URL is derived from hostname, and cost/resources ride along.
+// contract: the URL is derived from hostname, and resources ride along.
 func TestAppPreviewsListJSONShape(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 
 	p := prPreview(12, "feat/b")
-	p.EstimatedDailyCostUSD = f64ptr(1.25)
 	srv := previewStaticServer(t, previewPage([]previewEnvironment{p}, ""), nil)
 	defer srv.Close()
 
@@ -506,9 +489,6 @@ func TestAppPreviewsListJSONShape(t *testing.T) {
 	if got.AggregateResources.PodCount != 1 || got.AggregateResources.CPUCores != 0.5 {
 		t.Errorf("aggregateResources lost: %+v", got.AggregateResources)
 	}
-	if got.EstimatedDailyCostUSD == nil || *got.EstimatedDailyCostUSD != 1.25 {
-		t.Errorf("estimatedDailyCostUsd lost: %v", got.EstimatedDailyCostUSD)
-	}
 	if previewURL(got) != "https://pr-12.web.acme.example.com" {
 		t.Errorf("URL not derivable from the JSON row: %q", previewURL(got))
 	}
@@ -521,7 +501,6 @@ func TestAppPreviewsShowRendersDetail(t *testing.T) {
 	defer resetPreviewsFlags()
 
 	p := prPreview(12, "feat/b")
-	p.EstimatedDailyCostUSD = f64ptr(1.25)
 	srv := previewStaticServer(t, previewPage([]previewEnvironment{prPreview(7, "feat/a"), p}, ""), nil)
 	defer srv.Close()
 
@@ -540,7 +519,6 @@ func TestAppPreviewsShowRendersDetail(t *testing.T) {
 		"deadbeef",
 		"https://github.com/acme/web/pull/12",
 		"1 pod(s), 0.50 vCPU, 512 MiB",
-		"$1.25/day",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("detail missing %q\n%s", want, got)

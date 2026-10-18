@@ -24,13 +24,12 @@ import (
 )
 
 type zentinelleUsageRow struct {
-	AgentSlug    string  `json:"agentSlug"`
-	Provider     string  `json:"provider"`
-	Model        string  `json:"model"`
-	Requests     int64   `json:"requests"`
-	InputTokens  int64   `json:"inputTokens"`
-	OutputTokens int64   `json:"outputTokens"`
-	CostUSD      float64 `json:"costUsd"`
+	AgentSlug    string `json:"agentSlug"`
+	Provider     string `json:"provider"`
+	Model        string `json:"model"`
+	Requests     int64  `json:"requests"`
+	InputTokens  int64  `json:"inputTokens"`
+	OutputTokens int64  `json:"outputTokens"`
 }
 
 type zentinelleUsage struct {
@@ -71,7 +70,7 @@ const (
 	zentinelleCapabilityQuery = `query { astroliftZentinelleCapability { connected } }`
 	zentinelleUsageQuery      = `query($since: DateTime, $agentSlug: String, $projectId: GUID, $teamId: GUID) {
   astroliftZentinelleUsage(since: $since, agentSlug: $agentSlug, projectId: $projectId, teamId: $teamId) {
-    since rows { agentSlug provider model requests inputTokens outputTokens costUsd }
+    since rows { agentSlug provider model requests inputTokens outputTokens }
   }
 }`
 	zentinellePoliciesQuery = `query($agentSlug: String, $projectId: GUID) {
@@ -310,8 +309,8 @@ func zentinelleSelector(cmd *cobra.Command, ctx context.Context, client *api.Cli
 
 var agentUsageCmd = &cobra.Command{
 	Use:   "usage [<agent>]",
-	Short: "Model usage and cost from Zentinelle's gateway metering",
-	Long: `Model usage and cost for an agent, a project's agents (--project) or a
+	Short: "Model token usage from Zentinelle's gateway metering",
+	Long: `Model token usage for an agent, a project's agents (--project) or a
 team's (--team), or every agent you may see, per agent, provider and model.
 --since takes 24h, 7d, an RFC 3339 time or a date; the server's default is
 30 days. Needs zentinelle.usage_view.`,
@@ -351,14 +350,13 @@ func runAgentUsage(cmd *cobra.Command, ctx context.Context, client *api.Client, 
 		return nil
 	}
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "AGENT\tPROVIDER\tMODEL\tREQUESTS\tINPUT\tOUTPUT\tCOST (USD)")
+	fmt.Fprintln(tw, "AGENT\tPROVIDER\tMODEL\tREQUESTS\tINPUT\tOUTPUT")
 	var requests, input, output int64
-	var cost float64
 	for _, r := range resp.Usage.Rows {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%d\t%d\t%.4f\n", r.AgentSlug, r.Provider, r.Model, r.Requests, r.InputTokens, r.OutputTokens, r.CostUSD)
-		requests, input, output, cost = requests+r.Requests, input+r.InputTokens, output+r.OutputTokens, cost+r.CostUSD
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%d\t%d\n", r.AgentSlug, r.Provider, r.Model, r.Requests, r.InputTokens, r.OutputTokens)
+		requests, input, output = requests+r.Requests, input+r.InputTokens, output+r.OutputTokens
 	}
-	fmt.Fprintf(tw, "TOTAL\t\t\t%d\t%d\t%d\t%.4f\n", requests, input, output, cost)
+	fmt.Fprintf(tw, "TOTAL\t\t\t%d\t%d\t%d\n", requests, input, output)
 	if err := tw.Flush(); err != nil {
 		return err
 	}

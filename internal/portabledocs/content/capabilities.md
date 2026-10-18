@@ -42,7 +42,7 @@ separate checks and safe metadata reads through the existing GraphQL CLI.
 Per-app model traffic uses `models.authenticated_subscription_metrics` and
 current app-metrics authority. The runtime must provide its version 2 credential
 mapping and authenticated scrape. Missing data is distinct from measured zero;
-token counts and cost remain unsupported. The hosting guide includes a bounded
+token counts remain unsupported by this runtime metrics contract. The hosting guide includes a bounded
 read-only query for one exact app connection.
 `models.runtime_settings` adds typed Super-admin runtime declarations for one
 selected cluster/provider and compute mode. Saving a declaration is separate
