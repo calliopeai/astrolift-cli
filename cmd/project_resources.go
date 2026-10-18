@@ -78,20 +78,6 @@ type projectResource struct {
 	UpdatedAt            string `json:"updatedAt"`
 }
 
-type projectResourceCostPreview struct {
-	ManagedServiceID string                   `json:"managedServiceId"`
-	Available        bool                     `json:"available"`
-	Reason           string                   `json:"reason"`
-	Message          string                   `json:"message"`
-	MonthlyTotal     *float64                 `json:"monthlyTotal"`
-	Currency         string                   `json:"currency"`
-	LineItems        []map[string]interface{} `json:"lineItems"`
-	PricingSourceURL string                   `json:"pricingSourceUrl"`
-	PricingFetchedAt string                   `json:"pricingFetchedAt"`
-	Notes            []string                 `json:"notes"`
-	Approximate      bool                     `json:"approximate"`
-}
-
 type projectResourceMutation struct {
 	OK     bool             `json:"ok"`
 	Errors []mutationError  `json:"errors"`
@@ -154,15 +140,6 @@ var projectResourceShowCmd = &cobra.Command{
 			return err
 		}
 		return renderProjectResource(cmd, resource)
-	}),
-}
-
-var projectResourceCostCmd = &cobra.Command{
-	Use:   "cost <name-or-id>",
-	Short: "Preview monthly cost from the provider's live pricing API",
-	Args:  cobra.ExactArgs(1),
-	RunE: projectResourceRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef) error {
-		return runProjectResourceCost(cmd, ctx, client, project, cmd.Flags().Arg(0))
 	}),
 }
 
@@ -253,7 +230,6 @@ func init() {
 		projectResourceCatalogCmd,
 		projectResourceListCmd,
 		projectResourceShowCmd,
-		projectResourceCostCmd,
 		projectResourceAddCmd,
 		projectResourceUpdateCmd,
 		projectResourceReprovisionCmd,

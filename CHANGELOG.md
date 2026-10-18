@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Retire monetary CLI surfaces (platform #2464): remove organization and project-resource cost commands and monetary model-usage fields. Preview `show --resources` requests only CPU, memory and pod measurements and replaces `--cost`; upgrade with the matching resource-only server schema. Zentinelle usage retains requests and per-model token counts where the actual server API and connection are available.
+
+- Temporary apps (#168): registration and brain-hosted apps accept `--ttl` or `--expires-at`, and registration honors manifest `[app] expires_in`. Add `app extend --by|--until`, confirmed `app expiry --clear`, an EXPIRES column, `app list --temporary`, and JSON expiry/capability state. Expiry writes require `apps.temporary_expiry`; server permissions, fresh verification and organization policy remain authoritative.
+- Embed the canonical `temporary-apps` and `agent-inbox` API and usage guides for offline `astro docs` search/show/export.
+- Add `astro inbox list|show|reply|follow` for agents' messages addressed to the current person (platform #2434). Reads retain thread/message identity and pagination; explicit `show --mark-read` marks only that message. Replies preserve a request UUID for recovery and distinguish route acceptance from delivery/execution. Follow reconciles paged HTTP reads with deduplication, bounded transient retries, cancellation and explicit window limits. Requires `agents.messages` and the person's existing Astrolift credentials.
+
 - `astro agent inspect` and `astro agent logs` gain governance lines when the working organization is connected to Zentinelle. Inspect adds the task's agent's policies in effect and its last 24 hours of blocks, violations and approvals (a `governance` field with `--json`); logs end with that agent's blocks, violations and approvals in the task's time window, each line marked `[governance]` (not under `--follow`). An older server shows nothing new; an unconnected organization or a refused read gives the same one-line reason as `astro policy` and `astro audit` (#113).
 
 - `astro auth login --scope admin` asks for full administrative access (`client_kind=cli-admin`). Only the platform operator can approve it, and the sign-in lasts 12 hours; after that the CLI asks for `astro auth login` again, as it does for any expired session (#174, platform #2448).

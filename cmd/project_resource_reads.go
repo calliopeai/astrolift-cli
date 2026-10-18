@@ -3,12 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"math"
-	"net/url"
 	"regexp"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/google/uuid"
@@ -229,51 +226,6 @@ func renderProjectResource(cmd *cobra.Command, row *projectResource) error {
 	}
 	return nil
 }
-func runProjectResourceCost(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef, selector string) error {
-	row, err := resolveProjectResourceRevision(ctx, client, project.ID, selector, resourceStringFlag(cmd, "expected-context-revision"))
-	if err != nil {
-		return err
-	}
-	var response struct {
-		Preview *projectResourceCostPreview `json:"astroliftManagedServiceCostPreview"`
-	}
-	query := `query($managedServiceId: GUID!, $expectedContextRevision: String) { astroliftManagedServiceCostPreview(managedServiceId:$managedServiceId,expectedContextRevision:$expectedContextRevision) { managedServiceId available reason message monthlyTotal currency lineItems pricingSourceUrl pricingFetchedAt notes approximate } }`
-	if err := client.GraphQL(ctx, query, map[string]interface{}{"managedServiceId": row.ID, "expectedContextRevision": row.ContextRevision}, &response); err != nil {
-		return fmt.Errorf("pricing unavailable or resource context changed")
-	}
-	preview := response.Preview
-	if preview == nil || preview.ManagedServiceID != row.ID {
-		return fmt.Errorf("pricing unavailable")
-	}
-	parsed, err := url.Parse(preview.PricingSourceURL)
-	_, timeErr := time.Parse(time.RFC3339Nano, preview.PricingFetchedAt)
-	valid := preview.Available && preview.MonthlyTotal != nil && !math.IsNaN(*preview.MonthlyTotal) && !math.IsInf(*preview.MonthlyTotal, 0) && *preview.MonthlyTotal >= 0 && regexp.MustCompile(`^[A-Z]{3}$`).MatchString(preview.Currency) && err == nil && parsed.Scheme == "https" && parsed.Hostname() != "" && parsed.User == nil && timeErr == nil
-	if !valid {
-		preview.Available = false
-		preview.MonthlyTotal = nil
-		preview.Reason = "incomplete_price"
-		preview.Message = "Pricing is unavailable"
-		preview.PricingSourceURL = ""
-		preview.Notes = nil
-		preview.LineItems = nil
-	}
-	if boolFlag(cmd, "json") {
-		return renderJSON(cmd, preview)
-	}
-	if !valid {
-		fmt.Fprintln(cmd.OutOrStdout(), "Pricing is unavailable.")
-		return nil
-	}
-	prefix := ""
-	if preview.Approximate {
-		prefix = "approximately "
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s%.2f %s/month\nPricing source: %s\nPrice retrieved: %s\n", prefix, *preview.MonthlyTotal, preview.Currency, preview.PricingSourceURL, preview.PricingFetchedAt)
-	for _, note := range preview.Notes {
-		fmt.Fprintf(cmd.OutOrStdout(), "Note: %s\n", note)
-	}
-	return nil
-}
 
 var projectResourceAttachmentsCmd = &cobra.Command{Use: "attachments <resource-GUID>", Short: "Page currently visible resource consumers without credentials", Args: cobra.ExactArgs(1), RunE: projectResourceRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, project projectRef) error {
 	return runProjectResourceAttachments(cmd, ctx, client, project, cmd.Flags().Arg(0))
@@ -329,7 +281,7 @@ func init() {
 	projectResourceListCmd.Flags().StringSlice("status", nil, "Filter resource states")
 	projectResourceAttachmentsCmd.Flags().Int("limit", 50, "Maximum consumers in one server page (1-200)")
 	projectResourceAttachmentsCmd.Flags().String("after", "", "Continuation from the preceding consumer page")
-	for _, command := range []*cobra.Command{projectResourceShowCmd, projectResourceCostCmd, projectResourceUpdateCmd, projectResourceReprovisionCmd, projectResourceAttachCmd, projectResourceDetachCmd, projectResourceRemoveCmd, projectResourceAttachmentsCmd} {
+	for _, command := range []*cobra.Command{projectResourceShowCmd, projectResourceUpdateCmd, projectResourceReprovisionCmd, projectResourceAttachCmd, projectResourceDetachCmd, projectResourceRemoveCmd, projectResourceAttachmentsCmd} {
 		command.Flags().String("expected-context-revision", "", "Refuse a context changed since this reviewed revision")
 	}
 	projectResourceDetachCmd.Flags().String("resource", "", "Exact resource GUID owning this attachment (optional; otherwise resolve exact attachment owner)")
