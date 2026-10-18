@@ -45,6 +45,10 @@ authentication. The resulting credentials are stored at
 If no server slug is given, uses --server or the saved current_server.
 Use 'astro server add' to register a new server first.
 
+--scope admin asks for full administrative access. Only the platform
+operator can approve it, and the sign-in lasts 12 hours; after that,
+run 'astro auth login --scope admin' again.
+
 For an agent or any caller without a browser:
 
   astro auth login --no-wait --json     start the flow, print the session,
@@ -346,7 +350,7 @@ func init() {
 	authLoginCmd.Flags().BoolVar(&loginNoWait, "no-wait", false,
 		"start the flow, report the session, and exit without polling")
 	authLoginCmd.Flags().StringVar(&loginScope, "scope", "",
-		"ask for more than the CLI default: clusters (update and operate clusters, #2120)")
+		"ask for more than the CLI default: clusters (update and operate clusters, #2120) or admin (full administrative access, platform operator approval, 12 hours)")
 	authLoginCmd.Flags().BoolVar(&loginNoBrowser, "no-browser", false,
 		"do not try to open a browser")
 

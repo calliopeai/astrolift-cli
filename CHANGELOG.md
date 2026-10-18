@@ -4,6 +4,12 @@
 
 - `astro agent inspect` and `astro agent logs` gain governance lines when the working organization is connected to Zentinelle. Inspect adds the task's agent's policies in effect and its last 24 hours of blocks, violations and approvals (a `governance` field with `--json`); logs end with that agent's blocks, violations and approvals in the task's time window, each line marked `[governance]` (not under `--follow`). An older server shows nothing new; an unconnected organization or a refused read gives the same one-line reason as `astro policy` and `astro audit` (#113).
 
+- `astro auth login --scope admin` asks for full administrative access (`client_kind=cli-admin`). Only the platform operator can approve it, and the sign-in lasts 12 hours; after that the CLI asks for `astro auth login` again, as it does for any expired session (#174, platform #2448).
+
+- `astro agent dispatch --brain <slug>` (repeatable, at most 10) gives a run semantic layers to read besides its agent's own (`brainSlugs`); duplicates and an eleventh brain are refused before any call. `astro agent inspect` lists the run's brains with their source and when and why each was revoked, and the new `astro agent show <agent-slug>` shows an agent's `brains` and `brainsAllowed`. A server older than platform #2432 refuses `--brain` in one line; inspect leaves the brains out and show says the server is older (#173).
+
+- Cut Release checks the embedded docs against astrolift-docs main before tagging and names the stale files, so a docs merge no longer burns a version number as it did v0.14.0. The Portable docs drift workflow now opens or updates one verified "Refresh embedded docs" PR from `chore/refresh-embedded-docs` when it finds drift (#172).
+
 - `astro brain share <slug> --agent <a>` shares a semantic layer with an agent, viewer only, and `astro brain unshare <slug> --agent <a>` stops it. Runs of that agent nobody launched (schedule, loop, webhook, workflow stage) then read the layer as the agent when the agent also lists it in `brains` or `brains_allowed`; runs a person launches still read as that person. `astro brain show` lists the agents a layer is shared with (`agentShares` with `--json`). Name a team or an agent, not both. On a server older than platform #2449, `show` reads as before and `--agent` refuses in one line before any write (platform #2449).
 
 ## 0.14.1 — 2026-10-16

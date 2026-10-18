@@ -32,6 +32,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"text/tabwriter"
@@ -146,6 +147,16 @@ type agentTask struct {
 	VNCEnabled        bool               `json:"vncEnabled"`
 	VNCURL            string             `json:"vncUrl"`
 	SnapshotURL       *string            `json:"snapshotUrl"`
+	Brains            []agentTaskBrain   `json:"brains,omitempty"`
+}
+
+// agentTaskBrain mirrors AstroliftAgentTaskBrain (#2432): a brain the run
+// reads as its launcher, default (the agent's own) or requested (--brain).
+type agentTaskBrain struct {
+	Slug          string  `json:"slug"`
+	Source        string  `json:"source"`
+	RevokedAt     *string `json:"revokedAt"`
+	RevokedReason string  `json:"revokedReason"`
 }
 
 // noneMutationResult is the NoneTypeMutationResult envelope (cancelTask). Its
@@ -428,8 +439,9 @@ var agentInspectCmd = &cobra.Command{
 	Use:   "inspect <task-id>",
 	Short: "Print the full AgentTask record",
 	Long: `Fetches one AgentTask by GUID via the agentTask GraphQL query and
-prints its record: status, timestamps, VNC relay path, and terminal result
-payload (if any). Use --json for the raw record.
+prints its record: status, timestamps, VNC relay path, the brains the run
+reads (slug, source, and when and why a brain was revoked), and terminal
+result payload (if any). Use --json for the raw record.
 
 When the organization is connected to Zentinelle, it adds the agent's
 policies in effect and its last 24 hours of blocks, violations and
@@ -451,7 +463,7 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 	var resp struct {
 		AgentTask *agentTask `json:"agentTask"`
 	}
-	if err := queryAgentCallbackState(inspectCtx, client, agentTaskQuery,
+	if err := queryAgentTaskWithBrains(inspectCtx, client,
 		map[string]interface{}{"id": taskID}, &resp); err != nil {
 		return fmt.Errorf("fetching task: %w", err)
 	}
@@ -507,6 +519,16 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 	if t.SnapshotURL != nil && *t.SnapshotURL != "" {
 		fmt.Fprintf(out, "Snapshot URL:  %s\n", *t.SnapshotURL)
 	}
+	if len(t.Brains) > 0 {
+		fmt.Fprintln(out, "Brains:")
+		for _, b := range t.Brains {
+			line := fmt.Sprintf("  %s (%s)", b.Slug, b.Source)
+			if b.RevokedAt != nil && *b.RevokedAt != "" {
+				line += fmt.Sprintf(" revoked %s: %s", *b.RevokedAt, b.RevokedReason)
+			}
+			fmt.Fprintln(out, line)
+		}
+	}
 	printInspectGovernance(out, governance)
 	if t.Result != nil {
 		enc, err := json.MarshalIndent(t.Result, "", "  ")
@@ -515,6 +537,17 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 		}
 	}
 	return nil
+}
+
+// queryAgentTaskWithBrains reads agentTaskQuery plus the run's brains (#2432).
+// A server older than #2432 has no brains field; it gets the query without it.
+func queryAgentTaskWithBrains(ctx context.Context, client *api.Client, vars map[string]interface{}, target interface{}) error {
+	query := strings.Replace(agentTaskQuery, "    status\n", "    status\n    brains { slug source revokedAt revokedReason }\n", 1)
+	err := queryAgentCallbackState(ctx, client, query, vars, target)
+	if err != nil && errors.Is(err, api.ErrSchemaMismatch) && strings.Contains(strings.ToLower(err.Error()), "brains") {
+		return queryAgentCallbackState(ctx, client, agentTaskQuery, vars, target)
+	}
+	return err
 }
 
 // ---- helpers ---------------------------------------------------------------
