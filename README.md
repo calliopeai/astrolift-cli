@@ -1131,7 +1131,7 @@ reports cleanup separately from engine completion. Existing app-bound
 ### Search release-matched guides offline
 
 The embedded documentation snapshot comes from canonical `astrolift-docs`
-commit [`dcab33d79b940ed0d0443874ece1c9bdac2068b3`](https://github.com/calliopeai/astrolift-docs/commit/dcab33d79b940ed0d0443874ece1c9bdac2068b3).
+commit [`f84bae1b211619d647b55f69811f53b8c91bf3f7`](https://github.com/calliopeai/astrolift-docs/commit/f84bae1b211619d647b55f69811f53b8c91bf3f7).
 Check out that exact source revision and run
 `make vendor-docs-check DOCS_SRC=/path/to/astrolift-docs/docs` to verify every
 mapped file against it.
@@ -1141,7 +1141,6 @@ astro docs search 'workflow recovery'
 astro docs search '"request file"' --limit 5 --json
 astro docs search 'environment exec'
 astro docs show reviewed-starts
-astro docs show task-usage
 astro docs show platform-notifications
 astro docs show source-to-brain
 astro docs show atomic-workflow-review
@@ -1156,11 +1155,9 @@ output; JSON includes `matches`, `totalMatches` and `truncated`. Queries are
 bounded to 512 UTF-8 bytes and 32 terms/phrases. Use `docs show` for a complete
 guide and command `--help` for the actual executing command tree.
 
-The `task-usage` guide explains exact-task observations, decimal-string precision
-and the distinction between reported cost and unavailable actual billing. The
-`platform-notifications` guide covers genuine recipient-addressed warnings,
+The `platform-notifications` guide covers genuine recipient-addressed warnings,
 bounded catch-up, current authorization and historical expiry snapshots. Use the
-existing `astro api graphql` command for their read queries. These topics add no
+existing `astro api graphql` command for its read queries. This topic adds no
 API command or CLI notification stream. The bundled agent-inbox guide also
 includes personal quiet hours for agent-message email/push; expiry warnings keep
 their own delivery preferences.

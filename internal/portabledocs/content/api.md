@@ -47,10 +47,7 @@ With `notifications.quiet_hours`, `astroliftMyNotificationQuietHours` and
 email and push suppression. The inbox guide documents the IANA timezone and
 minute boundaries; quiet hours do not mark messages read or create a digest.
 
-`agentTaskUsageSnapshot(id)` requires `agents.task_usage_snapshot` and current
-task-level `app.read` plus `agent.read`. [Task usage](../guides/task-usage.md)
-documents per-field provenance and why reported cost is separate from unavailable
-actual billed cost. With `notifications.structured_inbox`,
+With `notifications.structured_inbox`,
 `astroliftMyNotificationsPage` and `astroliftMyNotificationStream` provide bounded,
 cursor-based [platform notification](../guides/platform-notifications.md) reads.
 

@@ -36,7 +36,6 @@ Use these plain-Markdown references as the current public contract. The target i
 - [Source-to-brain hosting](https://astrolift.dev/guides/source-to-brain/): immutable Builder artifact then fresh original-person hosting, project-isolated operator target, explicit deployment observation and ephemeral SQLite
 - [Agent setup](https://astrolift.dev/guides/agent-setup/): packages, environments, secret references, dispatch, and observation
 - [Agent inbox](https://astrolift.dev/guides/agent-inbox/): current recipient access, questions, approval replies, CLI follow and run-scoped messaging
-- [Task usage](https://astrolift.dev/guides/task-usage/): exact-task provenance, decimal strings, partial observations, reported cost and unavailable actual billing
 - [Platform notifications](https://astrolift.dev/guides/platform-notifications/): authorized catch-up, signed cursors, resumable streams and historical expiry warnings
 - [Workflow setup](https://astrolift.dev/guides/workflow-setup/): author, validate, bind, configure, and run ordered stages
 - [Bounded workflows](https://astrolift.dev/guides/bounded-workflows/): finite attempts, review return edges, serial collection bodies, exact identities and source-import limits

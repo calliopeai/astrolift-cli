@@ -89,8 +89,8 @@ func TestPortableGuideLinks(t *testing.T) {
 
 func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	topics := Topics()
-	if len(topics) != 34 {
-		t.Fatalf("release snapshot has %d topics, want 34", len(topics))
+	if len(topics) != 33 {
+		t.Fatalf("release snapshot has %d topics, want 33", len(topics))
 	}
 	files, err := Files()
 	if err != nil {
@@ -100,7 +100,7 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 35 || len(entries) != len(files) {
+	if len(files) != 34 || len(entries) != len(files) {
 		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
 	}
 	for _, entry := range entries {
@@ -120,10 +120,9 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	}
 }
 
-func TestTaskUsageAndNotificationsPortableLinks(t *testing.T) {
+func TestNotificationsPortableLinks(t *testing.T) {
 	for slug, targets := range map[string][]string{
-		"api":                    {"(task-usage.md)", "(platform-notifications.md)"},
-		"task-usage":             {"(callbacks.md)"},
+		"api":                    {"(platform-notifications.md)"},
 		"platform-notifications": {"(agent-inbox.md)"},
 	} {
 		body, topic, err := Read(slug)

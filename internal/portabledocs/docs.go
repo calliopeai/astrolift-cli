@@ -55,7 +55,6 @@ var topics = []Topic{
 	{Slug: "install-alert-mail", Title: "Set up and test install alert SMTP", Filename: "install-alert-mail.md", OnlinePath: "/guides/install-alert-mail/"},
 	{Slug: "temporary-apps", Title: "Create temporary apps and manage expiry", Filename: "temporary-apps.md", OnlinePath: "/guides/temporary-apps/"},
 	{Slug: "agent-inbox", Title: "Read and answer agent messages", Filename: "agent-inbox.md", OnlinePath: "/guides/agent-inbox/"},
-	{Slug: "task-usage", Title: "Read task usage and cost provenance", Filename: "task-usage.md", OnlinePath: "/guides/task-usage/"},
 	{Slug: "platform-notifications", Title: "Read platform notifications", Filename: "platform-notifications.md", OnlinePath: "/guides/platform-notifications/"},
 	{Slug: "source-to-brain", Title: "Build source and host it on an existing brain", Filename: "source-to-brain.md", OnlinePath: "/guides/source-to-brain/"},
 	{Slug: "atomic-workflow-review", Title: "Review a complete workflow and approve its schedule", Filename: "atomic-workflow-review.md", OnlinePath: "/guides/atomic-workflow-review/"},
