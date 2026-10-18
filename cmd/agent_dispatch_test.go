@@ -23,6 +23,7 @@ func resetDispatchFlags() {
 	agentDispatchCallbackSecretRef = ""
 	agentDispatchCorrelationID = ""
 	agentDispatchCallbackMode = ""
+	agentDispatchBrains = nil
 }
 
 func TestAgentDispatchSendsMutationAndParsesTask(t *testing.T) {

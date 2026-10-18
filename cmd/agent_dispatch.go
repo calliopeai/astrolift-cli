@@ -21,6 +21,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -46,7 +47,11 @@ var (
 	agentDispatchCallbackSecretRef string
 	agentDispatchCorrelationID     string
 	agentDispatchCallbackMode      string
+	agentDispatchBrains            []string
 )
+
+// maxDispatchBrains mirrors the server's limit on brains per run (#2432).
+const maxDispatchBrains = 10
 
 // ---- GraphQL ---------------------------------------------------------------
 
@@ -112,6 +117,9 @@ environment variable on the task container. A dispatch with no --input
 sets no such variable, so an agent should treat it as absent rather
 than empty.
 
+--brain <slug> (repeatable, at most 10) adds a semantic layer the run reads
+as you, besides the agent's own; 'astro agent inspect' lists them.
+
 --env-spec pins an AgentEnvironmentSpec (by slug) to launch into — its
 image + secret packet. Omit to use the workload's own image/runtime.
 
@@ -136,6 +144,9 @@ Exit codes: 0 success, 1 dispatch/run failure.`,
 
 func runAgentDispatch(cmd *cobra.Command, ctx context.Context, client *api.Client, agentSlug string) error {
 	input := map[string]interface{}{"agentSlug": agentSlug}
+	if err := addAgentBrainInput(input); err != nil {
+		return err
+	}
 	if err := addAgentCallbackInput(input); err != nil {
 		return err
 	}
@@ -173,6 +184,9 @@ func runAgentDispatch(cmd *cobra.Command, ctx context.Context, client *api.Clien
 	}
 	if err := client.GraphQL(dispatchCtx, query,
 		map[string]interface{}{"input": input}, &resp); err != nil {
+		if len(agentDispatchBrains) > 0 && errors.Is(err, api.ErrSchemaMismatch) && strings.Contains(strings.ToLower(err.Error()), "brainslugs") {
+			return fmt.Errorf("this server is older than platform #2432 and does not accept --brain; dispatch without it")
+		}
 		return fmt.Errorf("dispatching agent: %w", err)
 	}
 	if !resp.Result.Ok {
@@ -356,6 +370,32 @@ func firstMessageError(errs []struct {
 
 // ---- init ------------------------------------------------------------------
 
+// addAgentBrainInput checks --brain before any call; the server decides which
+// brains the caller may read and the agent accepts.
+func addAgentBrainInput(input map[string]interface{}) error {
+	if len(agentDispatchBrains) == 0 {
+		return nil
+	}
+	if len(agentDispatchBrains) > maxDispatchBrains {
+		return fmt.Errorf("--brain accepts at most %d brains, got %d", maxDispatchBrains, len(agentDispatchBrains))
+	}
+	slugs := make([]string, 0, len(agentDispatchBrains))
+	seen := map[string]bool{}
+	for _, raw := range agentDispatchBrains {
+		slug := strings.TrimSpace(raw)
+		if slug == "" {
+			return fmt.Errorf("--brain needs a brain slug")
+		}
+		if seen[slug] {
+			return fmt.Errorf("--brain %s is given more than once", slug)
+		}
+		seen[slug] = true
+		slugs = append(slugs, slug)
+	}
+	input["brainSlugs"] = slugs
+	return nil
+}
+
 // addAgentCallbackInput validates CLI shape; the server owns policy and authorization.
 func addAgentCallbackInput(input map[string]interface{}) error {
 	if agentDispatchCallbackURL == "" {
@@ -393,6 +433,7 @@ func init() {
 	agentDispatchCmd.Flags().StringVar(&agentDispatchCallbackSecretRef, "callback-secret-ref", "", "Organization signing secret name (never its value)")
 	agentDispatchCmd.Flags().StringVar(&agentDispatchCorrelationID, "correlation-id", "", "Opaque caller ID, at most 128 characters")
 	agentDispatchCmd.Flags().StringVar(&agentDispatchCallbackMode, "callback-mode", "", "Completion body: FULL (default) or NOTIFY")
+	agentDispatchCmd.Flags().StringArrayVar(&agentDispatchBrains, "brain", nil, "Brain slug the run also reads (repeatable, at most 10)")
 	agentDispatchCmd.Flags().StringVar(&agentDispatchInput, "input", "", "Trigger payload as a JSON string or @file.json")
 	agentDispatchCmd.Flags().StringVar(&agentDispatchEnvSpec, "env-spec", "", "Env-spec slug to pin (image + secret packet)")
 	agentDispatchCmd.Flags().IntVar(&agentDispatchTimeout, "timeout", 0, "Run timeout in seconds (0 = server default)")
