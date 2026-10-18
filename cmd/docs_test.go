@@ -34,6 +34,8 @@ func TestExportPortableDocs(t *testing.T) {
 		"guides/install-alert-mail.md",
 		"guides/callbacks.md",
 		"guides/environment-actions.md",
+		"guides/task-usage.md",
+		"guides/platform-notifications.md",
 		"commands/astro.md",
 		"man/man1/astro.1",
 	} {

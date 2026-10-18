@@ -89,8 +89,8 @@ func TestPortableGuideLinks(t *testing.T) {
 
 func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	topics := Topics()
-	if len(topics) != 30 {
-		t.Fatalf("release snapshot has %d topics, want 30", len(topics))
+	if len(topics) != 32 {
+		t.Fatalf("release snapshot has %d topics, want 32", len(topics))
 	}
 	files, err := Files()
 	if err != nil {
@@ -100,7 +100,7 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 31 || len(entries) != len(files) {
+	if len(files) != 33 || len(entries) != len(files) {
 		t.Fatalf("embedded/registered inventory differs: %d registered, %d embedded", len(files), len(entries))
 	}
 	for _, entry := range entries {
@@ -116,6 +116,25 @@ func TestModelHostingSnapshotInventoryAndPortableLinks(t *testing.T) {
 	for _, href := range []string{"(start.md)", "(capabilities.md)", "(api.md)", "https://docs.vllm.ai/en/v0.15.1/models/supported_models/"} {
 		if !strings.Contains(portable, href) {
 			t.Fatalf("portable hosting guide lacks %s", href)
+		}
+	}
+}
+
+func TestTaskUsageAndNotificationsPortableLinks(t *testing.T) {
+	for slug, targets := range map[string][]string{
+		"api":                    {"(task-usage.md)", "(platform-notifications.md)"},
+		"task-usage":             {"(callbacks.md)"},
+		"platform-notifications": {"(agent-inbox.md)"},
+	} {
+		body, topic, err := Read(slug)
+		if err != nil {
+			t.Fatalf("Read(%q): %v", slug, err)
+		}
+		portable := PortableMarkdown(topic, body)
+		for _, target := range targets {
+			if !strings.Contains(portable, target) {
+				t.Errorf("portable %s guide lacks %s", slug, target)
+			}
 		}
 	}
 }

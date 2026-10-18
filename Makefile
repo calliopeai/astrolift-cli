@@ -78,10 +78,12 @@ vendor-docs:
 	cp "$(DOCS_SRC)/guides/install-alert-mail.md" "$(DOCS_DST)/install-alert-mail.md"
 	cp "$(DOCS_SRC)/guides/temporary-apps.md" "$(DOCS_DST)/temporary-apps.md"
 	cp "$(DOCS_SRC)/guides/agent-inbox.md" "$(DOCS_DST)/agent-inbox.md"
+	cp "$(DOCS_SRC)/guides/task-usage.md" "$(DOCS_DST)/task-usage.md"
+	cp "$(DOCS_SRC)/guides/platform-notifications.md" "$(DOCS_DST)/platform-notifications.md"
 	cp "$(DOCS_SRC)/llms.txt" "$(DOCS_DST)/llms.txt"
 
 vendor-docs-check:
-	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md capabilities.md organization.md app-setup.md agent-setup.md workflow-setup.md bounded-workflows.md shared-services.md model-hosting.md native-models.md callbacks.md environment-actions.md reviewed-starts.md preview-targets.md cluster-agent-install.md cluster-log-collector.md logs-traces.md workload-signals.md domains.md email-delivery.md install-alert-mail.md temporary-apps.md agent-inbox.md llms.txt; do \
+	@for file in start.md client.md cli.md api.md mcp.md manifest.md agents.md workflows.md capabilities.md organization.md app-setup.md agent-setup.md workflow-setup.md bounded-workflows.md shared-services.md model-hosting.md native-models.md callbacks.md environment-actions.md reviewed-starts.md preview-targets.md cluster-agent-install.md cluster-log-collector.md logs-traces.md workload-signals.md domains.md email-delivery.md install-alert-mail.md temporary-apps.md agent-inbox.md task-usage.md platform-notifications.md llms.txt; do \
 		test -s "$(DOCS_DST)/$$file" || { echo "missing $(DOCS_DST)/$$file — run \`make vendor-docs\`"; exit 1; }; \
 	done
 	@if [ -d "$(DOCS_SRC)" ]; then \
@@ -116,6 +118,8 @@ vendor-docs-check:
 			"guides/install-alert-mail.md:install-alert-mail.md" \
 			"guides/temporary-apps.md:temporary-apps.md" \
 			"guides/agent-inbox.md:agent-inbox.md" \
+			"guides/task-usage.md:task-usage.md" \
+			"guides/platform-notifications.md:platform-notifications.md" \
 			"llms.txt:llms.txt"; do \
 			source="$${pair%%:*}"; destination="$${pair#*:}"; \
 			cmp -s "$(DOCS_SRC)/$$source" "$(DOCS_DST)/$$destination" || { \
