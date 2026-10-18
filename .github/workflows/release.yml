@@ -100,6 +100,28 @@ jobs:
             exit 1
           fi
 
+      # build-publish.yml refuses a tag whose embedded docs lag astrolift-docs
+      # main (v0.14.0, #172). Check here so a stale snapshot never burns a
+      # version number.
+      - name: Checkout canonical documentation
+        uses: actions/checkout@v4
+        with:
+          repository: calliopeai/astrolift-docs
+          ref: main
+          path: canonical-docs
+          token: ${{ secrets.PAT_CALLIOPE_CI }}
+
+      - name: Refuse to tag with stale embedded docs
+        run: |
+          set -euo pipefail
+          if make vendor-docs-check DOCS_SRC=canonical-docs/docs; then
+            exit 0
+          fi
+          make vendor-docs DOCS_SRC=canonical-docs/docs >/dev/null
+          STALE="$(git status --porcelain -- internal/portabledocs/content | cut -c4- | tr '\n' ' ')"
+          echo "::error::embedded docs lag astrolift-docs main: ${STALE:-see the check above}. Merge the 'Refresh embedded docs' PR (or run make vendor-docs) before cutting $TAG."
+          exit 1
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'

@@ -9,13 +9,13 @@ import (
 )
 
 func TestClientKindForScope(t *testing.T) {
-	for scope, want := range map[string]string{"": "", "default": "", "clusters": "cli-operator", " Clusters ": "cli-operator"} {
+	for scope, want := range map[string]string{"": "", "default": "", "clusters": "cli-operator", " Clusters ": "cli-operator", "admin": "cli-admin", "ADMIN": "cli-admin"} {
 		got, err := ClientKindForScope(scope)
 		if err != nil || got != want {
 			t.Fatalf("ClientKindForScope(%q) = %q, %v; want %q", scope, got, err, want)
 		}
 	}
-	if _, err := ClientKindForScope("admin"); err == nil {
+	if _, err := ClientKindForScope("root"); err == nil {
 		t.Fatal("an unknown scope must be refused, not silently widened or dropped")
 	}
 }
