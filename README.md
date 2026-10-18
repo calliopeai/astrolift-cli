@@ -1132,7 +1132,7 @@ reports cleanup separately from engine completion. Existing app-bound
 ### Search release-matched guides offline
 
 The embedded documentation snapshot comes from canonical `astrolift-docs`
-commit [`291e81840a8021a4505de9cccf765e8058f25fbe`](https://github.com/calliopeai/astrolift-docs/commit/291e81840a8021a4505de9cccf765e8058f25fbe).
+commit [`afb03e8ab489f8ca4d3481d3b77d487e082f7d2a`](https://github.com/calliopeai/astrolift-docs/commit/afb03e8ab489f8ca4d3481d3b77d487e082f7d2a).
 Check out that exact source revision and run
 `make vendor-docs-check DOCS_SRC=/path/to/astrolift-docs/docs` to verify every
 mapped file against it.

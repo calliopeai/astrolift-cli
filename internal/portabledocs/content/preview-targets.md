@@ -213,7 +213,7 @@ canonical contract; native mobile integration and consent UI require
 separate acceptance evidence.
 
 The resource-only contract is pinned to
-[signed backend 345bb429](https://github.com/calliopeai/astrolift-app/blob/345bb429fe4e3429d73bec927ac469a3b6168d9a/backend/schema.graphql).
-Its [operator rollout notes](https://github.com/calliopeai/astrolift-app/blob/345bb429fe4e3429d73bec927ac469a3b6168d9a/docs/operators/retire-costing.md)
+[signed backend 39eedf96](https://github.com/calliopeai/astrolift-app/blob/39eedf96c3399462c1cf92944383dc1a3cb3c746/backend/schema.graphql).
+Its [operator rollout notes](https://github.com/calliopeai/astrolift-app/blob/39eedf96c3399462c1cf92944383dc1a3cb3c746/docs/operators/retire-costing.md)
 cover paired clients and worker retirement. Source qualification does not prove
 that the selected installation has deployed this contract.
