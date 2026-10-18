@@ -55,6 +55,8 @@ var topics = []Topic{
 	{Slug: "install-alert-mail", Title: "Set up and test install alert SMTP", Filename: "install-alert-mail.md", OnlinePath: "/guides/install-alert-mail/"},
 	{Slug: "temporary-apps", Title: "Create temporary apps and manage expiry", Filename: "temporary-apps.md", OnlinePath: "/guides/temporary-apps/"},
 	{Slug: "agent-inbox", Title: "Read and answer agent messages", Filename: "agent-inbox.md", OnlinePath: "/guides/agent-inbox/"},
+	{Slug: "task-usage", Title: "Read task usage and cost provenance", Filename: "task-usage.md", OnlinePath: "/guides/task-usage/"},
+	{Slug: "platform-notifications", Title: "Read platform notifications", Filename: "platform-notifications.md", OnlinePath: "/guides/platform-notifications/"},
 }
 
 var aliases = map[string]string{

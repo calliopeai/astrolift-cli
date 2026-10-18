@@ -63,6 +63,20 @@ agents require `agents.messages`; see [the agent inbox](agent-inbox.md) for
 current recipient access, replies, approvals and client subscriptions. These
 markers grant no app, agent, dispatch or approval permissions.
 
+`agents.task_usage_snapshot` adds `agentTaskUsageSnapshot(id)` for exact-task
+usage with per-field provenance. Reported cost remains unreconciled; actual billed
+cost is unavailable. See [task usage](task-usage.md) for decimal strings, source
+precedence, partial observations and current target authority.
+
+`notifications.structured_inbox` adds bounded catch-up and a resumable stream of
+the person's platform notifications. See [platform notifications](platform-notifications.md)
+for signed cursors, current app visibility and historical expiry warnings.
+
+`notifications.quiet_hours` adds personal timezone-based quiet hours for
+agent-message email and push. Inbox reads remain available; other event kinds
+retain their own notification preferences. See the inbox guide for the exact
+self-service query, mutation and time-window rules.
+
 `models.bedrock_connections` identifies the prepared native Bedrock discovery
 and existing-connection APIs. It does not enable the default-off installation
 setting, grant operator/app authority or prove inference. Check

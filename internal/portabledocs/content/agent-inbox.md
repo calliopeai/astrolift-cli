@@ -167,6 +167,35 @@ also have those channels configured. Webhook subscriptions can select the
 `agent.message.sent` event. A channel accepting a notification does not prove
 that the recipient read it.
 
+When the installation advertises `notifications.quiet_hours`, a person can set
+quiet hours for agent-message push and email in notification settings. Messages
+remain in the inbox; the server records suppressed channel deliveries. Quiet
+hours do not queue a later digest or mute unrelated events such as app-expiry
+warnings. Those events retain their own notification preferences.
+
+```graphql
+query MyQuietHours {
+  astroliftMyNotificationQuietHours {
+    enabled timezone startMinute endMinute active
+  }
+}
+
+mutation SetMyQuietHours($input: SetNotificationQuietHoursInput!) {
+  setNotificationQuietHours(input: $input) {
+    ok
+    errors { code message field }
+    data { enabled timezone startMinute endMinute active }
+  }
+}
+```
+
+The settings are personal and authenticated. For 22:00 to 08:00 in Costa Rica,
+pass `enabled: true`, `timezone: "America/Costa_Rica"`, `startMinute: 1320`
+and `endMinute: 480`. Minutes must be distinct integers from 0 to 1439. The
+start is included and the end excluded; windows may cross midnight. The server
+uses the chosen IANA timezone, including daylight-saving transitions, to return
+`active`. Defaults are disabled with UTC 22:00 to 08:00.
+
 The purge command uses the organization's retention policy. Operators can run
 `manage.py purge_agent_messages` to purge expired history and should include it
 in their maintenance schedule. The command's availability does not establish
