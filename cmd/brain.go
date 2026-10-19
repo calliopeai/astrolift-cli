@@ -738,10 +738,12 @@ func brainEndpoint(b *brain, conn *brainConnection, env string) (string, string,
 		}
 		return "", "", fmt.Errorf("%s is not served in %q (served: %s)", b.Slug, env, strings.Join(names, ", "))
 	}
-	want := strings.TrimRight(chosen.URL, "/") + "/mcp"
+	// The server issues each environment's base URL; a brain serves MCP at
+	// /mcp on it, as the web console's brainMcpUrl does.
+	want := strings.TrimRight(chosen.URL, "/")
 	for _, endpoint := range conn.Endpoints {
-		if endpoint == want {
-			return chosen.Name, endpoint, nil
+		if strings.TrimRight(endpoint, "/") == want {
+			return chosen.Name, want + "/mcp", nil
 		}
 	}
 	return "", "", fmt.Errorf("the server issued no MCP endpoint for %s in %s", b.Slug, chosen.Name)
