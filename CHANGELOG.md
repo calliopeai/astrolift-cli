@@ -12,6 +12,8 @@
 
 - `astro brain share <slug> --agent <a>` shares a semantic layer with an agent, viewer only, and `astro brain unshare <slug> --agent <a>` stops it. Runs of that agent nobody launched (schedule, loop, webhook, workflow stage) then read the layer as the agent when the agent also lists it in `brains` or `brains_allowed`; runs a person launches still read as that person. `astro brain show` lists the agents a layer is shared with (`agentShares` with `--json`). Name a team or an agent, not both. On a server older than platform #2449, `show` reads as before and `--agent` refuses in one line before any write (platform #2449).
 
+- `astro version-check` reads the selected server's public install discovery (`astroliftServerInfo` at `/app/gql/config/public/`) instead of `/api/cli/v1/compat/<version>/`, a route the platform never served, so it no longer fails with an HTML 404 page. It sends no credentials and works before `astro auth login`. A server without public install discovery, or one that does not advertise `server_info.handshake` there, is reported as unsupported with that capability named, and the command exits 1. With `--json`, stdout carries the result (`compatible`, `cliVersion`, `server`, `apiUrl`, `serverVersion`, `apiVersion`, `requiredCapability`, `reason`) for an unsupported server too, and a check that cannot finish prints one JSON error on stderr (#178).
+
 ## 0.14.1 — 2026-10-16
 
 - The offline manifest guide (`astro docs show manifest`) covers `[ingress] max_body_size` and how each edge handles a request body, matching astrolift-docs main. v0.14.0 was tagged but never published: its release build stopped at this docs check, so 0.14.1 is the first release with `astro brain`.
