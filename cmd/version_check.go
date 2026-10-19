@@ -159,6 +159,7 @@ func checkServerCompatibility(ctx context.Context, client *api.Client) (versionC
 	}
 	err := client.PublicGraphQL(ctx, versionCheckQuery, nil, &response)
 	var httpErr *api.HTTPError
+	var refusal *api.GraphQLResponseError
 	switch {
 	case errors.As(err, &httpErr) && httpErr.Status == http.StatusNotFound:
 		return result.unsupported("The server has no public install discovery (POST /app/gql/config/public/ returned HTTP 404).")
@@ -170,6 +171,13 @@ func checkServerCompatibility(ctx context.Context, client *api.Client) (versionC
 		return result, &versionCheckError{
 			Message: fmt.Sprintf("public install discovery at %s returned HTTP %d %s", result.APIURL, httpErr.Status, http.StatusText(httpErr.Status)),
 			Status:  httpErr.Status,
+		}
+	case errors.As(err, &refusal) && refusal.Status >= http.StatusBadRequest:
+		// The server's rate limit on this route answers 429 with a
+		// GraphQL-shaped body; --json keeps that status.
+		return result, &versionCheckError{
+			Message: fmt.Sprintf("reading public install discovery at %s: %v", result.APIURL, err),
+			Status:  refusal.Status,
 		}
 	case err != nil:
 		return result, &versionCheckError{Message: fmt.Sprintf("reading public install discovery at %s: %v", result.APIURL, err)}

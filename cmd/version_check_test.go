@@ -206,6 +206,7 @@ func TestVersionCheckReportsAnInstallWithoutPublicDiscoveryAsUnsupported(t *test
 		{"route missing", nil, "returned HTTP 404", ""},
 		{"no handshake in discovery", respondWith(http.StatusOK, `{"errors":[{"message":"Cannot query field 'astroliftServerInfo' on type 'Query'."}]}`), "does not serve astroliftServerInfo", ""},
 		{"handshake without capability", handshakeWith("audit.read"), "does not advertise server_info.handshake", "0.1.0"},
+		{"null handshake", respondWith(http.StatusOK, `{"data":{"astroliftServerInfo":null}}`), "does not serve astroliftServerInfo", ""},
 	} {
 		t.Run(install.name, func(t *testing.T) {
 			srv, requests := versionCheckInstall(t, install.handshake)
@@ -251,6 +252,8 @@ func TestVersionCheckFailureIsOneJSONErrorWithoutSignInHint(t *testing.T) {
 	}{
 		{"anonymous request refused", respondWith(http.StatusUnauthorized, "<html>PRIVATE_BODY</html>"), http.StatusUnauthorized, false},
 		{"server unavailable", respondWith(http.StatusServiceUnavailable, "<html>PRIVATE_BODY</html>"), http.StatusServiceUnavailable, false},
+		// The shape of astrolift-app's rate-limit reply (config.views.ratelimited).
+		{"rate limited", respondWith(http.StatusTooManyRequests, `{"errors":[{"message":"Rate limit exceeded.","extensions":{"code":"RATE_LIMITED","retryAfterSeconds":60}}]}`), http.StatusTooManyRequests, false},
 		{"graphql error", respondWith(http.StatusOK, `{"errors":[{"message":"handshake unavailable"}]}`), 0, false},
 		{"unreachable", nil, 0, true},
 	} {
@@ -301,5 +304,21 @@ func TestVersionCheckNeedsAServerNotASignIn(t *testing.T) {
 	var result versionCheckResult
 	if err != nil || json.Unmarshal([]byte(stdout), &result) != nil || !result.Compatible || result.Server != "" || requests.Load() != 1 {
 		t.Fatalf("--api-url alone: %v, %q", err, stdout)
+	}
+}
+
+// --api-url wins over the current server's registered URL, as in
+// loadActiveClient.
+func TestVersionCheckAPIURLOverridesTheCurrentServer(t *testing.T) {
+	registered, registeredRequests := versionCheckInstall(t, nil)
+	versionCheckFixture(t, registered.URL, "signed in")
+	override, overrideRequests := versionCheckInstall(t, handshakeWith(versionCheckCapability))
+	viper.Set("api_url", override.URL)
+
+	stdout, _, err := runVersionCheckCommand(t, true)
+	var result versionCheckResult
+	if err != nil || json.Unmarshal([]byte(stdout), &result) != nil || !result.Compatible || result.APIURL != override.URL ||
+		registeredRequests.Load() != 0 || overrideRequests.Load() != 1 {
+		t.Fatalf("checked the registered URL instead of --api-url: %v, %q", err, stdout)
 	}
 }
