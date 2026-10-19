@@ -90,3 +90,16 @@ workflow, activity or Temporal client is replaced. Use a backend containing the
 recoverable human-gate API and the usual CLI binary environment variable, with
 its pytest configuration and backend conftest loaded. Temporary test tokens and
 configuration directories never read production credentials.
+
+## Public install discovery for version-check
+
+`test_version_check.py` validates the `astro version-check` discovery document
+against the app's public discovery schema, then runs the compiled CLI with no
+credential through real ASGI routing twice. Against the app as it is, the CLI
+reports a compatible server and exits 0. Against the same URL configuration
+with only `/app/gql/config/public/` removed, as on an install from before that
+route, Django's own 404 comes back as one unsupported-server result naming
+`server_info.handshake`, and the CLI exits 1. It needs no Kind cluster or
+Temporal server. An external test path does not pick up the backend conftest by
+itself; from the backend directory, load it with `-p conftest` next to
+`-c pytest.ini`, and use a separate test database as for the other receipts.
