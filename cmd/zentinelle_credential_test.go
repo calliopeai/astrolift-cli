@@ -57,6 +57,8 @@ func zentinelleCeilingServer(t *testing.T, holds bool, reads *int) *httptest.Ser
 			permission, field, data = "zentinelle.policy_view", "astroliftZentinellePolicies", []any{map[string]any{"id": "pol-1", "name": "oversight", "enforcement": "enforce"}}
 		case strings.Contains(request.Query, "astroliftZentinelleAuditPage"):
 			permission, field, data = "zentinelle.audit_view", "astroliftZentinelleAuditPage", map[string]any{"events": []any{map[string]any{"id": "evt-1", "action": "evaluate"}}, "nextCursor": nil}
+		case strings.Contains(request.Query, "exportZentinelleAudit"):
+			permission, field, data = "zentinelle.audit_export", "exportZentinelleAudit", map[string]any{"ok": true, "errors": []any{}, "data": map[string]any{"filename": "audit.ndjson", "content": "{}\n", "contentType": "application/x-ndjson", "rowCount": 1}}
 		default:
 			t.Errorf("unexpected document: %s", request.Query)
 		}
@@ -72,6 +74,14 @@ func zentinelleCeilingServer(t *testing.T, holds bool, reads *int) *httptest.Ser
 			case !holds:
 				reason = "no grant for this permission at any scope"
 			}
+		}
+		if reason != "" && field == "exportZentinelleAudit" {
+			// @mutation_audit puts the refusal's reason in the result
+			// envelope, with its code and without the permission.
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{field: map[string]any{
+				"ok": false, "data": nil, "errors": []any{map[string]any{"code": "PERMISSION_DENIED", "message": reason, "field": nil}},
+			}}})
+			return
 		}
 		if reason != "" {
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": nil, "errors": []any{map[string]any{
@@ -248,6 +258,97 @@ func TestAuditExportScopeRefusalNamesTheSignIn(t *testing.T) {
 		}
 	}
 	resetZentinelleReads()
+}
+
+// Under --json the export's error keeps the envelope's code, so a refusal can
+// be told from any other failure without reading the message, and its message
+// stays the server's, with the advice only in credential.
+func TestAuditExportErrorUnderJSONKeepsTheEnvelopeCode(t *testing.T) {
+	for _, fixture := range []struct {
+		name, token, reason string
+		advice              bool
+	}{
+		{"default sign-in", "cli-token", tokenScopeRefusal, true},
+		{"admin sign-in, account lacks it", "admin-token", "no grant for this permission at any scope", false},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			resetZentinelleReads()
+			t.Cleanup(resetZentinelleReads)
+			reads := 0
+			server := zentinelleCeilingServer(t, false, &reads)
+			command, out, errOut := zentinelleReadInvocation(t, server.URL, fixture.token)
+			_ = command.Flags().Set("json", "true")
+			zentinelleReadSince = "2026-10-01"
+			if err := auditExportCmd.RunE(command, nil); err == nil || reads != 1 || out.Len() != 0 {
+				t.Fatalf("refusal not reported: %v, asked %d times, stdout %q", err, reads, out)
+			}
+			var report struct {
+				Error      map[string]string `json:"error"`
+				Credential *credentialAdvice `json:"credential"`
+			}
+			if err := json.Unmarshal(errOut.Bytes(), &report); err != nil {
+				t.Fatalf("stderr is not one JSON object: %v\n%s", err, errOut)
+			}
+			if report.Error["code"] != "PERMISSION_DENIED" || report.Error["message"] != "export refused: "+fixture.reason {
+				t.Fatalf("lost the envelope's refusal: %s", errOut)
+			}
+			if (report.Credential != nil) != fixture.advice || fixture.advice && report.Credential.Permission != "zentinelle.audit_export" {
+				t.Fatalf("credential advice: %s", errOut)
+			}
+		})
+	}
+}
+
+// Only a refused Zentinelle permission gets the Zentinelle sign-in advice.
+// Resolving --project needs project.read, which the default sign-in carries
+// and a narrower API token may not; naming --scope admin for that refusal
+// would send the user after the wrong sign-in.
+func TestZentinelleReadsLeaveOtherScopeRefusalsAlone(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request gqlRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+			return
+		}
+		switch {
+		case strings.Contains(request.Query, "astroliftOrganizations"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"astroliftOrganizations": []map[string]string{{"id": "org-id", "slug": "org", "name": "Org"}}}})
+		case strings.Contains(request.Query, "astroliftZentinelleCapability"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"astroliftZentinelleCapability": map[string]any{"connected": true}}})
+		case strings.Contains(request.Query, "astroliftProjects"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": nil, "errors": []any{map[string]any{
+				"message": tokenScopeRefusal + ": project.read", "path": []string{"astroliftProjects"},
+				"extensions": map[string]string{"code": "PERMISSION_DENIED", "reason": tokenScopeRefusal, "permission": "project.read"},
+			}}})
+		default:
+			t.Errorf("asked after the project was refused: %s", request.Query)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(resetZentinelleReads)
+	for _, asJSON := range []bool{false, true} {
+		resetZentinelleReads()
+		command, out, errOut := zentinelleReadInvocation(t, server.URL, "narrow-token")
+		_ = command.Flags().Set("project", "intake")
+		if asJSON {
+			_ = command.Flags().Set("json", "true")
+		}
+		err := policyLsCmd.RunE(command, nil)
+		var scope *credentialScopeError
+		if err == nil || errors.As(err, &scope) || out.Len() != 0 {
+			t.Fatalf("json %t: %v", asJSON, err)
+		}
+		if !asJSON {
+			if errOut.Len() != 0 || strings.Contains(err.Error(), "--scope") || !strings.Contains(err.Error(), tokenScopeRefusal+": project.read") {
+				t.Fatalf("a project.read refusal got Zentinelle advice: %v", err)
+			}
+			continue
+		}
+		var report map[string]json.RawMessage
+		if err := json.Unmarshal(errOut.Bytes(), &report); err != nil || report["error"] == nil || report["credential"] != nil {
+			t.Fatalf("a project.read refusal must be JSON without credential advice: %v\n%s", err, errOut)
+		}
+	}
 }
 
 // The sign-in contract the help and the advice state (#179), as of
