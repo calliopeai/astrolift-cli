@@ -18,6 +18,12 @@ func TestClientKindForScope(t *testing.T) {
 	if _, err := ClientKindForScope("root"); err == nil {
 		t.Fatal("an unknown scope must be refused, not silently widened or dropped")
 	}
+	// The server has no Zentinelle sign-in kind, and it treats a kind it does
+	// not know as the plain CLI. Sending one would approve a sign-in without
+	// what was asked for, so the CLI refuses until the server defines it (#179).
+	if _, err := ClientKindForScope("zentinelle"); err == nil {
+		t.Fatal("--scope zentinelle must be refused until the server defines a kind for it")
+	}
 }
 
 func TestStartLoginSendsTheClientKind(t *testing.T) {

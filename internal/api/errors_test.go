@@ -125,6 +125,24 @@ func TestGraphQLMalformedVersionMetadataIsNotInvented(t *testing.T) {
 	}
 }
 
+// A refusal names the permission it refused (platform #1867), which is how a
+// caller tells which credential would be allowed (#179).
+func TestGraphQLRefusalKeepsTheRefusedPermission(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"errors":[{"message":"api token scope does not allow this permission: zentinelle.status_view","extensions":{"code":"PERMISSION_DENIED","reason":"api token scope does not allow this permission","permission":"zentinelle.status_view"}},{"message":"refused","extensions":{"code":"PERMISSION_DENIED","permission":"synthetic-token.read"}}]}`)
+	}))
+	defer server.Close()
+	err := NewClient(server.URL, "synthetic-token", false).GraphQL(context.Background(), "query{x}", nil, nil)
+	var failure *GraphQLResponseError
+	if !errors.As(err, &failure) || failure.Errors[0].Permission != "zentinelle.status_view" {
+		t.Fatalf("refused permission lost: %v", err)
+	}
+	encoded, _ := json.Marshal(failure)
+	if !strings.Contains(string(encoded), `"permission":"zentinelle.status_view"`) || failure.Errors[1].Permission != "[redacted].read" {
+		t.Fatalf("permission not reported safely: %s", encoded)
+	}
+}
+
 func TestGraphQLPermissionRefusalQuotesItsReasonOnce(t *testing.T) {
 	err := &GraphQLResponseError{Errors: []GraphQLError{{
 		Message: "no role binding grants this permission: org.read",
