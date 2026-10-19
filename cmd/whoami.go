@@ -163,11 +163,14 @@ func permissionCommandError(cmd *cobra.Command, err error) error {
 	}
 	var graphql *api.GraphQLResponseError
 	var httpError *api.HTTPError
+	var refused *exportRefused
 	report.Error = map[string]string{"message": failure.Error()}
 	if errors.As(failure, &graphql) {
 		report.Error = graphql
 	} else if errors.As(failure, &httpError) {
 		report.Error = httpError
+	} else if errors.As(failure, &refused) {
+		report.Error = refused
 	}
 	encoder := json.NewEncoder(cmd.ErrOrStderr())
 	encoder.SetIndent("", "  ")

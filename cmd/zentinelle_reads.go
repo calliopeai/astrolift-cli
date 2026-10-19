@@ -552,6 +552,15 @@ func renderJSONLine(cmd *cobra.Command, v any) error {
 	return json.NewEncoder(cmd.OutOrStdout()).Encode(v)
 }
 
+// exportRefused is the export's failure from its result envelope. Its code,
+// not only the message, is what --json reports, as for the reads' refusals.
+type exportRefused struct {
+	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
+}
+
+func (e *exportRefused) Error() string { return e.Message }
+
 func runAuditExport(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, _ []string) error {
 	if strings.TrimSpace(zentinelleReadSince) == "" {
 		return errors.New("export needs --since")
@@ -581,10 +590,13 @@ func runAuditExport(cmd *cobra.Command, ctx context.Context, client *api.Client,
 		return fmt.Errorf("exporting the Zentinelle audit stream: %w", err)
 	}
 	if !resp.Result.Ok || resp.Result.Data == nil {
-		err := fmt.Errorf("export refused: %s", firstDeployError(resp.Result.Errors))
-		// A mutation's refusal comes back in its envelope, without the permission.
-		if e := resp.Result.Errors; len(e) > 0 && e[0].Code == "PERMISSION_DENIED" && e[0].Message == tokenScopeRefusal {
-			return newCredentialScopeError("zentinelle.audit_export", err)
+		err := &exportRefused{Message: "export refused: " + firstDeployError(resp.Result.Errors)}
+		if e := resp.Result.Errors; len(e) > 0 {
+			err.Code = e[0].Code
+			// A mutation's refusal comes back in its envelope, without the permission.
+			if e[0].Code == "PERMISSION_DENIED" && e[0].Message == tokenScopeRefusal {
+				return newCredentialScopeError("zentinelle.audit_export", err)
+			}
 		}
 		return err
 	}
