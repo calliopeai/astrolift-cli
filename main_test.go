@@ -89,6 +89,63 @@ func TestPermissionInspectionExecutableEmitsOneJSONErrorAndExitsNonzero(t *testi
 	}
 }
 
+// version-check prints one JSON result on stdout for a current install and for
+// one without public install discovery, and only the latter exits nonzero
+// (#178). Only the executable shows main adding nothing after the result.
+func TestVersionCheckExecutableReportsOneResultAndExitCode(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "astro")
+	build := exec.Command("go", "build", "-ldflags", "-X github.com/calliopeai/astrolift-cli/cmd.Version=0.14.1", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build: %v %s", err, output)
+	}
+	for _, install := range []struct {
+		name      string
+		discovery bool
+		exit      int
+	}{
+		{"current install", true, 0},
+		{"install without public discovery", false, 1},
+	} {
+		t.Run(install.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "" {
+					t.Error("version-check sent a credential")
+				}
+				if install.discovery && r.Method == http.MethodPost && r.URL.Path == "/app/gql/config/public/" {
+					_, _ = fmt.Fprint(w, `{"data":{"astroliftServerInfo":{"version":"0.1.0","apiVersion":"0.1.0+5d41402abc4b2a76","capabilities":["server_info.handshake"]}}}`)
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = fmt.Fprint(w, "<!doctype html><title>Not Found</title><h1>Not Found</h1>")
+			}))
+			defer server.Close()
+			process := exec.Command(binary, "--api-url", server.URL, "version-check", "--json")
+			process.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "ASTROLIFT_NO_UPDATE_CHECK=1", "ASTROLIFT_DEPLOY_TOKEN=", "ASTROLIFT_SERVER=", "ASTROLIFT_TOKEN=")
+			var stdout, stderr strings.Builder
+			process.Stdout, process.Stderr = &stdout, &stderr
+			exit := 0
+			if err := process.Run(); err != nil {
+				failed, ok := err.(*exec.ExitError)
+				if !ok {
+					t.Fatal(err)
+				}
+				exit = failed.ExitCode()
+			}
+			var result struct {
+				Compatible         bool   `json:"compatible"`
+				CLIVersion         string `json:"cliVersion"`
+				RequiredCapability string `json:"requiredCapability"`
+			}
+			if exit != install.exit || stderr.Len() != 0 || json.Unmarshal([]byte(stdout.String()), &result) != nil {
+				t.Fatalf("exit=%d stdout=%s stderr=%s", exit, &stdout, &stderr)
+			}
+			if result.Compatible != install.discovery || result.CLIVersion != "0.14.1" || result.RequiredCapability != "server_info.handshake" {
+				t.Fatalf("wrong result: %s", &stdout)
+			}
+		})
+	}
+}
+
 // A Zentinelle read refused for the credential's scopes (#179) exits 1 with
 // nothing on stdout and exactly one JSON object on stderr: the server's
 // refusal and the sign-in that carries the permission.
