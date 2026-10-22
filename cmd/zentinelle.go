@@ -65,13 +65,21 @@ var zentinelleCmd = &cobra.Command{
 	Short: "Zentinelle connection and per-cluster gateways",
 	Long: `Connect the working organization to Zentinelle and manage the model
 gateway Zentinelle runs on each registered cluster. Each command needs the
-matching Zentinelle permission; the server's refusal is shown as is.`,
+matching Zentinelle permission; the server's refusal is shown as is.
+
+The server checks your sign-in's scopes before your roles, and the
+default and --scope clusters sign-ins carry no Zentinelle permission,
+so every command here and the reads (agent usage, policy, audit) are
+refused for them even when your account holds the permission. Status
+and the reads name the sign-in that carries it (see
+'astro auth login --help'); with --json they report any error as one
+JSON object on stderr and exit 1.`,
 }
 
 var zentinelleStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show the Zentinelle connection and each cluster's gateway",
-	RunE:  zentinelleRun(runZentinelleStatus),
+	RunE:  zentinelleReadErrors(zentinelleRun(runZentinelleStatus)),
 }
 
 var zentinelleConnectCmd = &cobra.Command{

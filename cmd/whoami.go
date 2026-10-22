@@ -145,23 +145,36 @@ func printAccountPermissions(cmd *cobra.Command, grants *accountGrantSummary) {
 	}
 }
 
-// Only these inspection commands add machine-readable errors. Other command
-// output and exit behavior stays unchanged; errors still go to stderr.
+// Only these inspection commands and the Zentinelle reads add machine-readable
+// errors. Other command output and exit behavior stays unchanged; errors still
+// go to stderr.
 func permissionCommandError(cmd *cobra.Command, err error) error {
 	if err == nil || !boolFlag(cmd, "json") {
 		return err
 	}
+	var report struct {
+		Error      any               `json:"error"`
+		Credential *credentialAdvice `json:"credential,omitempty"`
+	}
+	failure := err
+	var scope *credentialScopeError
+	if errors.As(err, &scope) {
+		failure, report.Credential = scope.err, &scope.advice
+	}
 	var graphql *api.GraphQLResponseError
 	var httpError *api.HTTPError
-	var payload any = map[string]string{"message": err.Error()}
-	if errors.As(err, &graphql) {
-		payload = graphql
-	} else if errors.As(err, &httpError) {
-		payload = httpError
+	var refused *exportRefused
+	report.Error = map[string]string{"message": failure.Error()}
+	if errors.As(failure, &graphql) {
+		report.Error = graphql
+	} else if errors.As(failure, &httpError) {
+		report.Error = httpError
+	} else if errors.As(failure, &refused) {
+		report.Error = refused
 	}
 	encoder := json.NewEncoder(cmd.ErrOrStderr())
 	encoder.SetIndent("", "  ")
-	if outputErr := encoder.Encode(map[string]any{"error": payload}); outputErr != nil {
+	if outputErr := encoder.Encode(report); outputErr != nil {
 		return fmt.Errorf("writing diagnostic error: %w (original error: %v)", outputErr, err)
 	}
 	return &reportedPermissionError{err}

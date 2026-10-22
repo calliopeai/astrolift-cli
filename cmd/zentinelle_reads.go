@@ -183,9 +183,10 @@ func revealZentinelleCommands(c *cobra.Command) {
 }
 
 // zentinelleReadRun loads the client and org, and refuses in one line unless
-// the org is connected to Zentinelle on this server.
+// the org is connected to Zentinelle on this server. Errors are reported as
+// zentinelleReadErrors does.
 func zentinelleReadRun(run func(*cobra.Command, context.Context, *api.Client, *config.Config, []string) error) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
+	return zentinelleReadErrors(func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		client, cfg, entry, err := loadActiveClient(ctx, boolFlag(cmd, "debug"))
 		if err != nil {
@@ -199,7 +200,7 @@ func zentinelleReadRun(run func(*cobra.Command, context.Context, *api.Client, *c
 			return err
 		}
 		return run(cmd, ctx, client, cfg, args)
-	}
+	})
 }
 
 func requireZentinelle(cmd *cobra.Command, ctx context.Context, client *api.Client, cfg *config.Config, server string) error {
@@ -551,6 +552,15 @@ func renderJSONLine(cmd *cobra.Command, v any) error {
 	return json.NewEncoder(cmd.OutOrStdout()).Encode(v)
 }
 
+// exportRefused is the export's failure from its result envelope. Its code,
+// not only the message, is what --json reports, as for the reads' refusals.
+type exportRefused struct {
+	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
+}
+
+func (e *exportRefused) Error() string { return e.Message }
+
 func runAuditExport(cmd *cobra.Command, ctx context.Context, client *api.Client, _ *config.Config, _ []string) error {
 	if strings.TrimSpace(zentinelleReadSince) == "" {
 		return errors.New("export needs --since")
@@ -580,7 +590,15 @@ func runAuditExport(cmd *cobra.Command, ctx context.Context, client *api.Client,
 		return fmt.Errorf("exporting the Zentinelle audit stream: %w", err)
 	}
 	if !resp.Result.Ok || resp.Result.Data == nil {
-		return fmt.Errorf("export refused: %s", firstDeployError(resp.Result.Errors))
+		err := &exportRefused{Message: "export refused: " + firstDeployError(resp.Result.Errors)}
+		if e := resp.Result.Errors; len(e) > 0 {
+			err.Code = e[0].Code
+			// A mutation's refusal comes back in its envelope, without the permission.
+			if e[0].Code == "PERMISSION_DENIED" && e[0].Message == tokenScopeRefusal {
+				return newCredentialScopeError("zentinelle.audit_export", err)
+			}
+		}
+		return err
 	}
 	data := resp.Result.Data
 	if zentinelleExportOut == "" {
