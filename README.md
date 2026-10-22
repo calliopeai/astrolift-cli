@@ -407,7 +407,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
 | `astro onboard` | Set an AI coding agent up against the selected install in one call: writes an MCP server entry pointing at the install's gateway, installs the bundled skill catalogue, and drops the offline guides as agent context. Components are selectable with `--only mcp,skills,docs`, the layout with `--target claude\|codex\|both`, and `--dry-run` reports the plan without touching the filesystem. Existing files are reported and left alone unless `--force`. Authentication is reported, never performed. |
 | `astro docs` | Open public docs, read embedded release-matched topics, or export portable Markdown and man pages. |
-| `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. |
+| `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. `version-check` reads the server's public install discovery without signing in and exits 1 for a server that predates it, naming the capability it lacks. |
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
 
 Every command supports `--json` for machine-readable output, plus
