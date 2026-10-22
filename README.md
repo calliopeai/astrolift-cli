@@ -620,6 +620,18 @@ Each needs its permission (`zentinelle.usage_view`, `policy_view`,
 server records each export in the audit log. `audit tail --json` prints one
 JSON event per line.
 
+The server checks your sign-in's scopes before your roles, and neither the
+default `astro auth login` nor `astro auth login --scope clusters` carries a
+Zentinelle permission. With either, `zentinelle status` and these reads are
+refused with `api token scope does not allow this permission` even when
+`astro perms diagnose --permission zentinelle.status_view` shows your account
+holds it. Of the sign-ins, only `astro auth login --scope admin` carries them,
+and only the platform operator can approve it; an API token works when its own
+scopes allow the permission. The refusal names that sign-in. Under `--json`,
+status and the reads report any error as one JSON object on stderr and exit 1:
+`error` keeps the server's code, reason and permission, and `credential` adds
+the `permission`, the `loginScope` that carries it and a `hint`.
+
 ### Semantic layers
 
 A semantic layer is a Mimwell brain registered as an app of kind `mimwell`.
