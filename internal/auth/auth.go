@@ -63,12 +63,14 @@ func ClientKindForScope(scope string) (string, error) {
 		// The CLI's scopes plus write:clusters and manage:clusters (#2120),
 		// for an operator who would otherwise mint an admin token.
 		return "cli-operator", nil
+	case "zentinelle":
+		return "cli-zentinelle", nil
 	case "admin":
 		// Full administrative access (#2448): only the platform operator can
 		// approve it, and the sign-in lasts 12 hours.
 		return "cli-admin", nil
 	default:
-		return "", fmt.Errorf("unknown --scope %q (want: clusters, admin)", scope)
+		return "", fmt.Errorf("unknown --scope %q (want: clusters, zentinelle, admin)", scope)
 	}
 }
 

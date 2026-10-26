@@ -66,10 +66,18 @@ func latestReleaseURL() string {
 }
 
 func runUpdate(cmd *cobra.Command, dryRun bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	parent := cmd.Context()
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 60*time.Second)
 	defer cancel()
 
-	fmt.Fprintln(cmd.OutOrStdout(), "Checking for latest release…")
+	progress := cmd.OutOrStdout()
+	if boolFlag(cmd, "json") {
+		progress = cmd.ErrOrStderr()
+	}
+	fmt.Fprintln(progress, "Checking for latest release…")
 
 	token := githubToken()
 	var release githubRelease
@@ -94,11 +102,14 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 		cmp = -1
 	}
 	if cmp >= 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "Already at latest version %s — nothing to do.\n", Version)
+		if boolFlag(cmd, "json") {
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{"currentVersion": Version, "latestVersion": release.TagName, "updateAvailable": false, "dryRun": dryRun})
+		}
+		fmt.Fprintf(progress, "Already at latest version %s — nothing to do.\n", Version)
 		return nil
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Current: %s → Latest: %s\n", Version, release.TagName)
+	fmt.Fprintf(progress, "Current: %s → Latest: %s\n", Version, release.TagName)
 
 	// Determine the correct asset name for this OS/arch
 	assetName := resolveAssetName()
@@ -123,6 +134,9 @@ func runUpdate(cmd *cobra.Command, dryRun bool) error {
 	}
 
 	if dryRun {
+		if boolFlag(cmd, "json") {
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{"currentVersion": Version, "latestVersion": release.TagName, "updateAvailable": true, "dryRun": true, "downloadUrl": downloadURL})
+		}
 		fmt.Fprintf(cmd.OutOrStdout(), "[dry-run] Would download: %s\n", downloadURL)
 		fmt.Fprintln(cmd.OutOrStdout(), "[dry-run] No changes made.")
 		return nil
