@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -137,10 +138,10 @@ func TestZentinelleReadsNeedTheCredentialScopeAndTheAccountPermission(t *testing
 				var scope *credentialScopeError
 				switch {
 				case fixture.token == "cli-token":
-					if !errors.As(err, &scope) || scope.advice.Permission != read.permission || scope.advice.LoginScope != "admin" || out.Len() != 0 {
+					if !errors.As(err, &scope) || scope.advice.Permission != read.permission || scope.advice.LoginScope != "zentinelle" || out.Len() != 0 {
 						t.Fatalf("scope refusal without the sign-in that carries it: %v", err)
 					}
-					for _, want := range []string{tokenScopeRefusal + ": " + read.permission, "--scope clusters", "astro auth login --scope admin", "roles cannot widen"} {
+					for _, want := range []string{tokenScopeRefusal + ": " + read.permission, "--scope clusters", "astro auth login --scope zentinelle", "roles cannot widen"} {
 						if !strings.Contains(err.Error(), want) {
 							t.Fatalf("refusal does not say %q:\n%v", want, err)
 						}
@@ -186,7 +187,7 @@ func TestZentinelleReadErrorsUnderJSONAreOneObjectOnStderr(t *testing.T) {
 				t.Fatalf("lost the server's refusal: %s", errOut)
 			}
 			advice := report.Credential
-			if advice == nil || advice.Permission != read.permission || advice.LoginScope != "admin" || !strings.Contains(advice.Hint, "astro auth login --scope admin") {
+			if advice == nil || advice.Permission != read.permission || advice.LoginScope != "zentinelle" || !strings.Contains(advice.Hint, "astro auth login --scope zentinelle") {
 				t.Fatalf("no credential advice: %s", errOut)
 			}
 			if strings.Contains(errOut.String(), "cli-token") {
@@ -357,13 +358,13 @@ func TestZentinelleReadsLeaveOtherScopeRefusalsAlone(t *testing.T) {
 // ceilings; only its admin wildcard covers them. When the server adds a
 // narrower Zentinelle sign-in, this and zentinelleLoginScope change with it.
 func TestZentinelleSignInContract(t *testing.T) {
-	for scope, wantKind := range map[string]string{"": "", "clusters": "cli-operator", zentinelleLoginScope: "cli-admin"} {
+	for scope, wantKind := range map[string]string{"": "", "clusters": "cli-operator", zentinelleLoginScope: "cli-zentinelle", "admin": "cli-admin"} {
 		if kind, err := auth.ClientKindForScope(scope); err != nil || kind != wantKind {
 			t.Fatalf("--scope %q signs in as %q (%v), want %q", scope, kind, err, wantKind)
 		}
 	}
 	help := func(c *cobra.Command) string { return strings.Join(strings.Fields(c.Long), " ") }
-	for _, want := range []string{"Neither the default sign-in nor --scope clusters carries a Zentinelle permission", "only --scope admin carries them", tokenScopeRefusal} {
+	for _, want := range []string{"Neither the default sign-in nor --scope clusters carries a Zentinelle permission", "--scope zentinelle adds status", tokenScopeRefusal} {
 		if !strings.Contains(help(authLoginCmd), want) {
 			t.Errorf("astro auth login --help does not say %q", want)
 		}
@@ -371,6 +372,54 @@ func TestZentinelleSignInContract(t *testing.T) {
 	for _, want := range []string{"default and --scope clusters sign-ins carry no Zentinelle permission", "astro auth login --help", "one JSON object on stderr"} {
 		if !strings.Contains(help(zentinelleCmd), want) {
 			t.Errorf("astro zentinelle --help does not say %q", want)
+		}
+	}
+}
+
+func TestZentinelleLoginPreflightRefusesOldServerBeforeIssuance(t *testing.T) {
+	for _, supported := range []bool{false, true} {
+		t.Run(fmt.Sprint(supported), func(t *testing.T) {
+			starts := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "" {
+					t.Error("preflight forwarded credentials")
+				}
+				if r.URL.Path == "/app/gql/config/public/" {
+					caps := []string{}
+					if supported {
+						caps = append(caps, "identity.zentinelle_read_scope")
+					}
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": map[string]interface{}{"astroliftServerInfo": map[string]interface{}{"capabilities": caps}}})
+					return
+				}
+				starts++
+				if r.URL.Path != "/api/cli/v1/auth/start" {
+					t.Error(r.URL.Path)
+				}
+				var input map[string]string
+				_ = json.NewDecoder(r.Body).Decode(&input)
+				if input["client_kind"] != "cli-zentinelle" {
+					t.Errorf("wrong kind: %v", input)
+				}
+				fmt.Fprint(w, `{"session_id":"new","login_url":"https://example.test/approve"}`)
+			}))
+			defer server.Close()
+			_, err := startScopedLogin(context.Background(), server.URL, "cli-zentinelle")
+			if supported {
+				if err != nil || starts != 1 {
+					t.Fatalf("starts=%d err=%v", starts, err)
+				}
+			} else if err == nil || starts != 0 {
+				t.Fatalf("old server issued login: starts=%d err=%v", starts, err)
+			}
+		})
+	}
+}
+
+func TestZentinelleExportAndWritesNeverUseReadScope(t *testing.T) {
+	for _, permission := range []string{"zentinelle.audit_export", "zentinelle.connect", "zentinelle.policy_edit", "zentinelle.future_permission"} {
+		if got := zentinelleScopeForPermission(permission); got != "admin" {
+			t.Fatalf("%s: %s", permission, got)
 		}
 	}
 }

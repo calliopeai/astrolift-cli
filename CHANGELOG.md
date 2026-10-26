@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+
+- Fix `ci status` to accept a deployment GUID from `ci deploy` and use the served deployment-status route; HTTP failures no longer print raw server bodies (#185).
+- Make `self-update` a login-free preview alias for `update --dry-run`, including JSON output (#183).
+- Add explicitly consented Zentinelle read login with an old-server capability refusal; audit export and writes retain their separate authority (#179).
+
+
 - Retire monetary CLI surfaces (platform #2464): remove organization and project-resource cost commands and monetary model-usage fields. Preview `show --resources` requests only CPU, memory and pod measurements and replaces `--cost`; upgrade with the matching resource-only server schema. Zentinelle usage retains requests and per-model token counts where the actual server API and connection are available.
 
 - Temporary apps (#168): registration and brain-hosted apps accept `--ttl` or `--expires-at`, and registration honors manifest `[app] expires_in`. Add `app extend --by|--until`, confirmed `app expiry --clear`, an EXPIRES column, `app list --temporary`, and JSON expiry/capability state. Expiry writes require `apps.temporary_expiry`; server permissions, fresh verification and organization policy remain authoritative.
