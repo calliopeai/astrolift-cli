@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.15.0 — 2026-10-25
+
+- `astro brain connect` builds the MCP URL from the environment URL the server issues and appends `/mcp`, as the web console does. It looked for a `/mcp` URL among the issued endpoints, never found one, and failed with `the server issued no MCP endpoint` on every install (#186).
+
 - `astro agent inspect` and `astro agent logs` gain governance lines when the working organization is connected to Zentinelle. Inspect adds the task's agent's policies in effect and its last 24 hours of blocks, violations and approvals (a `governance` field with `--json`); logs end with that agent's blocks, violations and approvals in the task's time window, each line marked `[governance]` (not under `--follow`). An older server shows nothing new; an unconnected organization or a refused read gives the same one-line reason as `astro policy` and `astro audit` (#113).
 
 - `astro auth login --scope admin` asks for full administrative access (`client_kind=cli-admin`). Only the platform operator can approve it, and the sign-in lasts 12 hours; after that the CLI asks for `astro auth login` again, as it does for any expired session (#174, platform #2448).
