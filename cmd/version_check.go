@@ -17,16 +17,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// CompatStatus is what the platform returns from
-// GET /api/cli/v1/compat/<cli-version>/.
-type CompatStatus struct {
-	Compatible   bool   `json:"compatible"`
-	MinSupported string `json:"min_supported_cli"`
-	LatestStable string `json:"latest_stable_cli"`
-	UpgradeURL   string `json:"upgrade_url"`
-	Reason       string `json:"reason,omitempty"`
-}
-
 // versionCheckCapability is what a server advertises when it serves the public
 // install handshake this CLI reads before login. The server publishes no
 // minimum CLI version and a fixed server version, so this capability is the
@@ -215,25 +205,13 @@ func reportVersionCheckError(cmd *cobra.Command, err error) error {
 
 var selfUpdateCmd = &cobra.Command{
 	Use:   "self-update",
-	Short: "Print the upgrade URL for this platform's recommended CLI version",
-	Long: `Doesn't actually self-replace the binary (that would need
-admin perms on most installs). Prints the platform's recommended
-upgrade path so the operator can re-install via brew/scoop/curl.`,
+	Short: "Preview the latest CLI release without installing it",
+	Long: `Alias for astro update --dry-run. Reads the latest GitHub release without
+requiring an Astrolift sign-in and never replaces the binary.
+Run astro update to install the release.`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
-		defer cancel()
-		client, _, _, err := loadActiveClient(ctx, false)
-		if err != nil {
-			return err
-		}
-		var status CompatStatus
-		if err := client.Get(ctx, fmt.Sprintf("/api/cli/v1/compat/%s/", Version), &status); err != nil {
-			return err
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Latest stable CLI: %s\nUpgrade: %s\n",
-			status.LatestStable, status.UpgradeURL,
-		)
-		return nil
+		return runUpdate(cmd, true)
 	},
 }
 

@@ -4,11 +4,20 @@
 
 - Inspect committed brain task DAGs with `astro plan ls/show`: exact Git revision, source identity, story states, expanded dependencies and blockers (#181).
 
+- Fix `ci status` to accept a deployment GUID from `ci deploy` and use the served deployment-status route; HTTP failures no longer print raw server bodies (#185).
+- Make `self-update` a login-free preview alias for `update --dry-run`, including JSON output (#183).
+- Add explicitly consented Zentinelle read login with an old-server capability refusal; audit export and writes retain their separate authority (#179).
+
+
 - Retire monetary CLI surfaces (platform #2464): remove organization and project-resource cost commands and monetary model-usage fields. Preview `show --resources` requests only CPU, memory and pod measurements and replaces `--cost`; upgrade with the matching resource-only server schema. Zentinelle usage retains requests and per-model token counts where the actual server API and connection are available.
 
 - Temporary apps (#168): registration and brain-hosted apps accept `--ttl` or `--expires-at`, and registration honors manifest `[app] expires_in`. Add `app extend --by|--until`, confirmed `app expiry --clear`, an EXPIRES column, `app list --temporary`, and JSON expiry/capability state. Expiry writes require `apps.temporary_expiry`; server permissions, fresh verification and organization policy remain authoritative.
 - Embed the canonical `temporary-apps` and `agent-inbox` API and usage guides for offline `astro docs` search/show/export.
 - Add `astro inbox list|show|reply|follow` for agents' messages addressed to the current person (platform #2434). Reads retain thread/message identity and pagination; explicit `show --mark-read` marks only that message. Replies preserve a request UUID for recovery and distinguish route acceptance from delivery/execution. Follow reconciles paged HTTP reads with deduplication, bounded transient retries, cancellation and explicit window limits. Requires `agents.messages` and the person's existing Astrolift credentials.
+
+## 0.15.0 — 2026-10-25
+
+- `astro brain connect` builds the MCP URL from the environment URL the server issues and appends `/mcp`, as the web console does. It looked for a `/mcp` URL among the issued endpoints, never found one, and failed with `the server issued no MCP endpoint` on every install (#186).
 
 - `astro agent inspect` and `astro agent logs` gain governance lines when the working organization is connected to Zentinelle. Inspect adds the task's agent's policies in effect and its last 24 hours of blocks, violations and approvals (a `governance` field with `--json`); logs end with that agent's blocks, violations and approvals in the task's time window, each line marked `[governance]` (not under `--follow`). An older server shows nothing new; an unconnected organization or a refused read gives the same one-line reason as `astro policy` and `astro audit` (#113).
 
