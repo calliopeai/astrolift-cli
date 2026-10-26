@@ -69,8 +69,9 @@ matching Zentinelle permission; the server's refusal is shown as is.
 
 The server checks your sign-in's scopes before your roles, and the
 default and --scope clusters sign-ins carry no Zentinelle permission,
-so every command here and the reads (agent usage, policy, audit) are
-refused for them even when your account holds the permission. Status
+so those sign-ins are refused even when your account holds the permission.
+Use --scope zentinelle for reads on a supporting server; export and writes still
+require admin. Status
 and the reads name the sign-in that carries it (see
 'astro auth login --help'); with --json they report any error as one
 JSON object on stderr and exit 1.`,

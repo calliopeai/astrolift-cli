@@ -215,7 +215,7 @@ func TestZentinelleReadExecutableReportsAScopeRefusalAsOneJSONError(t *testing.T
 			if len(refusal) != 1 || refusal[0].Code != "PERMISSION_DENIED" || refusal[0].Permission != fixture.permission {
 				t.Fatalf("lost the server's refusal: %s", &stderr)
 			}
-			if report.Credential.Permission != fixture.permission || report.Credential.LoginScope != "admin" || !strings.Contains(report.Credential.Hint, "astro auth login --scope admin") {
+			if report.Credential.Permission != fixture.permission || report.Credential.LoginScope != "zentinelle" || !strings.Contains(report.Credential.Hint, "astro auth login --scope zentinelle") {
 				t.Fatalf("no sign-in advice: %s", &stderr)
 			}
 			if strings.Contains(stderr.String(), "synthetic-token") {
