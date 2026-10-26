@@ -154,8 +154,8 @@ func TestAgentUsageResolvesTheProjectAndTotals(t *testing.T) {
 		return map[string]interface{}{"astroliftZentinelleUsage": map[string]interface{}{
 			"since": "2026-10-01T00:00:00+00:00",
 			"rows": []map[string]interface{}{
-				{"agentSlug": "triage", "provider": "anthropic", "model": "claude", "requests": 2, "inputTokens": 100, "outputTokens": 50, "costUsd": 0.25},
-				{"agentSlug": "review", "provider": "openai", "model": "gpt", "requests": 1, "inputTokens": 3000000000, "outputTokens": 10, "costUsd": 1.5},
+				{"agentSlug": "triage", "provider": "anthropic", "model": "claude", "requests": 2, "inputTokens": 100, "outputTokens": 50},
+				{"agentSlug": "review", "provider": "openai", "model": "gpt", "requests": 1, "inputTokens": 3000000000, "outputTokens": 10},
 			},
 		}}
 	})
@@ -177,8 +177,11 @@ func TestAgentUsageResolvesTheProjectAndTotals(t *testing.T) {
 	if d := time.Since(since); d < 167*time.Hour || d > 169*time.Hour {
 		t.Fatalf("--since 7d sent %v", sent.Variables["since"])
 	}
-	if !strings.Contains(out.String(), "TOTAL") || !strings.Contains(out.String(), "3000000100") || !strings.Contains(out.String(), "1.7500") {
+	if !strings.Contains(out.String(), "TOTAL") || !strings.Contains(out.String(), "3000000100") {
 		t.Fatalf("output: %s", out.String())
+	}
+	if strings.Contains(sent.Query, "costUsd") || strings.Contains(out.String(), "COST") {
+		t.Fatalf("token usage requested or displayed monetary data: %s\n%s", sent.Query, out.String())
 	}
 
 	cmd, out = zentinelleReadCmd()
@@ -192,6 +195,9 @@ func TestAgentUsageResolvesTheProjectAndTotals(t *testing.T) {
 	var decoded zentinelleUsage
 	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil || len(decoded.Rows) != 2 {
 		t.Fatalf("json: %v %s", err, out.String())
+	}
+	if strings.Contains(out.String(), "costUsd") {
+		t.Fatalf("token JSON exposes monetary data: %s", out.String())
 	}
 }
 
@@ -211,7 +217,7 @@ func TestPolicyShowFindsThePolicyAndRefusesATeam(t *testing.T) {
 	srv := zentinelleServer(t, true, func(req gqlRequest) map[string]interface{} {
 		sent = req
 		return map[string]interface{}{"astroliftZentinellePolicies": []map[string]interface{}{
-			{"id": "pol-1", "name": "budget", "policyType": "budget_limit", "enforcement": "enforce", "scope": "endpoint", "priority": 10, "description": "Daily cap"},
+			{"id": "pol-1", "name": "oversight", "policyType": "human_oversight", "enforcement": "enforce", "scope": "endpoint", "priority": 10, "description": "Named reviewer"},
 		}}
 	})
 	defer srv.Close()
@@ -222,7 +228,7 @@ func TestPolicyShowFindsThePolicyAndRefusesATeam(t *testing.T) {
 	if err := runPolicyShow(cmd, context.Background(), client, &config.Config{}, []string{"pol-1"}); err != nil {
 		t.Fatal(err)
 	}
-	if sent.Variables["agentSlug"] != "triage" || !strings.Contains(out.String(), "Description: Daily cap") {
+	if sent.Variables["agentSlug"] != "triage" || !strings.Contains(out.String(), "Description: Named reviewer") {
 		t.Fatalf("variables %#v output %s", sent.Variables, out.String())
 	}
 	if err := runPolicyShow(cmd, context.Background(), client, &config.Config{}, []string{"pol-2"}); err == nil || !strings.Contains(err.Error(), "not in effect") {

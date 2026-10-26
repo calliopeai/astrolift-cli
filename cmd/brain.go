@@ -280,9 +280,10 @@ type brainHostedAppResult struct {
 	EnvironmentName string   `json:"environmentName"`
 	EnvKeys         []string `json:"envKeys"`
 	App             struct {
-		ID   string `json:"id"`
-		Slug string `json:"slug"`
-		Name string `json:"name"`
+		ID        string  `json:"id"`
+		Slug      string  `json:"slug"`
+		Name      string  `json:"name"`
+		ExpiresAt *string `json:"expiresAt"`
 	} `json:"app"`
 }
 
@@ -1151,10 +1152,17 @@ func runBrainHostApp(cmd *cobra.Command, ctx context.Context, client *api.Client
 	if cmd.Flags().Changed("port") {
 		input["port"] = brainHostPort
 	}
+	if err := applyCreationExpiry(cmd, ctx, client, input, ""); err != nil {
+		return err
+	}
 	var resp struct {
 		Result brainResult[brainHostedAppResult] `json:"hostAppOnBrain"`
 	}
-	if err := brainGraphQL(ctx, client, brainHostAppMutation, map[string]interface{}{"input": input}, &resp, "hosting an app on "+brainSlug); err != nil {
+	mutation := brainHostAppMutation
+	if serverAdvertises(ctx, client, "apps.temporary_expiry") {
+		mutation = strings.Replace(mutation, "app { id slug name }", "app { id slug name expiresAt }", 1)
+	}
+	if err := brainGraphQL(ctx, client, mutation, map[string]interface{}{"input": input}, &resp, "hosting an app on "+brainSlug); err != nil {
 		return err
 	}
 	if !resp.Result.OK || resp.Result.Data == nil {

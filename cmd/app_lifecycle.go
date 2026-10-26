@@ -247,6 +247,8 @@ type deploymentSummary struct {
 }
 
 type appListItem struct {
+	ExpiryAvailable    bool               `json:"expiryAvailable"`
+	ExpiresAt          *string            `json:"expiresAt"`
 	Slug               string             `json:"slug"`
 	Name               string             `json:"name"`
 	ProvisioningStatus string             `json:"provisioningStatus"`
@@ -259,6 +261,8 @@ type appListItem struct {
 }
 
 type appDetail struct {
+	ExpiryAvailable    bool               `json:"expiryAvailable"`
+	ExpiresAt          *string            `json:"expiresAt"`
 	ID                 string             `json:"id"`
 	Slug               string             `json:"slug"`
 	Name               string             `json:"name"`
@@ -473,10 +477,23 @@ func runAppList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 	var resp struct {
 		Apps []appListItem `json:"astroliftApps"`
 	}
-	if err := client.GraphQL(listCtx, astroliftAppsQuery, vars, &resp); err != nil {
+	expiryAvailable, err := queryWithExpiry(cmd, listCtx, client, astroliftAppsQuery, vars, &resp, boolFlag(cmd, "temporary"))
+	if err != nil {
 		return fmt.Errorf("listing apps: %w", err)
 	}
 
+	for i := range resp.Apps {
+		resp.Apps[i].ExpiryAvailable = expiryAvailable
+	}
+	if boolFlag(cmd, "temporary") {
+		filtered := make([]appListItem, 0)
+		for _, app := range resp.Apps {
+			if app.ExpiresAt != nil {
+				filtered = append(filtered, app)
+			}
+		}
+		resp.Apps = filtered
+	}
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Apps)
 	}
@@ -488,11 +505,11 @@ func runAppList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SLUG\tNAME\tSTATUS\tREPO\tLAST DEPLOYED")
+	fmt.Fprintln(w, "SLUG\tNAME\tSTATUS\tREPO\tLAST DEPLOYED\tEXPIRES")
 	for _, a := range resp.Apps {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			a.Slug, a.Name, appStatusLabel(a.ProvisioningStatus, a.IsActive, a.IsArchived),
-			dashIfEmpty(a.SourceRepo), shortTime(a.LastDeployedAt),
+			dashIfEmpty(a.SourceRepo), shortTime(a.LastDeployedAt), appExpiryLabel(a.ExpiresAt, a.ExpiryAvailable),
 		)
 	}
 	if err := w.Flush(); err != nil {
@@ -534,14 +551,16 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 	defer cancel()
 
 	var result appShowResult
-	if err := client.GraphQL(showCtx, astroliftAppShowQuery,
-		map[string]interface{}{"slug": slug}, &result); err != nil {
+	expiryAvailable, err := queryWithExpiry(cmd, showCtx, client, astroliftAppShowQuery,
+		map[string]interface{}{"slug": slug}, &result, false)
+	if err != nil {
 		return fmt.Errorf("fetching app: %w", err)
 	}
 	if result.App == nil {
 		return fmt.Errorf("app %q not found", slug)
 	}
 
+	result.App.ExpiryAvailable = expiryAvailable
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, result)
 	}
@@ -553,6 +572,7 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 		fmt.Fprintf(out, "Description:  %s\n", a.Description)
 	}
 	fmt.Fprintf(out, "Status:       %s\n", appStatusLabel(a.ProvisioningStatus, a.IsActive, a.IsArchived))
+	fmt.Fprintf(out, "Expires:      %s\n", appExpiryLabel(a.ExpiresAt, a.ExpiryAvailable))
 	if a.ProvisioningError != "" {
 		fmt.Fprintf(out, "Error:        %s\n", a.ProvisioningError)
 	}

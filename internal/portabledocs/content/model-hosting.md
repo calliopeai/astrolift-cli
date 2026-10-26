@@ -189,7 +189,7 @@ The attributed measures are requests per second, errors per second, accepted
 response bytes per second and p95 request duration in seconds. Error rate here
 is an absolute count per second, not an error percentage. Bytes cover the ASGI
 application's accepted sends, not proof of receipt by the caller. Token counts
-and cost are **unsupported** until a real attributable usage source exists.
+are **unsupported** by this runtime metrics contract.
 Missing, unconfigured, unavailable and stale measurements remain distinct from
 measured zero.
 

@@ -42,7 +42,7 @@ separate checks and safe metadata reads through the existing GraphQL CLI.
 Per-app model traffic uses `models.authenticated_subscription_metrics` and
 current app-metrics authority. The runtime must provide its version 2 credential
 mapping and authenticated scrape. Missing data is distinct from measured zero;
-token counts and cost remain unsupported. The hosting guide includes a bounded
+token counts remain unsupported by this runtime metrics contract. The hosting guide includes a bounded
 read-only query for one exact app connection.
 `models.runtime_settings` adds typed Super-admin runtime declarations for one
 selected cluster/provider and compute mode. Saving a declaration is separate
@@ -56,6 +56,35 @@ For completion notifications, require `agents.completion_callbacks`; replay
 also requires `agents.completion_callback_redelivery`. The resource catalogue
 distinguishes available entries from planned and
 unavailable entries. Inspect its reason before selecting a kind and variant.
+
+Temporary apps require `apps.temporary_expiry`. See [temporary apps](temporary-apps.md)
+for creation deadlines, extensions, policy and retained data. Conversations with
+agents require `agents.messages`; see [the agent inbox](agent-inbox.md) for
+current recipient access, replies, approvals and client subscriptions. These
+markers grant no app, agent, dispatch or approval permissions.
+
+`builder.brain_source_artifacts` advertises the two-step
+`builder-brain-source-v1` REST protocol. An authenticated Builder capabilities
+read separately describes its build/host phases. An operator-prepared,
+project-isolated AWS target is required; discovery does not certify IAM,
+registry or runtime health. See [source-to-brain hosting](source-to-brain.md)
+for immutable artifact admission and the fresh original-person hosting request.
+
+`workflows.atomic_full_review` adds complete definition/configured-schedule
+review and explicit schedule consent. It does not enable a definition, activate
+the engine or satisfy run-specific human gates. See
+[complete workflow review](atomic-workflow-review.md) for canonical graph
+digests, separate definition activation, revocable approval and rollout rules.
+These API capabilities add no dedicated CLI commands.
+
+`notifications.structured_inbox` adds bounded catch-up and a resumable stream of
+the person's platform notifications. See [platform notifications](platform-notifications.md)
+for signed cursors, current app visibility and historical expiry warnings.
+
+`notifications.quiet_hours` adds personal timezone-based quiet hours for
+agent-message email and push. Inbox reads remain available; other event kinds
+retain their own notification preferences. See the inbox guide for the exact
+self-service query, mutation and time-window rules.
 
 `models.bedrock_connections` identifies the prepared native Bedrock discovery
 and existing-connection APIs. It does not enable the default-off installation
@@ -107,7 +136,9 @@ GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 | Inspect domain records, public delegation and app routes | `domains` | [Domains and DNS](domains-dns.md) |
 | Test an exact applied SES service and read delivery observations | `email-delivery` | [Email delivery](email-delivery.md) |
 | Register and operate an application | `app-setup` | [Set up an app](app-setup.md) |
+| Create or extend an app with a deadline | `temporary-apps` | [Temporary apps](temporary-apps.md) |
 | Package, register, and dispatch an agent | `agent-setup` | [Set up an agent](agent-setup.md) |
+| Read and answer an agent's messages | `agent-inbox` | [Agent inbox](agent-inbox.md) |
 | Compose and run stages | `workflow-setup` | [Set up a workflow](workflow-setup.md) |
 | Bound revisions, retries and record bodies | `bounded-workflows` | [Bounded workflows](bounded-workflows.md) |
 | Review and recover exact starts | `reviewed-starts` | [Reviewed starts](reviewed-starts.md) |
