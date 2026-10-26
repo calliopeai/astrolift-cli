@@ -120,6 +120,13 @@ than empty.
 --brain <slug> (repeatable, at most 10) adds a semantic layer the run reads
 as you, besides the agent's own; 'astro agent inspect' lists them.
 
+--spec <node-id> --brain <slug> compiles a ready story, its pinned context
+recipe, linked docs, target repository/branch and test commands. --source
+selects a local brain checkout; --connection plus a full --revision reads it
+through an authorized source connection. --dry-run prints the exact envelope
+without dispatching. Plan states come from the committed source manifest;
+this command does not implement the server's factory scheduler or WIP leases.
+
 --env-spec pins an AgentEnvironmentSpec (by slug) to launch into — its
 image + secret packet. Omit to use the workload's own image/runtime.
 
@@ -151,6 +158,18 @@ func runAgentDispatch(cmd *cobra.Command, ctx context.Context, client *api.Clien
 		return err
 	}
 
+	if stringFlag(cmd, "spec") != "" {
+		payload, err := specEnvelope(cmd, ctx, client)
+		if err != nil {
+			return err
+		}
+		if boolFlag(cmd, "dry-run") {
+			return renderJSON(cmd, payload)
+		}
+		input["triggerPayload"] = payload
+	} else if boolFlag(cmd, "dry-run") {
+		return fmt.Errorf("--dry-run requires --spec")
+	}
 	if agentDispatchInput != "" {
 		payload, err := parseJSONInput(agentDispatchInput)
 		if err != nil {

@@ -1339,3 +1339,12 @@ The checkout's origin must match the registered brain. Set `--revision <commit>`
 to pin a snapshot, or use `--connection <id> --revision <full-sha>` for authorized
 remote source reads. States come from the source manifest, not a live scheduler.
 Containers expand to their stories; missing dependencies and cycles are refused.
+
+### Dispatch a brain story
+
+`astro agent dispatch <agent> --spec <node-id> --brain <slug> --source <checkout>
+--dry-run` prints a pinned story envelope with its context recipe, linked docs,
+acceptance tests and target repository/branch. Remove `--dry-run` to submit it
+through normal agent dispatch. `--issue`, `--branch` and `--attempt` select its
+review identity. Missing references, blocked dependencies and stories without
+a test command are refused. This does not acquire a factory scheduler lease.

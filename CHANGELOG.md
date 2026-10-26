@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 0.16.0 — 2026-10-26
+
+- Compile ready brain stories into pinned agent-dispatch envelopes with their context recipe, references, acceptance tests and target identity; add a no-dispatch preview (#180).
 - Inspect committed brain task DAGs with `astro plan ls/show`: exact Git revision, source identity, story states, expanded dependencies and blockers (#181).
 
 - Fix `ci status` to accept a deployment GUID from `ci deploy` and use the served deployment-status route; HTTP failures no longer print raw server bodies (#185).
@@ -16,6 +19,8 @@
 - Add `astro inbox list|show|reply|follow` for agents' messages addressed to the current person (platform #2434). Reads retain thread/message identity and pagination; explicit `show --mark-read` marks only that message. Replies preserve a request UUID for recovery and distinguish route acceptance from delivery/execution. Follow reconciles paged HTTP reads with deduplication, bounded transient retries, cancellation and explicit window limits. Requires `agents.messages` and the person's existing Astrolift credentials.
 
 ## 0.15.0 — 2026-10-25
+
+The release was prepared but not published after the documentation gate refused stale embedded guides. These changes are included in 0.16.0.
 
 - `astro brain connect` builds the MCP URL from the environment URL the server issues and appends `/mcp`, as the web console does. It looked for a `/mcp` URL among the issued endpoints, never found one, and failed with `the server issued no MCP endpoint` on every install (#186).
 
