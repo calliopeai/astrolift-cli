@@ -409,3 +409,66 @@ choice. `astro workflow gate-status --run <guid> --stage <guid> --json` recovers
 read-only. Requested and recorded outcomes are distinct; retain the exact target
 from JSON/error output after a lost response. The former slug/newest-gate flow
 is replaced. See [workflow setup](../guides/workflow-setup.md).
+
+## Deployment status and release updates
+
+`astro ci deploy --no-wait` prints both the workflow and deployment IDs.
+Use the deployment GUID with `astro ci status <deployment-id>`; the workflow ID
+is not a status lookup key. Add `--json` for the state object.
+
+`astro self-update` previews the latest GitHub release without replacing the
+binary. It is an alias for `astro update --dry-run`; `astro update` installs it.
+These commands do not require an Astrolift sign-in.
+
+## Read Zentinelle without an admin credential
+
+```sh
+astro auth login --scope zentinelle
+astro zentinelle status
+astro agent usage
+astro policy ls
+astro audit tail
+```
+
+The browser requests the usual CLI scopes plus `read:zentinelle`. That addition
+allows status, policy, token-usage, conformance and audit reads, subject to the
+account's existing permissions. It adds no export or write permission. Audit
+export and administration still require their own permission and an admin
+credential. Default and cluster logins keep their existing scopes.
+
+This login requires a server advertising `identity.zentinelle_read_scope`.
+The CLI refuses an older server before opening the login flow rather than
+accepting a token without the requested scope.
+
+## Inspect a brain plan and dispatch one story
+
+```sh
+astro plan ls --brain product-brain --source ./product-brain
+astro plan show build/parser --brain product-brain --source ./product-brain --json
+astro agent dispatch builder --spec build/parser --brain product-brain \
+  --source ./product-brain --issue 123 --dry-run
+```
+
+The local checkout's origin must match the registered brain's source repository.
+Reads use committed Git objects, so uncommitted edits are not dispatched. The
+output records the exact commit. Set `--revision <commit>` to select another
+snapshot. Alternatively, `--connection <id> --revision <full-commit-sha>` reads
+through an authorized Astrolift source connection without a local checkout.
+
+The plan includes stories only, resolves container dependencies to their stories,
+and refuses unresolved references or cycles. Ready means the committed story is
+planned, has one target-repository label, and its dependencies are done. Running,
+blocked and done are the states declared in that snapshot. This view does not
+claim live scheduler state or acquire a concurrency lease.
+
+Spec dispatch compiles the story, acceptance checklist, context recipe, linked
+documents, target repository/branch and explicit test commands into the existing
+agent input envelope. `--dry-run` prints it without dispatching. Remove that flag
+to dispatch through normal agent permissions and the selected environment spec.
+Use `--branch`, `--issue` and `--attempt` for the task's review identity. The source
+must include its compiled `app/brain.json` and `brain-schema.json`; a missing spec
+or a story without an acceptance test command is refused.
+
+The envelope does not authorize a merge, make a story done, or replace the
+server-side factory scheduler and its WIP limits. Review the selected snapshot
+and keep using the normal workflow and repository gates.
