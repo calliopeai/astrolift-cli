@@ -47,6 +47,7 @@ func resetBrainFlags() {
 	brainConnectionSel, brainRepo, brainName, brainVisibility, brainTemplateRef = "", "", "", "private", ""
 	brainNoDeploy, brainWait, brainYes, brainIngest, brainHostDeploy = false, false, false, false, false
 	brainAccess, brainHostImage, brainHostName, brainHostSlug, brainHostPort = "viewer", "", "", "", 0
+	brainAgent = ""
 	brainPollInterval = time.Millisecond
 }
 
@@ -144,7 +145,7 @@ func brainConnectServer(t *testing.T) *httptest.Server {
 			return map[string]interface{}{"issueBrainReadToken": brainOK(map[string]interface{}{
 				"id": "b-1", "slug": "acme-brain", "header": "X-Brain-Token", "token": "jwt-1",
 				"expiresAt": "2026-10-16T20:15:00Z",
-				"endpoints": []string{"https://acme.example/mcp", "https://staging.acme.example/mcp"},
+				"endpoints": []string{"https://acme.example", "https://staging.acme.example/"},
 			})}
 		}
 		return map[string]interface{}{"astroliftBrain": brainPayload("acme-brain")}
