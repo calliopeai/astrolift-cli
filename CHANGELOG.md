@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Compile ready brain stories into pinned agent-dispatch envelopes with their context recipe, references, acceptance tests and target identity; add a no-dispatch preview (#180).
+
 - Inspect committed brain task DAGs with `astro plan ls/show`: exact Git revision, source identity, story states, expanded dependencies and blockers (#181).
 
 - Retire monetary CLI surfaces (platform #2464): remove organization and project-resource cost commands and monetary model-usage fields. Preview `show --resources` requests only CPU, memory and pod measurements and replaces `--cost`; upgrade with the matching resource-only server schema. Zentinelle usage retains requests and per-model token counts where the actual server API and connection are available.
