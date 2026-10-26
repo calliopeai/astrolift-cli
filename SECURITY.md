@@ -55,5 +55,5 @@ When using the Astrolift CLI:
   rotate access tokens rather than long-lived credentials.
 - Verify the platform you're logging into — `astro server add <slug> <api-url>`
   binds a slug to a URL; check the URL before completing the device flow.
-- Run `astro version-check` periodically; the platform reports the
-  minimum supported CLI and the upgrade URL.
+- Keep the CLI current with `astro update`. `astro version-check` confirms
+  the selected server serves the install discovery this CLI relies on.

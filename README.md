@@ -408,7 +408,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
 | `astro onboard` | Set an AI coding agent up against the selected install in one call: writes an MCP server entry pointing at the install's gateway, installs the bundled skill catalogue, and drops the offline guides as agent context. Components are selectable with `--only mcp,skills,docs`, the layout with `--target claude\|codex\|both`, and `--dry-run` reports the plan without touching the filesystem. Existing files are reported and left alone unless `--force`. Authentication is reported, never performed. |
 | `astro docs` | Open public docs, read embedded release-matched topics, or export portable Markdown and man pages. |
-| `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. |
+| `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. `version-check` reads the server's public install discovery without signing in and exits 1 for a server that predates it, naming the capability it lacks. |
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
 
 Every command supports `--json` for machine-readable output, plus
@@ -622,6 +622,18 @@ Each needs its permission (`zentinelle.usage_view`, `policy_view`,
 server records each export in the audit log. `audit tail --json` prints one
 JSON event per line.
 
+The server checks your sign-in's scopes before your roles, and neither the
+default `astro auth login` nor `astro auth login --scope clusters` carries a
+Zentinelle permission. With either, `zentinelle status` and these reads are
+refused with `api token scope does not allow this permission` even when
+`astro perms diagnose --permission zentinelle.status_view` shows your account
+holds it. Of the sign-ins, only `astro auth login --scope admin` carries them,
+and only the platform operator can approve it; an API token works when its own
+scopes allow the permission. The refusal names that sign-in. Under `--json`,
+status and the reads report any error as one JSON object on stderr and exit 1:
+`error` keeps the server's code, reason and permission, and `credential` adds
+the `permission`, the `loginScope` that carries it and a `hint`.
+
 ### Semantic layers
 
 A semantic layer is a Mimwell brain registered as an app of kind `mimwell`.
@@ -640,6 +652,8 @@ astro brain status acme-brain                             # running vs head comm
 astro brain rebuild acme-brain --ingest                   # run knowledge-refresh.yml; its push deploys
 astro brain share acme-brain --team sales --access viewer # or editor: also edits and deploys
 astro brain unshare acme-brain --team sales
+astro brain share acme-brain --agent triage               # viewer only: the agent's unattended runs read it
+astro brain unshare acme-brain --agent triage
 astro brain host-app acme-brain --project kb --image ghcr.io/acme/bot:1 --deploy
 astro brain substrate acme-brain --authority postgres --persistence postgres
 astro brain delete acme-brain --yes                       # archive; the repository is kept

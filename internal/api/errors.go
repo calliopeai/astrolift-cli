@@ -13,6 +13,7 @@ type GraphQLError struct {
 	Message          string `json:"message"`
 	Code             string `json:"code,omitempty"`
 	Reason           string `json:"reason,omitempty"`
+	Permission       string `json:"permission,omitempty"`
 	Path             []any  `json:"path,omitempty"`
 	CurrentVersion   *int   `json:"currentVersion,omitempty"`
 	RequestedVersion *int   `json:"requestedVersion,omitempty"`
@@ -92,6 +93,7 @@ func (c *Client) graphQLError(raw json.RawMessage) GraphQLError {
 	_ = json.Unmarshal(fields["extensions"], &extensions)
 	_ = json.Unmarshal(extensions["code"], &item.Code)
 	_ = json.Unmarshal(extensions["reason"], &item.Reason)
+	_ = json.Unmarshal(extensions["permission"], &item.Permission)
 	if item.CurrentVersion == nil {
 		item.CurrentVersion = optionalErrorVersion(extensions["currentVersion"])
 	}
@@ -113,6 +115,7 @@ func (c *Client) graphQLError(raw json.RawMessage) GraphQLError {
 	item.Message = c.redactCredential(item.Message)
 	item.Code = c.redactCredential(item.Code)
 	item.Reason = c.redactCredential(item.Reason)
+	item.Permission = c.redactCredential(item.Permission)
 	return item
 }
 
