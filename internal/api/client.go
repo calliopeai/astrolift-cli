@@ -225,8 +225,7 @@ func (c *Client) Get(ctx context.Context, path string, target interface{}) error
 		return ErrUnauthorized
 	}
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("GET %s returned %d: %s", path, resp.StatusCode, body)
+		return &HTTPError{Status: resp.StatusCode}
 	}
 	if target == nil {
 		return nil

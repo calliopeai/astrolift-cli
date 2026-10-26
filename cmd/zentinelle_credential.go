@@ -22,12 +22,18 @@ import (
 // the account's roles, refuse a permission.
 const tokenScopeRefusal = "api token scope does not allow this permission"
 
-// zentinelleLoginScope is the narrowest `astro auth login --scope` whose
-// sign-in carries Zentinelle's permissions. astrolift-app maps no
-// zentinelle.* permission into the default or clusters ceilings
-// (CLI_DEVICE_SCOPES, CLI_OPERATOR_DEVICE_SCOPES); only its admin wildcard
-// covers them, so no narrower sign-in exists yet.
-const zentinelleLoginScope = "admin"
+// Zentinelle reads have their own explicitly approved ceiling. Export and writes
+// retain the admin requirement.
+const zentinelleLoginScope = "zentinelle"
+
+func zentinelleScopeForPermission(permission string) string {
+	switch permission {
+	case "zentinelle.status_view", "zentinelle.policy_view", "zentinelle.usage_view", "zentinelle.conformance_view", "zentinelle.audit_view":
+		return zentinelleLoginScope
+	default:
+		return "admin"
+	}
+}
 
 // credentialAdvice is the credential field of a --json error.
 type credentialAdvice struct {
@@ -46,11 +52,12 @@ func (e *credentialScopeError) Error() string { return e.err.Error() + "\n" + e.
 func (e *credentialScopeError) Unwrap() error { return e.err }
 
 func newCredentialScopeError(permission string, err error) *credentialScopeError {
+	scope := zentinelleScopeForPermission(permission)
 	hint := fmt.Sprintf("This credential's scopes do not allow %s, and your account's roles cannot widen them, whatever astro perms diagnose shows. "+
-		"The default and --scope clusters sign-ins carry no Zentinelle permission; astro auth login --scope %s does, and only the platform operator can approve it. "+
-		"An API token works when its own scopes allow %s.", permission, zentinelleLoginScope, permission)
+		"The default and --scope clusters sign-ins carry no Zentinelle permission; astro auth login --scope %s does on a server that supports it. "+
+		"An API token works when its own scopes allow %s.", permission, scope, permission)
 	return &credentialScopeError{
-		advice: credentialAdvice{Permission: permission, LoginScope: zentinelleLoginScope, Hint: hint},
+		advice: credentialAdvice{Permission: permission, LoginScope: scope, Hint: hint},
 		err:    err,
 	}
 }

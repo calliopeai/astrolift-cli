@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -87,19 +88,28 @@ Exit codes: 0 success, 1 deploy failure, 2 config error.`,
 		defer cancel()
 
 		var resp struct {
-			WorkflowID string `json:"workflow_id"`
-			PollingURL string `json:"polling_url"`
+			WorkflowID   string `json:"workflow_id"`
+			DeploymentID string `json:"deployment_id"`
+			PollingURL   string `json:"polling_url"`
 		}
 		path := fmt.Sprintf("/api/cli/v1/apps/%s/deploy/", slug)
 		if err := client.Post(ctx, path, body, &resp); err != nil {
 			return deployErr(fmt.Errorf("enqueueing deploy: %w", err))
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "Deploy enqueued: %s\n", resp.WorkflowID)
-		fmt.Fprintf(cmd.OutOrStdout(), "Polling URL:     %s\n", resp.PollingURL)
+		progress := cmd.OutOrStdout()
+		if boolFlag(cmd, "json") {
+			progress = cmd.ErrOrStderr()
+		}
+		fmt.Fprintf(progress, "Deploy enqueued: %s\n", resp.WorkflowID)
+		fmt.Fprintf(progress, "Deployment ID:   %s\n", resp.DeploymentID)
+		fmt.Fprintf(progress, "Polling URL:     %s\n", resp.PollingURL)
 
 		noWait, _ := cmd.Flags().GetBool("no-wait")
 		if noWait {
+			if boolFlag(cmd, "json") {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(resp)
+			}
 			return nil
 		}
 
@@ -115,12 +125,17 @@ Exit codes: 0 success, 1 deploy failure, 2 config error.`,
 		pollCtx, pollCancel := context.WithTimeout(cmd.Context(), timeout)
 		defer pollCancel()
 
-		fmt.Fprintln(cmd.OutOrStdout(), "Polling for terminal state...")
+		fmt.Fprintln(progress, "Polling for terminal state...")
 		state, err := pollWorkflow(pollCtx, client, resp.PollingURL)
 		if err != nil {
 			return deployErr(err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Final state: %s\n", state)
+		fmt.Fprintf(progress, "Final state: %s\n", state)
+		if boolFlag(cmd, "json") {
+			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]interface{}{"deployment_id": resp.DeploymentID, "workflow_id": resp.WorkflowID, "polling_url": resp.PollingURL, "state": state}); err != nil {
+				return err
+			}
+		}
 		if state != "succeeded" && state != "completed" {
 			return deployErr(fmt.Errorf("deploy ended in %q", state))
 		}
@@ -129,10 +144,14 @@ Exit codes: 0 success, 1 deploy failure, 2 config error.`,
 }
 
 var ciStatusCmd = &cobra.Command{
-	Use:   "status <workflow-id>",
-	Short: "Get the status of a deploy workflow",
+	Use:   "status <deployment-id>",
+	Short: "Get a deployment's status using the ID printed by ci deploy",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := uuid.Parse(args[0])
+		if err != nil {
+			return fmt.Errorf("expected a deployment GUID printed by astro ci deploy, not a workflow ID: %w", err)
+		}
 		apiURL := os.Getenv("ASTROLIFT_API_URL")
 		token := os.Getenv("ASTROLIFT_DEPLOY_TOKEN")
 		if apiURL == "" || token == "" {
@@ -146,8 +165,11 @@ var ciStatusCmd = &cobra.Command{
 		}
 		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 		defer cancel()
-		if err := client.Get(ctx, fmt.Sprintf("/api/cli/v1/workflow_runs/%s", args[0]), &status); err != nil {
+		if err := client.Get(ctx, fmt.Sprintf("/api/cli/v1/deployments/%s/status/", id.String()), &status); err != nil {
 			return err
+		}
+		if boolFlag(cmd, "json") {
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(status)
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), status.State)
 		return nil
@@ -238,9 +260,7 @@ func init() {
 
 // pollWorkflow polls the workflow status URL until terminal state.
 func pollWorkflow(ctx context.Context, client *api.Client, pollingURL string) (string, error) {
-	// pollingURL from #17's polling_url_for is path-only
-	// (e.g. /api/cli/v1/workflow_runs/<id>); strip leading
-	// slash for client.Get which prepends baseURL.
+	// The deployment endpoint returns an origin-relative polling path.
 	path := pollingURL
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
