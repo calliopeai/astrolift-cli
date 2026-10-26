@@ -1329,3 +1329,13 @@ scopes and account roles still apply. A server without
 `identity.zentinelle_read_scope` is refused before login; upgrade that server
 instead of falling back to an ordinary token. Administrative/export commands
 still require a separately approved admin scope.
+
+### Inspect a brain plan
+
+`astro plan ls --brain <slug> --source <checkout>` lists a committed brain's
+story states, target repositories and dependency blockers. Use
+`astro plan show <spec-id> --brain <slug> --source <checkout> --json` for one story.
+The checkout's origin must match the registered brain. Set `--revision <commit>`
+to pin a snapshot, or use `--connection <id> --revision <full-sha>` for authorized
+remote source reads. States come from the source manifest, not a live scheduler.
+Containers expand to their stories; missing dependencies and cycles are refused.

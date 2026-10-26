@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Inspect committed brain task DAGs with `astro plan ls/show`: exact Git revision, source identity, story states, expanded dependencies and blockers (#181).
+
 - Fix `ci status` to accept a deployment GUID from `ci deploy` and use the served deployment-status route; HTTP failures no longer print raw server bodies (#185).
 - Make `self-update` a login-free preview alias for `update --dry-run`, including JSON output (#183).
 - Add explicitly consented Zentinelle read login with an old-server capability refusal; audit export and writes retain their separate authority (#179).
