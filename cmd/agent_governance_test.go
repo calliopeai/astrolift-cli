@@ -50,7 +50,7 @@ func (f *governanceFixture) server(t *testing.T) *api.Client {
 			}
 			reply(map[string]interface{}{"data": map[string]interface{}{"astroliftZentinellePolicies": []map[string]interface{}{
 				{"id": "p1", "name": "pii-guard", "enforcement": "enforce"},
-				{"id": "p2", "name": "cost-cap", "enforcement": "audit"},
+				{"id": "p2", "name": "delegation-rule", "enforcement": "audit"},
 			}}})
 		case strings.Contains(req.Query, "astroliftZentinelleAuditPage"):
 			f.auditVars = append(f.auditVars, req.Variables)
@@ -125,9 +125,9 @@ func TestAgentInspectGovernanceGolden(t *testing.T) {
 		want    string
 	}{
 		{"connected and paged", governanceFixture{capability: true, pages: governancePages},
-			inspectRecord + "Governance:    triage, last 24h: 1 block, 1 violation, 2 approvals\nPolicies:      pii-guard (enforce), cost-cap (audit)\n"},
+			inspectRecord + "Governance:    triage, last 24h: 1 block, 1 violation, 2 approvals\nPolicies:      pii-guard (enforce), delegation-rule (audit)\n"},
 		{"connected and empty", governanceFixture{capability: true},
-			inspectRecord + "Governance:    triage, last 24h: 0 blocks, 0 violations, 0 approvals\nPolicies:      pii-guard (enforce), cost-cap (audit)\n"},
+			inspectRecord + "Governance:    triage, last 24h: 0 blocks, 0 violations, 0 approvals\nPolicies:      pii-guard (enforce), delegation-rule (audit)\n"},
 		{"not connected", governanceFixture{capability: false},
 			inspectRecord + "Governance:    Zentinelle is not connected on {server}\n"},
 		{"forbidden", governanceFixture{capability: true, forbidden: true},

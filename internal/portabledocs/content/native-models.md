@@ -158,7 +158,7 @@ Unverified or conflicting legacy role ownership refuses reconciliation; an
 operator must resolve its immutable identity through a reviewed identity change.
 Astrolift does not infer ownership from a reused app slug or namespace.
 
-Native traffic, token counts, costs, density and playground invocation remain
+Native traffic, token counts, density and playground invocation remain
 unsupported observations in this connection flow. Missing/unsupported data is
 not measured zero. Local-hosted models retain their own runtime and metrics.
 

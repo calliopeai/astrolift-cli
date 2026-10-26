@@ -53,9 +53,17 @@ var topics = []Topic{
 	{Slug: "domains", Title: "Connect domains and inspect DNS and routing", Filename: "domains.md", OnlinePath: "/guides/domains-dns/"},
 	{Slug: "email-delivery", Title: "Test exact email-service delivery and read observations", Filename: "email-delivery.md", OnlinePath: "/guides/email-delivery/"},
 	{Slug: "install-alert-mail", Title: "Set up and test install alert SMTP", Filename: "install-alert-mail.md", OnlinePath: "/guides/install-alert-mail/"},
+	{Slug: "temporary-apps", Title: "Create temporary apps and manage expiry", Filename: "temporary-apps.md", OnlinePath: "/guides/temporary-apps/"},
+	{Slug: "agent-inbox", Title: "Read and answer agent messages", Filename: "agent-inbox.md", OnlinePath: "/guides/agent-inbox/"},
+	{Slug: "platform-notifications", Title: "Read platform notifications", Filename: "platform-notifications.md", OnlinePath: "/guides/platform-notifications/"},
+	{Slug: "source-to-brain", Title: "Build source and host it on an existing brain", Filename: "source-to-brain.md", OnlinePath: "/guides/source-to-brain/"},
+	{Slug: "atomic-workflow-review", Title: "Review a complete workflow and approve its schedule", Filename: "atomic-workflow-review.md", OnlinePath: "/guides/atomic-workflow-review/"},
 }
 
 var aliases = map[string]string{
+	"ttl":                      "temporary-apps",
+	"expiry":                   "temporary-apps",
+	"inbox":                    "agent-inbox",
 	"alert-mail":               "install-alert-mail",
 	"install-smtp":             "install-alert-mail",
 	"dns":                      "domains",

@@ -64,7 +64,7 @@ project or app, cluster/environment GUIDs and versions, current status and
 operation identity/timestamps. It contains no configuration, credentials,
 connection material, provider failure bodies or unrequested grants. A missing,
 deleted or inaccessible GUID never selects a same-name replacement. A name on
-project show/cost/actions uses at most two discovery rows, then rereads the
+project show/actions uses at most two discovery rows, then rereads the
 selected GUID; ambiguous names require a GUID.
 
 ## Provision once
@@ -122,20 +122,6 @@ return an explicit incomplete-walk error. Its `--page` mode exposes one page.
 Exact detail validates the selected app and immutable resource GUID. Project
 mutations operate on shared project resources, not an app-owned substitute.
 
-## Request pricing explicitly
-
-```bash
-astro project resources cost <resource-guid> --project platform \
-  --expected-context-revision <reviewed-revision> --json
-```
-
-Basic browsing never requests pricing. Cost is a separate permission-checked
-read of the reviewed context. A valid estimate includes amount, currency,
-retrieval time, HTTPS source and approximation flag. A missing amount, invalid
-source/time/currency, negative amount or unavailable provider is unavailable,
-not zero. A valid explicit zero still needs the same pricing evidence. Provider
-list prices can omit discounts and usage; the amount is not an actual bill.
-
 ## Service exporter metrics
 
 Where supported, request `astroliftAppManagedServiceMetrics` using the exact
@@ -173,7 +159,7 @@ bindings are refused before effects. Reviewed lifecycle workers carry the
 accepted binding and refuse ownership changes before provider work; exact GUIDs
 alone would not prevent following a moved service.
 
-Project reads require `PROJECT_READ`; exact generic/app reads and pricing require
+Project reads require `PROJECT_READ`; exact generic/app reads require
 `APP_READ` on the actual owner. App consumers require current app-read permission;
 agent consumers require visible agent-environment-spec access. Writes require
 project RBAC (`PROJECT_UPDATE`) and token scope `project:write`. A token scope

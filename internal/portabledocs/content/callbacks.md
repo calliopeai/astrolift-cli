@@ -128,7 +128,6 @@ X-Astrolift-Signature: v1=<lowercase-hex-hmac-sha256>
     "duration_ms": 146000,
     "input_tokens": null,
     "output_tokens": null,
-    "total_cost_usd": null,
     "model": null
   },
   "result": {"output": {"summary": "Processing completed"}}
@@ -145,6 +144,13 @@ as zero. Duration uses the actual task timing. A task that failed before
 starting can have a null `started_at` and duration. In `NOTIFY`, `result` is absent
 and free-text failure content is not sent; fetch the result through
 `agentTask(id)` using an authorized API client.
+
+The [merged retirement source](https://github.com/calliopeai/astrolift-app/blob/09e3f2c28875fc3f476e5104151fd2a3166aae14/docs/operators/retire-costing.md)
+uses the reduced envelope for retries and manual replay too. It omits the
+retired envelope field in memory before signing outgoing bytes; historical
+ciphertext and arbitrary user result JSON remain unchanged. Always verify the
+exact bytes received. Adoption requires the paired API/client release and old
+worker drain described in those operator notes.
 
 ## Receiver outage and backoff
 

@@ -33,17 +33,50 @@ Astrolift's typed control-plane API is GraphQL. Focused REST, SSE, and WebSocket
 routes exist where device authentication, callbacks, streaming, or CI semantics
 do not fit GraphQL well.
 
+The [temporary-app guide](../guides/temporary-apps.md) covers `registerApp` and
+`hostAppOnBrain` creation deadlines, `setAppExpiry` and the organization's expiry
+policy. Require `apps.temporary_expiry` in server discovery before using those
+fields. [Agent conversations](../guides/agent-inbox.md) use
+`astroliftAgentMessages`, `astroliftAgentMessageThreads`,
+`markAgentMessagesRead`, `replyToAgentMessage` and
+`astroliftAgentMessageReceived`; require `agents.messages` and the caller's
+current agent access.
+
+With `notifications.quiet_hours`, `astroliftMyNotificationQuietHours` and
+`setNotificationQuietHours` let the authenticated person configure agent-message
+email and push suppression. The inbox guide documents the IANA timezone and
+minute boundaries; quiet hours do not mark messages read or create a digest.
+
+With `notifications.structured_inbox`,
+`astroliftMyNotificationsPage` and `astroliftMyNotificationStream` provide bounded,
+cursor-based [platform notification](../guides/platform-notifications.md) reads.
+
 ## Base URLs
+
+Builder source-to-brain hosting uses bearer REST under `/api/builder/v1/`.
+Require `builder.brain_source_artifacts`, then inspect authenticated Builder
+capabilities and the operator-prepared project target. Build admission freezes
+source into a verified artifact; a fresh original-person `host/` request creates
+the app/binding/deployment. See [source-to-brain hosting](../guides/source-to-brain.md)
+for exact routes, request fields, ephemeral SQLite and recovery boundaries.
 
 Given an install at `https://astrolift.example.com`:
 
 | Surface | URL |
 |---|---|
 | GraphQL HTTP/explorer | `https://astrolift.example.com/app/gql/config/` |
+| Anonymous installation discovery | `https://astrolift.example.com/app/gql/config/public/` |
 | GraphQL subscriptions | `wss://astrolift.example.com/app/gql/config/ws/` |
 | CLI device flow | `https://astrolift.example.com/api/cli/v1/auth/...` |
 | MCP | `https://astrolift.example.com/api/mcp/v1/` |
 | Health | `https://astrolift.example.com/health/` |
+
+Before login, POST `query { astroliftServerInfo { version apiVersion capabilities } }`
+to the public discovery endpoint without bearer, organization or cookie headers.
+Its schema exposes only installation discovery and has no mutation or
+subscription root. The main GraphQL endpoint still requires authentication;
+do not probe it as an anonymous fallback. A capability advertises an API surface
+and grants no permission to use it.
 
 The server root returns a link map when requested as JSON:
 
@@ -285,6 +318,15 @@ closure and resource cleanup.
 
 ## Reviewed workflow and pipeline starts
 
+With `workflows.atomic_full_review`, `workflowDefinitionFullReview` and
+`workflowScheduleFullReview` return atomic complete graph/configuration
+captures. `setWorkflowDefinitionEnabled` performs separate revision-bound
+definition activation. `activateReviewedWorkflowSchedule` records explicit
+person consent for the exact configured schedule digest; its saved receipt has
+`engineState: UNCONFIRMED`. See [complete workflow review](../guides/atomic-workflow-review.md)
+for permissions, original versus post-enable digests, current authority and
+the required worker/API rollout. Schedule consent does not bypass human gates.
+
 `workflowDefinitionById(id: GUID!)` reads an exact visible definition, execution
 revision and JSON Schema 2020-12 input contract. `startWorkflowDefinition` binds
 the exact GUID, expected revision, schema digest and actor-scoped request UUID;
@@ -401,7 +443,7 @@ to the selected app's environments while remaining organization-owned.
 `astroliftModelSubscriptionMetrics` reads one authenticated subscription under
 current `app.read_metrics` and organization visibility. Its declared placement
 and subscription identities must match. It exposes measured traffic, accepted
-ASGI response bytes and request duration; token use and cost are unsupported.
+ASGI response bytes and request duration; token use is unsupported by this metrics contract.
 Use `models.authenticated_subscription_metrics` for API discovery and the hosting
 guide's exact read-only query. A capability marker does not grant app access.
 

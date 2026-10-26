@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestPreviewExactIDBypassesRecentCatalogAndPricing(t *testing.T) {
+func TestPreviewExactIDBypassesRecentCatalogAndRuntimeReads(t *testing.T) {
 	resetPreviewsFlags()
 	defer resetPreviewsFlags()
 	p := prPreview(1, "oldest")
@@ -19,8 +19,11 @@ func TestPreviewExactIDBypassesRecentCatalogAndPricing(t *testing.T) {
 		if req.Variables["id"] != p.ID {
 			t.Fatalf("exact GUID lost: %+v", req.Variables)
 		}
-		if req.Variables["includeRuntimeCost"] != false {
-			t.Fatal("basic detail requested pricing")
+		if req.Variables["includeRuntimeResources"] != false {
+			t.Fatal("basic detail requested resource usage")
+		}
+		if strings.Contains(req.Query, "Cost") || strings.Contains(req.Query, "cost") {
+			t.Fatalf("preview read still requests money fields: %s", req.Query)
 		}
 		return previewPage([]previewEnvironment{p}, "")
 	}, &captured)
@@ -32,23 +35,38 @@ func TestPreviewExactIDBypassesRecentCatalogAndPricing(t *testing.T) {
 	if len(captured) != 1 || !strings.Contains(captured[0].Query, "astroliftPreviewEnvironment(") || strings.Contains(captured[0].Query, "astroliftPreviewEnvironmentsPage") {
 		t.Fatalf("must make one singular read: %+v", captured)
 	}
-	if !strings.Contains(out.String(), "not_requested") || strings.Contains(out.String(), "$0.00") {
+	if !strings.Contains(out.String(), "not_requested") {
 		t.Fatalf("invented runtime: %s", out.String())
 	}
 }
 
-func TestPreviewExactShowCostIsExplicit(t *testing.T) {
+func TestPreviewExactShowResourcesIsExplicit(t *testing.T) {
 	p := prPreview(12, "feature")
 	var captured []gqlRequest
 	srv := previewsServer(t, func(gqlRequest) map[string]interface{} { return previewPage([]previewEnvironment{p}, "") }, &captured)
 	defer srv.Close()
 	cmd, _ := appTestCmd()
-	cmd.Flags().Bool("cost", true, "")
+	cmd.Flags().Bool("resources", true, "")
 	if err := runAppPreviewsShow(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", previewSelector{id: p.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if len(captured) != 1 || captured[0].Variables["includeRuntimeCost"] != true {
-		t.Fatalf("cost opt-in lost: %+v", captured)
+	if len(captured) != 1 || captured[0].Variables["includeRuntimeResources"] != true {
+		t.Fatalf("resource opt-in lost: %+v", captured)
+	}
+}
+
+func TestRetiredMonetaryCommandsAreUnavailable(t *testing.T) {
+	for _, path := range [][]string{{"org", "cost"}, {"project", "resources", "cost"}} {
+		command, remaining, err := rootCmd.Find(path)
+		if err == nil && len(remaining) == 0 && command.Name() == "cost" {
+			t.Fatalf("retired command remains callable: %v", path)
+		}
+	}
+	if appPreviewsShowCmd.Flags().Lookup("cost") != nil {
+		t.Fatal("retired preview --cost remains available")
+	}
+	if flag := appPreviewsShowCmd.Flags().Lookup("resources"); flag == nil || flag.DefValue != "false" {
+		t.Fatal("preview resource usage must be explicitly requested")
 	}
 }
 

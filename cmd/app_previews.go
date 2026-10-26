@@ -9,7 +9,7 @@
 // Detail reads use the exact preview GUID. PR/branch selectors discover a GUID
 // in bounded pages, then reread it. Logs carry the stored environment identity
 // and reviewed versions; hostname and naming conventions never select a target.
-// Catalog/detail metadata does not request live resources or pricing; show --cost
+// Catalog/detail metadata does not request live resources; show --resources
 // explicitly opts into one bounded preview runtime read.
 //
 // The pin is the operator's exemption from garbage collection, and it covers
@@ -110,21 +110,19 @@ const previewEnvironmentsPageQuery = `query($appSlug: String, $limit: Int!, $aft
       sourceUrl
       prUrl
       aggregateResources { cpuCores memoryBytes podCount }
-      estimatedDailyCostUsd
     }
     nextCursor
     totalCount
   }
 }`
 
-const previewEnvironmentQuery = `query($id: GUID!, $includeRuntimeCost: Boolean = false) {
-  astroliftPreviewEnvironment(id: $id, includeRuntimeCost: $includeRuntimeCost) {
+const previewEnvironmentQuery = `query($id: GUID!, $includeRuntimeResources: Boolean = false) {
+  astroliftPreviewEnvironment(id: $id, includeRuntimeResources: $includeRuntimeResources) {
     id version registeredAppSlug prNumber isManual branch commitSha status hostname namespace
     environmentStatus runtimeStatus
     environment { previewId previewVersion appId appVersion appSlug environmentId environmentVersion environmentName clusterId clusterVersion namespace }
     lastDeployedAt tornDownAt ttlUntil isPinned pinnedAt pinnedByEmail pinReason sourceUrl prUrl
     aggregateResources { cpuCores memoryBytes podCount }
-    estimatedDailyCostUsd
   }
 }`
 
@@ -167,7 +165,6 @@ const setPreviewPinnedMutation = `mutation($input: SetPreviewPinnedInput!) {
       sourceUrl
       prUrl
       aggregateResources { cpuCores memoryBytes podCount }
-      estimatedDailyCostUsd
     }
   }
 }`
@@ -184,30 +181,29 @@ type previewAggregateResources struct {
 // previewEnvironment mirrors the AstroliftPreviewEnvironment GraphQL type.
 // This is the shape --json emits.
 type previewEnvironment struct {
-	ID                    string                    `json:"id"`
-	Version               int                       `json:"version"`
-	EnvironmentStatus     string                    `json:"environmentStatus"`
-	RuntimeStatus         string                    `json:"runtimeStatus"`
-	Environment           *previewTarget            `json:"environment"`
-	RegisteredAppSlug     string                    `json:"registeredAppSlug"`
-	PRNumber              int                       `json:"prNumber"`
-	IsManual              bool                      `json:"isManual"`
-	Branch                string                    `json:"branch"`
-	CommitSha             string                    `json:"commitSha"`
-	Status                string                    `json:"status"`
-	Hostname              string                    `json:"hostname"`
-	Namespace             string                    `json:"namespace"`
-	LastDeployedAt        *string                   `json:"lastDeployedAt"`
-	TornDownAt            *string                   `json:"tornDownAt"`
-	TTLUntil              string                    `json:"ttlUntil"`
-	IsPinned              bool                      `json:"isPinned"`
-	PinnedAt              *string                   `json:"pinnedAt"`
-	PinnedByEmail         *string                   `json:"pinnedByEmail"`
-	PinReason             string                    `json:"pinReason"`
-	SourceURL             string                    `json:"sourceUrl"`
-	PRURL                 string                    `json:"prUrl"`
-	AggregateResources    previewAggregateResources `json:"aggregateResources"`
-	EstimatedDailyCostUSD *float64                  `json:"estimatedDailyCostUsd"`
+	ID                 string                    `json:"id"`
+	Version            int                       `json:"version"`
+	EnvironmentStatus  string                    `json:"environmentStatus"`
+	RuntimeStatus      string                    `json:"runtimeStatus"`
+	Environment        *previewTarget            `json:"environment"`
+	RegisteredAppSlug  string                    `json:"registeredAppSlug"`
+	PRNumber           int                       `json:"prNumber"`
+	IsManual           bool                      `json:"isManual"`
+	Branch             string                    `json:"branch"`
+	CommitSha          string                    `json:"commitSha"`
+	Status             string                    `json:"status"`
+	Hostname           string                    `json:"hostname"`
+	Namespace          string                    `json:"namespace"`
+	LastDeployedAt     *string                   `json:"lastDeployedAt"`
+	TornDownAt         *string                   `json:"tornDownAt"`
+	TTLUntil           string                    `json:"ttlUntil"`
+	IsPinned           bool                      `json:"isPinned"`
+	PinnedAt           *string                   `json:"pinnedAt"`
+	PinnedByEmail      *string                   `json:"pinnedByEmail"`
+	PinReason          string                    `json:"pinReason"`
+	SourceURL          string                    `json:"sourceUrl"`
+	PRURL              string                    `json:"prUrl"`
+	AggregateResources previewAggregateResources `json:"aggregateResources"`
 }
 
 type previewTarget struct {
@@ -324,7 +320,7 @@ func previewIsTornDown(p previewEnvironment) bool {
 }
 
 // livePreviews drops torn-down rows. `list` hides them by default so the
-// table shows what is currently costing money; --all brings back the history.
+// table shows active workloads; --all brings back the history.
 func livePreviews(items []previewEnvironment) []previewEnvironment {
 	live := make([]previewEnvironment, 0, len(items))
 	for _, p := range items {
@@ -423,15 +419,6 @@ func previewResourcesLabel(r previewAggregateResources) string {
 	return fmt.Sprintf("%d pod(s), %.2f vCPU, %s", r.PodCount, r.CPUCores, previewMemoryLabel(r.MemoryBytes))
 }
 
-// previewCostLabel renders the estimated daily cost; null means the cluster
-// has no pricing wired up, which is not the same as zero.
-func previewCostLabel(usd *float64) string {
-	if usd == nil {
-		return "-"
-	}
-	return fmt.Sprintf("$%.2f/day", *usd)
-}
-
 // writePreviewPinDetail renders the pin block for `show`.
 //
 // The pin is what decides whether the TTL line above it means anything, so it
@@ -497,7 +484,7 @@ func loadPreview(ctx context.Context, client *api.Client, appSlug string, sel pr
 	return loadReviewedPreview(ctx, client, appSlug, sel, false)
 }
 
-func loadReviewedPreview(ctx context.Context, client *api.Client, appSlug string, sel previewSelector, cost bool) (previewEnvironment, error) {
+func loadReviewedPreview(ctx context.Context, client *api.Client, appSlug string, sel previewSelector, resources bool) (previewEnvironment, error) {
 	if err := sel.validate(); err != nil {
 		return previewEnvironment{}, err
 	}
@@ -524,7 +511,7 @@ func loadReviewedPreview(ctx context.Context, client *api.Client, appSlug string
 	}
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := client.GraphQL(fetchCtx, previewEnvironmentQuery, map[string]interface{}{"id": id, "includeRuntimeCost": cost}, &resp); err != nil {
+	if err := client.GraphQL(fetchCtx, previewEnvironmentQuery, map[string]interface{}{"id": id, "includeRuntimeResources": resources}, &resp); err != nil {
 		return previewEnvironment{}, fmt.Errorf("reading exact preview (requires an updated server): %w", err)
 	}
 	p := resp.Preview
@@ -642,8 +629,8 @@ var appPreviewsShowCmd = &cobra.Command{
 	Short: "Show one preview environment in detail",
 	Long: `Prints one preview environment's full record: its URL, status, branch and
 commit, the namespace it runs in, its TTL, its garbage-collection pin, the
-pull request that created it, and the aggregate resources and estimated
-daily cost with the explicit --cost option. Basic reads never request live pricing.
+pull request that created it, and aggregate resources with the explicit
+--resources option. Basic reads never request live resource usage.
 
 Select an exact preview with --id <GUID>. --pr <n> and --branch <name> discover
 a preview in the recent catalog, then reread its exact GUID.`,
@@ -663,7 +650,7 @@ a preview in the recent catalog, then reread its exact GUID.`,
 }
 
 func runAppPreviewsShow(cmd *cobra.Command, ctx context.Context, client *api.Client, appSlug string, sel previewSelector) error {
-	p, err := loadReviewedPreview(ctx, client, appSlug, sel, boolFlag(cmd, "cost"))
+	p, err := loadReviewedPreview(ctx, client, appSlug, sel, boolFlag(cmd, "resources"))
 	if err != nil {
 		return err
 	}
@@ -698,9 +685,8 @@ func runAppPreviewsShow(cmd *cobra.Command, ctx context.Context, client *api.Cli
 	}
 	if p.RuntimeStatus == "available" {
 		fmt.Fprintf(out, "Resources:        %s\n", previewResourcesLabel(p.AggregateResources))
-		fmt.Fprintf(out, "Estimated cost:   %s\n", previewCostLabel(p.EstimatedDailyCostUSD))
 	} else {
-		fmt.Fprintf(out, "Resources/cost:   %s (use --cost to request a live snapshot)\n", dashIfEmpty(p.RuntimeStatus))
+		fmt.Fprintf(out, "Resources:        %s (use --resources to request a live snapshot)\n", dashIfEmpty(p.RuntimeStatus))
 	}
 	fmt.Fprintf(out, "ID:               %s\n", p.ID)
 	return nil
@@ -915,7 +901,7 @@ A pin covers both collection rules: the TTL never expires the preview, and
 max-active eviction skips it, so a newer PR cannot claim its slot. That is
 what makes this different from extending a TTL, which only defers the TTL
 clock and leaves the preview evictable under pressure. The pin holds until
-someone runs "unpin" — nothing expires it — so it keeps costing money.
+someone runs "unpin" — nothing expires it automatically.
 
 Pass --reason <text> to record why. The reason is stored with the pin and is
 shown by "previews show"; it is truncated to 512 characters. Re-pinning an
@@ -1098,7 +1084,7 @@ func init() {
 	appPreviewsListCmd.Flags().IntVar(&previewsListLimit, "limit", 50, "Maximum number of previews to show")
 
 	addPreviewSelectorFlags(appPreviewsShowCmd, &previewsShowSel)
-	appPreviewsShowCmd.Flags().Bool("cost", false, "Explicitly request one live resource and estimated-cost snapshot")
+	appPreviewsShowCmd.Flags().Bool("resources", false, "Explicitly request one live resource-usage snapshot")
 	addPreviewSelectorFlags(appPreviewsLogsCmd, &previewsLogsSel)
 	addPreviewSelectorFlags(appPreviewsOpenCmd, &previewsOpenSel)
 	addPreviewSelectorFlags(appPreviewsTeardownCmd, &previewsTeardownSel)
