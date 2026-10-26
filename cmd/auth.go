@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/calliopeai/astrolift-cli/internal/auth"
 	"github.com/calliopeai/astrolift-cli/internal/config"
 	"github.com/spf13/cobra"
@@ -53,13 +54,14 @@ operating clusters to the CLI's usual scopes.
 operator can approve it, and the sign-in lasts 12 hours; after that,
 run 'astro auth login --scope admin' again.
 
-Neither the default sign-in nor --scope clusters carries a Zentinelle
-permission, so 'astro zentinelle status', 'astro agent usage',
-'astro policy' and 'astro audit' are refused for them with "api token
-scope does not allow this permission" even when your account holds
-the permission: roles never widen a sign-in. Of the sign-ins, only
---scope admin carries them; an API token works when its own scopes
-allow the permission.
+Neither the default sign-in nor --scope clusters carries a Zentinelle permission.
+--scope zentinelle adds status, policies, token usage, conformance and audit reads
+with explicit browser consent; it excludes audit export and all writes.
+The server must advertise identity.zentinelle_read_scope. Older servers refuse
+this request before login instead of silently issuing the default scope.
+Account roles still apply: "api token scope does not allow this permission"
+is a credential refusal, and adding a role cannot widen a sign-in.
+--scope admin remains necessary for export and administrative operations.
 
 For an agent or any caller without a browser:
 
@@ -101,7 +103,7 @@ MCP gateway alike.`,
 		if err != nil {
 			return err
 		}
-		session, err := auth.StartLogin(startCtx, entry.APIURL, clientKind)
+		session, err := startScopedLogin(startCtx, entry.APIURL, clientKind)
 		if err != nil {
 			return fmt.Errorf("starting login: %w", err)
 		}
@@ -362,7 +364,7 @@ func init() {
 	authLoginCmd.Flags().BoolVar(&loginNoWait, "no-wait", false,
 		"start the flow, report the session, and exit without polling")
 	authLoginCmd.Flags().StringVar(&loginScope, "scope", "",
-		"ask for more than the CLI default: clusters (update and operate clusters, #2120) or admin (full administrative access, platform operator approval, 12 hours)")
+		"ask for more than the CLI default: clusters, zentinelle (read only), or admin (platform operator, 12 hours)")
 	authLoginCmd.Flags().BoolVar(&loginNoBrowser, "no-browser", false,
 		"do not try to open a browser")
 
@@ -395,4 +397,13 @@ func openBrowser(url string) error {
 	}
 	args = append(args, url)
 	return exec.Command(cmd, args...).Start()
+}
+
+func startScopedLogin(ctx context.Context, apiURL, clientKind string) (*auth.LoginSession, error) {
+	if clientKind == "cli-zentinelle" {
+		if err := requireServerFeature(ctx, api.NewClient(apiURL, "", false), "identity.zentinelle_read_scope", "Zentinelle read sign-in"); err != nil {
+			return nil, err
+		}
+	}
+	return auth.StartLogin(ctx, apiURL, clientKind)
 }

@@ -232,6 +232,8 @@ astro ci deploy                 # enqueues + polls until terminal state
 # Exit codes: 0 success, 1 deploy failure, 2 config error
 ```
 
+`astro ci status <deployment-id>` reads the deployment ID printed by `ci deploy` (not its workflow ID).
+
 `ci deploy` defaults to polling. Pass `--no-wait` for fire-and-forget,
 or set `ASTROLIFT_DEPLOY_TIMEOUT` (Go duration) to override the
 30-minute polling cap.
@@ -408,7 +410,7 @@ continues on the server; this change introduces no generic command preflight.
 | `astro api graphql` | Run a GraphQL document using stored credentials and the explicit `--org` or saved working organization. Unknown organizations fail before the document is sent. Without either organization selection, account-level queries remain unscoped. |
 | `astro onboard` | Set an AI coding agent up against the selected install in one call: writes an MCP server entry pointing at the install's gateway, installs the bundled skill catalogue, and drops the offline guides as agent context. Components are selectable with `--only mcp,skills,docs`, the layout with `--target claude\|codex\|both`, and `--dry-run` reports the plan without touching the filesystem. Existing files are reported and left alone unless `--force`. Authentication is reported, never performed. |
 | `astro docs` | Open public docs, read embedded release-matched topics, or export portable Markdown and man pages. |
-| `astro version-check` / `astro self-update` | Server-aware compatibility check + upgrade pointer. `version-check` reads the server's public install discovery without signing in and exits 1 for a server that predates it, naming the capability it lacks. |
+| `astro version-check` / `astro self-update` | `version-check` reads public install discovery without signing in and exits 1 for an unsupported server. `self-update` previews the latest GitHub release (alias for `update --dry-run`); `update` installs it. Neither update command requires platform login. |
 | `astro version` | Print the CLI version (set at build time via `-ldflags`). |
 
 Every command supports `--json` for machine-readable output, plus
@@ -627,9 +629,10 @@ default `astro auth login` nor `astro auth login --scope clusters` carries a
 Zentinelle permission. With either, `zentinelle status` and these reads are
 refused with `api token scope does not allow this permission` even when
 `astro perms diagnose --permission zentinelle.status_view` shows your account
-holds it. Of the sign-ins, only `astro auth login --scope admin` carries them,
-and only the platform operator can approve it; an API token works when its own
-scopes allow the permission. The refusal names that sign-in. Under `--json`,
+holds it. `astro auth login --scope zentinelle` adds the read permissions on
+a supporting server; audit export and writes still require the admin scope.
+An API token works when its own scopes allow the permission. The refusal names
+the applicable sign-in. Under `--json`,
 status and the reads report any error as one JSON object on stderr and exit 1:
 `error` keeps the server's code, reason and permission, and `credential` adds
 the `permission`, the `loginScope` that carries it and a `hint`.
@@ -1316,6 +1319,16 @@ astro docs search '"immutable manifest"' --json
 `astro docs list` and generated help reflect the executing binary. The guide
 does not establish a live installation’s capability, storage setup or model
 health.
+
+### Zentinelle read-only login
+
+`astro auth login --scope zentinelle` requests the usual CLI scopes plus
+`read:zentinelle`: status, policy, observed token usage, conformance and audit
+reads. It does not add export or write authority. The browser shows the requested
+scopes and account roles still apply. A server without
+`identity.zentinelle_read_scope` is refused before login; upgrade that server
+instead of falling back to an ordinary token. Administrative/export commands
+still require a separately approved admin scope.
 
 ### Inspect a brain plan
 
