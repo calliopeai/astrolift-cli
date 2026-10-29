@@ -32,7 +32,7 @@
 
 ARG ASTRO_STAGE=astro-src
 
-FROM golang:1.23-alpine AS astro-src
+FROM golang:1.25-alpine AS astro-src
 
 WORKDIR /src
 
