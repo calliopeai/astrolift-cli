@@ -236,12 +236,19 @@ func normalizeManTree(destination string, generatedAt time.Time) error {
 			if strings.HasPrefix(line, ".TH ") {
 				line = strings.Replace(line, oldDate, newDate, 1)
 			}
-			if line == ".PP" && index+2 < len(lines) &&
-				strings.HasPrefix(lines[index+1], `\fB`) &&
-				strings.HasPrefix(lines[index+2], "\t") {
-				normalized = append(normalized, ".TP", lines[index+1])
-				normalized = appendWrappedRoff(normalized, strings.TrimPrefix(lines[index+2], "\t"), noFill)
-				index += 2
+			// go-md2man before 2.0.6 emits ".PP" ahead of every flag block;
+			// later versions omit it for the first flag under a section heading.
+			flag := index
+			if line == ".PP" {
+				flag = index + 1
+			}
+			afterHeading := len(normalized) > 0 && strings.HasPrefix(normalized[len(normalized)-1], ".SH ")
+			if (line == ".PP" || afterHeading) && flag+1 < len(lines) &&
+				strings.HasPrefix(lines[flag], `\fB`) &&
+				strings.HasPrefix(lines[flag+1], "\t") {
+				normalized = append(normalized, ".TP", lines[flag])
+				normalized = appendWrappedRoff(normalized, strings.TrimPrefix(lines[flag+1], "\t"), noFill)
+				index = flag + 1
 				continue
 			}
 			if line == ".PP" && len(normalized) > 0 && strings.HasPrefix(normalized[len(normalized)-1], ".SH ") {
