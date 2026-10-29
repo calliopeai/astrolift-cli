@@ -12,7 +12,7 @@ Thank you for your interest in contributing!
 
 ## Prerequisites
 
-- Go 1.23 or newer
+- Go 1.25 or newer
 - `golangci-lint` (optional but recommended for local lint runs)
 - `goreleaser` (only needed to test release builds)
 
