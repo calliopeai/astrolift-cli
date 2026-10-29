@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Security sweep (#191): move to Go 1.25 and bump helm 3.16.3→3.20.2, x/crypto 0.27.0→0.55.0, x/net 0.26.0→0.58.0, x/oauth2 0.21.0→0.36.0, gRPC 1.65.0→1.83.2, containerd 1.7.23→1.7.36, klauspost/compress 1.17.2→1.18.7 and gorilla/websocket 1.5.0→1.5.4 (pseudo-version), clearing the open Dependabot alerts. Helm 3.20.2 drops the docker/docker, docker/cli, docker/distribution and moby/spdystream modules, which clears the alerts that had no published fix. The man-page normalizer also handles go-md2man 2.0.6's first-flag layout; `astro-ci-setup(1)` loses an `.RS`/`.RE` indent around its numbered list. Builder and source Dockerfiles use `golang:1.25-alpine`.
+
 ## 0.16.0 — 2026-10-26
 
 - Compile ready brain stories into pinned agent-dispatch envelopes with their context recipe, references, acceptance tests and target identity; add a no-dispatch preview (#180).
