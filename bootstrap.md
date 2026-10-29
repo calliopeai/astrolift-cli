@@ -12,7 +12,7 @@ Astrolift metarepo.
 
 ## Stack
 
-- **Language:** Go 1.23
+- **Language:** Go 1.25
 - **CLI framework:** Cobra
 - **Config management:** Viper (YAML config + env vars + flags)
 - **API transport:** GraphQL (primary) + REST (auth, CI deploy, streaming)
