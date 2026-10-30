@@ -1,7 +1,7 @@
 # astrolift-cli
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/go-%3E%3D1.23-00ADD8.svg)](https://go.dev/)
+[![Go](https://img.shields.io/badge/go-%3E%3D1.25-00ADD8.svg)](https://go.dev/)
 
 `astro` is the command-line client for the
 [Astrolift](https://astrolift.ai) PaaS. App developers use it to register
@@ -18,9 +18,9 @@ register clusters and configure providers against an Astrolift control plane.
 ## Install
 
 Source and [release archives](https://github.com/calliopeai/astrolift-cli/releases)
-are public. Manual `curl` downloads need no GitHub account. Homebrew and Scoop
-publication remain unconfigured; the legacy installer still requires GitHub
-credentials unless a mirror is supplied. The container images are public.
+are public. Manual `curl` downloads and `scripts/install.sh` need no GitHub
+account; a mirror, an authenticated `gh` or a token is optional. Homebrew and
+Scoop publication remain unconfigured. The container images are public.
 
 ### Docker (no credentials required)
 
@@ -47,7 +47,7 @@ The image is `gcr.io/distroless/static-debian12:nonroot`. To copy the binary
 out into another image, pin the version:
 
 ```dockerfile
-FROM calliopeai/astrolift-cli:0.12.0 AS astro-cli
+FROM calliopeai/astrolift-cli:0.16.0 AS astro-cli
 COPY --from=astro-cli /usr/local/bin/astro /usr/local/bin/astro
 ```
 
@@ -61,7 +61,11 @@ cd astrolift-cli
 
 The installer detects your OS and architecture, downloads the matching
 archive, **verifies it against `astro-checksums.txt`**, and installs `astro`
-into `/usr/local/bin` or `~/.local/bin`. GitHub credentials are optional.
+into `/usr/local/bin` or `~/.local/bin`. It ends with `Installed man page to
+<dir>`; `astro version` then prints `astro X.Y.Z (commit <sha>, built
+<timestamp>)`. `GitHub returned 404: release or asset not found` means
+`ASTRO_INSTALL_TAG` names a tag that does not exist (tags carry a `v` prefix).
+GitHub credentials are optional.
 The download paths, in order, are:
 
 1. `ASTRO_INSTALL_BASE_URL` — a mirror you control, or an offline fixture
@@ -75,7 +79,8 @@ An optional token raises the GitHub API rate limit. The installer requires
 and missing-release errors identify the HTTP status without printing tokens.
 
 Set `ASTRO_INSTALL_TAG=vX.Y.Z` to pin a release, `ASTRO_INSTALL_DIR` to choose
-the destination.
+the destination and `ASTRO_MAN_DIR` for the man page. `ASTRO_GITHUB_API_URL`
+points the installer at a GitHub Enterprise or mirror API.
 
 ### Manual release download
 
@@ -109,7 +114,7 @@ Once a day `astro` will note on stderr if a newer release exists; set
 ```bash
 git clone https://github.com/calliopeai/astrolift-cli.git
 cd astrolift-cli
-make build              # produces ./astro
+make build              # produces ./astro; needs Go 1.25 or newer
 ./astro version
 ```
 
@@ -123,11 +128,31 @@ make build              # produces ./astro
 # 1. Tell the CLI where your platform lives
 astro server add prod https://api.astrolift.example.com
 astro auth login
+astro version-check
+```
 
+`prod` is any slug you choose; the URL is the API URL your operator gave you
+(`astro server list` shows it afterwards). Expect `Added server prod -> <url>`
+and `Set as current server.`, then `Logged in to <url>.` once the browser flow
+finishes, then `CLI X.Y.Z is compatible with <url>.`. ``no current server. run
+`astro server add <slug> <api-url>` and `astro auth login` `` means step 1
+was skipped; ``loading credentials (run `astro auth login`)`` means sign in;
+`version-check` exiting 1 names the server capability this CLI needs, so
+`astro update` or ask the operator to upgrade the server. Without a browser,
+`astro auth login --no-wait --json` prints the URL for a person to open and
+`astro auth wait --session-id <id>` finishes the login.
+
+```bash
 # 2. Scaffold an app manifest in your project
 cd my-service/
 astro app init                  # writes astrolift.toml
+```
 
+Expect `Created astrolift.toml`; `astrolift.toml already exists` means the
+directory is already initialized. Edit the manifest before registering; the
+keys are in the [`astrolift.toml` reference](https://astrolift.dev/reference/astrolift-toml/).
+
+```bash
 # 3. Register and deploy
 astro app register --project-id <project-uuid> --source-repo myorg/my-service
 astro app deploy --image-tag sha-deadbeef --wait   # --env defaults to production
@@ -136,7 +161,17 @@ astro app deploy --image-tag sha-deadbeef --wait   # --env defaults to productio
 astro app deploy --wait
 astro app deploy --ref release/v2 --wait         # branch, tag, or commit
 # Apps with build_mode = "none" use images declared in their saved manifest.
+```
 
+`<project-uuid>` is the project GUID from `astro project list --json`;
+`myorg/my-service` is the repository the platform's source connection can
+read; `sha-deadbeef` is an image tag your CI already pushed. Expect
+`Registered app:   <name> (<slug>)` with its ID, project and namespace, then
+`Deployment started: <id>`, status transitions, and `Final status: running`.
+`Final status: failed` prints a `Reason:` line; read it, then `astro app logs`.
+``unauthorized: run `astro auth login` `` means the sign-in expired.
+
+```bash
 # 4. Watch it run
 astro app list                  # apps in the org
 astro app show                  # status, source, workloads, environments
@@ -147,6 +182,11 @@ astro exec --app web -- ps aux  # one-off command in a running pod
 astro app tasks run --workload migrate --wait  # run a kind="task" workload as a Job
 # astro app rollback            # roll back the running deployment
 ```
+
+`app logs [workload]` and `app exec [workload]` take a workload as their
+positional; the app comes from the global `--app <slug>` or the local
+`astrolift.toml`. The full walk-through is the
+[app setup guide](https://astrolift.dev/guides/app-setup/).
 
 ### Registering before a source connection is configured
 
@@ -740,7 +780,8 @@ normal signed/DCO review flow.
 
 ## Configuration + credentials
 
-The CLI stores its state under `~/.config/astrolift/`:
+The CLI stores its state under `~/.config/astrolift/` (`$XDG_CONFIG_HOME/astrolift/`
+when that variable is set):
 
 ```
 ~/.config/astrolift/
@@ -771,6 +812,10 @@ Environment variables take precedence over the config file (CI mode):
 | `ASTROLIFT_COMMIT_SHA` | optional, falls back to `git rev-parse HEAD` |
 | `ASTROLIFT_IDEMPOTENCY_KEY` | optional, suppresses duplicate deploys |
 | `ASTROLIFT_DEPLOY_TIMEOUT` | optional, Go duration; default 30m |
+| `ASTROLIFT_NO_UPDATE_CHECK` | `1` silences the once-a-day newer-release hint |
+| `ASTRO_GITHUB_TOKEN` / `GITHUB_TOKEN` / `GH_TOKEN` | optional, `astro update` and `scripts/install.sh`; raises the GitHub API rate limit |
+| `ASTRO_GITHUB_API_URL` | optional, `astro update` and `scripts/install.sh`; GitHub API mirror |
+| `XDG_CONFIG_HOME` | optional, config directory root |
 
 ---
 
