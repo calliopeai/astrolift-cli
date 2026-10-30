@@ -17,36 +17,34 @@ docker run --rm calliopeai/astrolift-cli:latest version
 
 ```bash
 docker run --rm -it \
-  -v $HOME/.config/astrolift:/home/nonroot/.config/astrolift \
+  -v "$HOME/.config/astrolift:/home/nonroot/.config/astrolift" \
   calliopeai/astrolift-cli:latest \
-  workloads list --server=https://your-astrolift-install.example
+  server add prod https://your-astrolift-install.example
+docker run --rm -it \
+  -v "$HOME/.config/astrolift:/home/nonroot/.config/astrolift" \
+  calliopeai/astrolift-cli:latest app list
 ```
 
 Credentials live at `~/.config/astrolift/credentials/<server>.yaml` (mode `0600`).
+`astro auth login` opens a browser device flow; from a container, run
+`auth login --no-browser` and open the printed URL yourself, or export
+`ASTROLIFT_TOKEN` with an API token.
 
 ### Copy the binary into your own image
 
 ```dockerfile
-FROM calliopeai/astrolift-cli:0.3.0 AS astro-cli
+FROM calliopeai/astrolift-cli:0.16.0 AS astro-cli
 COPY --from=astro-cli /usr/local/bin/astro /usr/local/bin/astro
 ```
 
-This image is the only install path that needs no credentials — prefer it for
-containers and CI.
-
 ## Native binary install
 
-Native archives live in a **private** GitHub release repository, so they
-cannot be downloaded anonymously; GitHub answers anonymous requests for a
-private repo with 404 rather than 401. Authorized users can fetch them with
-`gh release download --repo calliopeai/astrolift-cli`, or with a token:
-
-```bash
-GITHUB_TOKEN="$(gh auth token)" ./scripts/install.sh
-```
-
-Homebrew, Scoop, anonymous `curl`, and direct browser downloads are not
-supported until those archives have a public distribution channel. There is no
+Release archives (`astro-<os>-<arch>.tar.gz`, `.zip` on Windows) and
+`astro-checksums.txt` are public on
+[GitHub Releases](https://github.com/calliopeai/astrolift-cli/releases) and
+download anonymously. `scripts/install.sh` in the source repository verifies
+the checksum and installs the binary and man page; set `ASTRO_INSTALL_TAG` to
+pin a release. Homebrew and Scoop are not published, and there is no
 `curl | sh` installer URL. See the
 [CLI install reference](https://astrolift.dev/reference/cli/#install).
 
