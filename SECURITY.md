@@ -2,10 +2,10 @@
 
 ## Reporting a Vulnerability
 
-**This repository is private.** Everyone who can read this file already has
-repository access, so the reliable channel today is a new issue in this
-repository, titled with a `[security]` prefix. While the repository is
-private that issue is not publicly visible.
+This repository is public. Do not open a public issue for a vulnerability;
+an issue is visible to everyone the moment it is filed. Report through GitHub
+private vulnerability reporting on this repository: the Security tab, then
+"Report a vulnerability". Only the maintainers see the report.
 
 Include:
 
@@ -16,13 +16,6 @@ Include:
 
 We aim to acknowledge a report within 48 hours, and to release a fix within
 7 days for critical issues.
-
-### Before this repository becomes public
-
-A repository issue stops being confidential the moment the repository is
-public. Ahead of that, this policy has to move to GitHub private
-vulnerability reporting, which is only available on public repositories.
-Tracked in calliopeai/astrolift-app#1404.
 
 Earlier revisions of this policy directed reports to an address on a domain
 with no nameserver delegation and no MX record, so mail to it could never be
@@ -49,8 +42,9 @@ When using the Astrolift CLI:
   personal access token from automation.
 - Don't commit `~/.config/astrolift/` or any file under it to source
   control.
-- Rotate deploy tokens regularly via `astro app tokens` (per-app) or
-  `astro org tokens` (org-scoped).
+- Rotate deploy tokens regularly from the dashboard (the app's Tokens page or
+  Administration > Tokens); `astro ci setup <app>` pushes the current deploy
+  token to the repository's CI secrets.
 - Use `astro auth status` to check token expiry; let `astro auth refresh`
   rotate access tokens rather than long-lived credentials.
 - Verify the platform you're logging into — `astro server add <slug> <api-url>`
