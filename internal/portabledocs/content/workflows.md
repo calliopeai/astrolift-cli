@@ -1,5 +1,16 @@
 # Workflow TOML reference
 
+!!! note "Agent notes"
+    `astro workflow pull <slug>` exports a definition's canonical TOML, and
+    `astro workflow validate <file> --server` is the authoritative check; the
+    local check knows a subset of the rules and does not know the
+    `github_checks` kind, so validate that kind with `--server`. The parser is
+    `backend/workflows/manifest.py` in astrolift-app. `supervisor_worker` and
+    `advisor` parse but are refused at import; `skill_slug` is legacy and not
+    a TOML key. Frequent mistakes: `[[stage]]`, not `[[stages]]`; `skills` is
+    an array; `workflow` is set only when `kind = "workflow"`; two stages
+    sharing an `output_key`; an `input_schema_json` written as a TOML table.
+
 Workflow definitions are ordered pipelines stored in `workflows/**/*.toml`.
 Agent-repo registration and source webhook reconciliation discover and converge
 them independently from each agent's `astrolift.toml`.
@@ -96,7 +107,7 @@ One `[[stage]]` is one ordered `WorkflowStage`; array index becomes `order`.
 
 | TOML | Runtime meaning |
 |---|---|
-| `kind` | `agent_dispatch`, `workflow`, `human_gate`, `checkpoint`, `aggregation`, `collection`, or `format_record` |
+| `kind` | `agent_dispatch`, `workflow`, `human_gate`, `checkpoint`, `aggregation`, `collection`, `format_record`, or `github_checks` |
 | `role` | Human-readable responsibility used by builders/importers |
 | `agent` | Agent workload `guid:<canonical-UUID>` or organization-local literal slug; a slug may resolve after import |
 | `workflow` | Definition `guid:<canonical-UUID>` or literal slug, required for `kind = "workflow"`; review its resolved identity |
@@ -104,13 +115,37 @@ One `[[stage]]` is one ordered `WorkflowStage`; array index becomes `order`.
 | `skills` | Ordered catalogue/local/org-repo overlays using the agent skill grammar |
 | `prompt` | Agent instruction overlay or human-gate question |
 | `output_key` | Unique key in `named_outputs`; defaults to `stage_<order>` |
-| `on_failure` | Server-advertised failure policy; default `fail` |
+| `on_failure` | `fail` (default), `retry`, `skip` or `escalate` |
 | `max_attempts` | Integer 1–20 including the first attempt; default 3 |
 | `back_edge` / `back_edge_json` | Finite earlier-stage return object or JSON string; exactly one representation |
-| `iteration` / `iteration_json` | Bounded collection or record-formatter contract; exactly one representation |
+| `iteration` / `iteration_json` | Kind-specific stage contract; exactly one representation. A bounded collection or record-formatter contract on `collection` and `format_record`; the gate configuration on `github_checks`; a source-port contract on an imported Langflow `agent_dispatch` or `workflow` stage. Empty elsewhere |
 | `timeout` | Non-negative seconds; default 300 |
 | `fan_out` | `0`, a positive integer, or `"dynamic"` |
-| `approvers` | Human-gate principal selectors |
+| `approvers` | Human-gate principal selectors. Email addresses are enforced: when a gate names at least one, only a signed-in user with a matching email may decide it. Team or role slugs are stored but not resolved, so a gate naming only slugs defers to `workflow.trigger` at the run's scope. The platform operator may always decide |
+
+A `github_checks` stage waits for named GitHub check runs on a pull request's
+head commit. Its configuration is the stage's `iteration` table with exactly
+four keys: `repo` (`owner/name`), `sha_source = "pull_request_head"`,
+`pull_request_path` (a dotted field in the preceding stage's output, or the
+run input for a first stage, holding a pull request number or that
+repository's pull request URL) and `checks` (1 to 20 distinct check names).
+A check passes on the conclusions GitHub branch protection accepts; a gate
+still pending at the stage `timeout` is decided `timed_out`. Polling uses the
+organization's GitHub connection.
+
+```toml
+[[stage]]
+kind = "github_checks"
+role = "ci-gate"
+output_key = "checks"
+timeout = 3600
+
+  [stage.iteration]
+  repo = "acme/orders-api"
+  sha_source = "pull_request_head"
+  pull_request_path = "pr"
+  checks = ["lint", "test"]
+```
 
 Explicit `guid:` references retain the selected target through export and source
 reconciliation. Malformed, deleted or inaccessible GUID targets are refused
@@ -133,13 +168,19 @@ gate-rejection return; the pattern name alone does not repeat stages.
 
 ## Source reconciliation
 
-Every TOML file directly or recursively under `workflows/` is parsed. A bad
-workflow fails reconciliation with its source path. Definitions are owned by
-`(organization, source_repo, source_path)`; slug collisions with another
-definition fail loudly. Removing a source-owned workflow disables and
-soft-deletes its definition while retaining history.
+Every TOML file directly or recursively under `workflows/` is parsed, in
+sorted path order. A bad workflow fails reconciliation with its source path.
+Definitions are owned by `(organization, source_repo, source_path)`; slug
+collisions with another definition fail loudly. A reconciled definition is
+enabled and owned by the registering project. Removing a source-owned workflow
+disables and soft-deletes its definition while retaining history.
 
 ## CLI authoring
+
+The end-to-end flow, including binding and running, is in
+[Set up and run a workflow](../guides/workflow-setup.md). `workflows/triage.toml`
+is your file; `ooda` is a catalogue definition slug from `astro workflow
+definitions`.
 
 ```bash
 astro workflow init --pattern chained -o workflows/triage.toml
@@ -147,10 +188,23 @@ astro workflow validate workflows/triage.toml
 astro workflow validate workflows/triage.toml --server
 astro workflow import workflows/triage.toml --preview
 astro workflow import workflows/triage.toml
+astro workflow import workflows/triage.toml --replace
 astro workflow pull ooda -o workflows/ooda.toml
+astro workflow run-manifest workflows/triage.toml --input ticket=INC-42
 ```
 
-Local validation checks TOML shape. Server validation is authoritative for the
-installed version. Import preview does not persist; apply creates an org-scoped
-definition. `pull` is the easiest way to start from a built-in catalogue
-definition.
+Local validation prints `OK (local shape check): workflows/triage.toml` and
+lists the stages; `--server` prints the parsed definition, or `server validation
+failed at stage[<n>].<key>: <reason>`, which names the key to fix. A persisting
+import prints the created definition slug. Server validation is authoritative
+for the installed version. Import preview does not persist; apply creates an
+org-scoped definition, disabled for review until `astro workflow definition-enable
+<slug>`. A second plain import of the same slug creates `<slug>-1`;
+`--replace` upserts the org's own definition instead: in place when the stage
+kinds are unchanged, otherwise as a new version with every configured Workflow
+repointed to it, or a refusal that changes nothing when a repoint would break
+a Workflow's bindings. `pull` is the easiest way to start from a built-in
+catalogue definition. `run-manifest` imports, binds each `agent_dispatch`
+stage to its declared agent (override with `--bind <order>=<guid>`), enables
+the new definition and starts a run in one call; `--dry-run` shows the
+resolved bindings and `--no-run` stops before the run.
