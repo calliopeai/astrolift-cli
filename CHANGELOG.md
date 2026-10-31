@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `astro app reprovision` (platform #2573): re-render an app's platform resources from current state and re-apply them against the running image through `reprovisionApp`, with no build or image change. It prints each environment's reachability and the objects it created and updated, or `unchanged`. `--env` limits it to one environment, and `--wait` polls the app's `reachabilityStatus` until it is reachable within `--timeout` (default 5m), exiting 1 on a timeout or when the app needs a reprovision or has no managed domain. A server without `reprovisionApp` is named in one line before anything runs. `app list` gains a REACHABILITY column and `app show` a `Reachability:` line; a server without the field reads as before.
 - Security sweep (#191): move to Go 1.25 and bump helm 3.16.3→3.20.2, x/crypto 0.27.0→0.55.0, x/net 0.26.0→0.58.0, x/oauth2 0.21.0→0.36.0, gRPC 1.65.0→1.83.2, containerd 1.7.23→1.7.36, klauspost/compress 1.17.2→1.18.7 and gorilla/websocket 1.5.0→1.5.4 (pseudo-version), clearing the open Dependabot alerts. Helm 3.20.2 drops the docker/docker, docker/cli, docker/distribution and moby/spdystream modules, which clears the alerts that had no published fix. The man-page normalizer also handles go-md2man 2.0.6's first-flag layout; `astro-ci-setup(1)` loses an `.RS`/`.RE` indent around its numbered list. Builder and source Dockerfiles use `golang:1.25-alpine`.
 
 ## 0.16.0 — 2026-10-26
