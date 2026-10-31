@@ -19,6 +19,32 @@ remain server-side.
 3. Mint a narrowly scoped API token for unattended GraphQL or MCP access.
 4. Use an app deploy token, not a user token, for a single app's CI deployment.
 
+For an AI coding agent (Claude Code, Codex, or any MCP client), `astro onboard`
+writes the MCP server entry for the selected install, the bundled skill
+catalogue and the offline guides into a workspace:
+
+```bash
+astro server add prod https://astrolift.example.com
+astro onboard --dry-run
+astro onboard
+```
+
+Substitute `prod` with a slug of your choice and the URL with the API URL your
+operator gave you (`astro server list` shows registered servers). The dry run
+prints `Dry run: nothing written.` and one `would write <path>` line per file;
+the real run prints `Install: <url>` and `wrote` lines for `.mcp.json` and/or
+`.codex/mcp.json`, the skills under `.claude/skills/` or `.codex/skills/`, and
+the guides under `.astrolift/docs/`. `skipped <path> (exists; pass --force to
+replace)` leaves an existing file alone. `Auth: NOT configured` is expected on a
+fresh machine: export `ASTROLIFT_TOKEN` (an API token from Settings > API
+tokens) or run `astro auth login`, then re-run `astro onboard` to see `Auth:`
+report the source. `no current server` means the `server add` step was skipped.
+`--only mcp,skills,docs` and `--target claude|codex|both` narrow what is
+written. The MCP entry references `${ASTROLIFT_TOKEN}`, so one API token
+authenticates both the CLI and the MCP gateway; the token model is in the
+[API reference](../reference/api.md) and the gateway contract in the
+[MCP reference](../reference/mcp.md).
+
 An API token is a ceiling over the user's RBAC grants. Both must allow an
 operation. Giving a token `admin` does not grant its owner an RBAC permission,
 and making the user an administrator does not add missing token scopes.
@@ -32,12 +58,9 @@ astro version-check
 ```
 
 The status response identifies the server version and capabilities. Pin a CLI
-release in CI, and refresh a device-flow token after the server adds a new CLI
-scope:
-
-```bash
-astro auth refresh
-```
+release in CI. `astro auth refresh` renews the current server's access token;
+a sign-in's scopes are fixed when it is approved, so a scope the server added
+later (for example `--scope zentinelle`) needs a new `astro auth login`.
 
 Continue with the [CLI](../reference/cli.md), [API](../reference/api.md), or
 [MCP](../reference/mcp.md) reference.
