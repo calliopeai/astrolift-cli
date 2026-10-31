@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // Exercise the executable: RunE tests alone cannot detect main appending plain
@@ -273,7 +275,10 @@ func TestAppReprovisionExecutableExitCodes(t *testing.T) {
 			}))
 			defer server.Close()
 			args := append([]string{"--api-url", server.URL, "--token", "synthetic-token", "app", "reprovision", "--app", "web", "--env", "production", "--wait"}, fixture.args...)
-			process := exec.Command(binary, args...)
+			// A broken exit condition would poll every 5s forever; fail it fast.
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			process := exec.CommandContext(ctx, binary, args...)
 			process.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "ASTROLIFT_NO_UPDATE_CHECK=1", "ASTROLIFT_DEPLOY_TOKEN=", "ASTROLIFT_SERVER=", "ASTROLIFT_TOKEN=")
 			var stdout, stderr strings.Builder
 			process.Stdout, process.Stderr = &stdout, &stderr

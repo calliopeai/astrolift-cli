@@ -62,6 +62,15 @@ func reprovisionServer(t *testing.T, envelope map[string]interface{}, statuses [
 	return api.NewClient(srv.URL, "tok", false)
 }
 
+// waitTestContext bounds a --wait test, so a broken exit condition fails it in
+// seconds instead of hanging until go test's own timeout.
+func waitTestContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func TestAppReprovisionSendsTheInputAndPrintsEachEnvironment(t *testing.T) {
 	resetAppReprovisionFlags()
 	t.Cleanup(resetAppReprovisionFlags)
@@ -212,7 +221,7 @@ func TestAppReprovisionWaitPollsUntilReachable(t *testing.T) {
 	client := reprovisionServer(t, reprovisionAccepted(), []string{"PROVISIONING", "PROVISIONING", "REACHABLE"}, &sent)
 	cmd, out := appTestCmd()
 
-	if err := runAppReprovision(cmd, context.Background(), client, "web"); err != nil {
+	if err := runAppReprovision(cmd, waitTestContext(t), client, "web"); err != nil {
 		t.Fatal(err)
 	}
 	if len(sent) != 4 {
@@ -251,7 +260,7 @@ func TestAppReprovisionWaitFailsWhenTheAppIsNotReachable(t *testing.T) {
 			client := reprovisionServer(t, reprovisionAccepted(), tc.statuses, &sent)
 			cmd, _ := appTestCmd()
 
-			err := runAppReprovision(cmd, context.Background(), client, "web")
+			err := runAppReprovision(cmd, waitTestContext(t), client, "web")
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("expected an error containing %q, got %v", tc.want, err)
 			}
@@ -282,7 +291,7 @@ func TestAppReprovisionWaitJSONReportsTheFinalStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err := runAppReprovision(cmd, context.Background(), client, "web")
+			err := runAppReprovision(cmd, waitTestContext(t), client, "web")
 			if (err != nil) != tc.fails {
 				t.Fatalf("error = %v, want failure %t", err, tc.fails)
 			}
@@ -324,7 +333,7 @@ func TestAppReprovisionWaitStopsOnAFailedRead(t *testing.T) {
 			defer srv.Close()
 			cmd, _ := appTestCmd()
 
-			err := runAppReprovision(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
+			err := runAppReprovision(cmd, waitTestContext(t), api.NewClient(srv.URL, "tok", false), "web")
 			if err == nil || !strings.Contains(err.Error(), tc.want) || reads != 1 {
 				t.Fatalf("expected one read failing with %q, got %v after %d reads", tc.want, err, reads)
 			}
