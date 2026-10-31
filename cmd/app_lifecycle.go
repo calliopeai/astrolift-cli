@@ -252,6 +252,7 @@ type appListItem struct {
 	Slug               string             `json:"slug"`
 	Name               string             `json:"name"`
 	ProvisioningStatus string             `json:"provisioningStatus"`
+	ReachabilityStatus string             `json:"reachabilityStatus,omitempty"` // astrolift-app#2573; older servers lack it
 	IsActive           bool               `json:"isActive"`
 	IsArchived         bool               `json:"isArchived"`
 	SourceKind         string             `json:"sourceKind"`
@@ -281,6 +282,7 @@ type appDetail struct {
 	IsActive           bool               `json:"isActive"`
 	IsArchived         bool               `json:"isArchived"`
 	ProvisioningStatus string             `json:"provisioningStatus"`
+	ReachabilityStatus string             `json:"reachabilityStatus,omitempty"` // astrolift-app#2573; older servers lack it
 	ProvisioningError  string             `json:"provisioningError"`
 	LastDeployedAt     *string            `json:"lastDeployedAt"`
 	LatestDeployment   *deploymentSummary `json:"latestDeployment"`
@@ -477,7 +479,7 @@ func runAppList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 	var resp struct {
 		Apps []appListItem `json:"astroliftApps"`
 	}
-	expiryAvailable, err := queryWithExpiry(cmd, listCtx, client, astroliftAppsQuery, vars, &resp, boolFlag(cmd, "temporary"))
+	expiryAvailable, err := queryWithReachability(cmd, listCtx, client, astroliftAppsQuery, vars, &resp, boolFlag(cmd, "temporary"))
 	if err != nil {
 		return fmt.Errorf("listing apps: %w", err)
 	}
@@ -505,10 +507,11 @@ func runAppList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SLUG\tNAME\tSTATUS\tREPO\tLAST DEPLOYED\tEXPIRES")
+	fmt.Fprintln(w, "SLUG\tNAME\tSTATUS\tREACHABILITY\tREPO\tLAST DEPLOYED\tEXPIRES")
 	for _, a := range resp.Apps {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			a.Slug, a.Name, appStatusLabel(a.ProvisioningStatus, a.IsActive, a.IsArchived),
+			dashIfEmpty(reachabilityLabel(a.ReachabilityStatus)),
 			dashIfEmpty(a.SourceRepo), shortTime(a.LastDeployedAt), appExpiryLabel(a.ExpiresAt, a.ExpiryAvailable),
 		)
 	}
@@ -551,7 +554,7 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 	defer cancel()
 
 	var result appShowResult
-	expiryAvailable, err := queryWithExpiry(cmd, showCtx, client, astroliftAppShowQuery,
+	expiryAvailable, err := queryWithReachability(cmd, showCtx, client, astroliftAppShowQuery,
 		map[string]interface{}{"slug": slug}, &result, false)
 	if err != nil {
 		return fmt.Errorf("fetching app: %w", err)
@@ -572,6 +575,9 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 		fmt.Fprintf(out, "Description:  %s\n", a.Description)
 	}
 	fmt.Fprintf(out, "Status:       %s\n", appStatusLabel(a.ProvisioningStatus, a.IsActive, a.IsArchived))
+	if a.ReachabilityStatus != "" {
+		fmt.Fprintf(out, "Reachability: %s\n", reachabilityLabel(a.ReachabilityStatus))
+	}
 	fmt.Fprintf(out, "Expires:      %s\n", appExpiryLabel(a.ExpiresAt, a.ExpiryAvailable))
 	if a.ProvisioningError != "" {
 		fmt.Fprintf(out, "Error:        %s\n", a.ProvisioningError)

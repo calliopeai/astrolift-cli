@@ -224,3 +224,88 @@ func TestZentinelleReadExecutableReportsAScopeRefusalAsOneJSONError(t *testing.T
 		})
 	}
 }
+
+// app reprovision --wait exits 0 only once the app reads reachable. A
+// refusal, a status that needs someone to act, and the timeout each exit 1
+// (platform #2573); only the executable shows the flags wired through cobra
+// and main's exit code. Under --json, stdout still carries the one result.
+func TestAppReprovisionExecutableExitCodes(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "astro")
+	if output, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput(); err != nil {
+		t.Fatalf("build: %v %s", err, output)
+	}
+	accepted := `{"data":{"reprovisionApp":{"ok":true,"errors":[],"data":{"appSlug":"web","environments":[{"environmentName":"production","deploymentId":"dep-7","reachabilityStatus":"PROVISIONING","objectsCreated":["Ingress/web"],"objectsUpdated":[],"unchanged":false}]}}}}`
+	refused := `{"data":{"reprovisionApp":{"ok":false,"errors":[{"code":"PERMISSION_DENIED","message":"app.deploy is required","field":null}],"data":null}}}`
+	for _, fixture := range []struct {
+		name     string
+		mutation string
+		status   string
+		args     []string
+		exit     int
+		stderr   string
+	}{
+		{"reachable", accepted, "REACHABLE", nil, 0, ""},
+		{"needs reprovision", accepted, "NEEDS_REPROVISION", nil, 1, "app web still needs a reprovision"},
+		{"timeout", accepted, "PROVISIONING", []string{"--timeout", "1ns"}, 1, "app web still provisioning after 1ns"},
+		{"refused", refused, "REACHABLE", nil, 1, "reprovision failed: app.deploy is required"},
+		{"json", accepted, "NO_MANAGED_DOMAIN", []string{"--json"}, 1, "app web has no managed domain"},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			var reads atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var request struct {
+					Query     string                 `json:"query"`
+					Variables map[string]interface{} `json:"variables"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+					t.Error(err)
+					return
+				}
+				if strings.Contains(request.Query, "reprovisionApp") {
+					if input, _ := request.Variables["input"].(map[string]interface{}); input["appSlug"] != "web" || input["environmentName"] != "production" {
+						t.Errorf("reprovisionApp input: %v", input)
+					}
+					_, _ = fmt.Fprint(w, fixture.mutation)
+					return
+				}
+				reads.Add(1)
+				_, _ = fmt.Fprintf(w, `{"data":{"astroliftApp":{"slug":"web","reachabilityStatus":%q}}}`, fixture.status)
+			}))
+			defer server.Close()
+			args := append([]string{"--api-url", server.URL, "--token", "synthetic-token", "app", "reprovision", "--app", "web", "--env", "production", "--wait"}, fixture.args...)
+			process := exec.Command(binary, args...)
+			process.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "ASTROLIFT_NO_UPDATE_CHECK=1", "ASTROLIFT_DEPLOY_TOKEN=", "ASTROLIFT_SERVER=", "ASTROLIFT_TOKEN=")
+			var stdout, stderr strings.Builder
+			process.Stdout, process.Stderr = &stdout, &stderr
+			exit := 0
+			if err := process.Run(); err != nil {
+				failed, ok := err.(*exec.ExitError)
+				if !ok {
+					t.Fatal(err)
+				}
+				exit = failed.ExitCode()
+			}
+			if exit != fixture.exit || (fixture.stderr == "" && stderr.Len() != 0) || !strings.Contains(stderr.String(), fixture.stderr) {
+				t.Fatalf("exit=%d stdout=%s stderr=%s", exit, &stdout, &stderr)
+			}
+			switch fixture.name {
+			case "refused":
+				if reads.Load() != 0 || stdout.Len() != 0 {
+					t.Fatalf("a refused reprovision polled or printed: reads=%d stdout=%s", reads.Load(), &stdout)
+				}
+			case "json":
+				var result struct {
+					AppSlug            string `json:"appSlug"`
+					ReachabilityStatus string `json:"reachabilityStatus"`
+				}
+				if err := json.Unmarshal([]byte(stdout.String()), &result); err != nil || result.AppSlug != "web" || result.ReachabilityStatus != "NO_MANAGED_DOMAIN" {
+					t.Fatalf("stdout is not the one JSON result: %v %s", err, &stdout)
+				}
+			default:
+				if !strings.HasPrefix(stdout.String(), "production: provisioning; created Ingress/web\n") || reads.Load() != 1 {
+					t.Fatalf("reads=%d stdout=%s", reads.Load(), &stdout)
+				}
+			}
+		})
+	}
+}
