@@ -1,5 +1,20 @@
 # `astrolift.toml` reference
 
+!!! note "Agent notes"
+    The registered app's manifest is what the platform runs, not your working
+    copy: `astro app manifest pull <app-slug>` replaces the staged draft with the
+    repo's file, and `astro ci render` prints the Kubernetes resources the server
+    renders from it. The parser is `backend/astrolift_manifest/parser.py` in
+    astrolift-app; `[package]`, `[environment]` and `[secrets]` on an agent
+    manifest are read by `backend/astrolift_agents/services/agent_package.py`.
+    Compatibility only: `scope`, `tier`, `version` and `inject_as` on a managed
+    service, `web` and `worker` as `[app] kind`, `dockerfile` on a job or task.
+    Frequent mistakes: an unknown key inside `[[workloads]]` or a container is
+    refused, so `env` goes under `[workloads.containers.env]`, not on the
+    workload; a `cronjob` without `schedule`; `[workloads.metrics]` without
+    `port`; `[app] slug` or `display_name` missing, which `astro app register`
+    refuses before contacting the server.
+
 `astrolift.toml` is used by more than one source workflow. Identify the file's
 role before choosing fields:
 
@@ -55,9 +70,11 @@ hpa_target_cpu_pct = 70
 ```
 
 The top-level `name` is the server parser's required display name. The `[app]`
-identity is read by the CLI registration flow; include both. Unknown TOML keys
-may be retained for forward compatibility, but do not assume they affect the
-runtime unless documented here.
+identity is read by the CLI registration flow; include both. Unknown keys
+inside `[[workloads]]`, `[[workloads.containers]]`, `[[managed_services]]`,
+`[edge]`, `[ingress.access]` and `[brain]` are refused at parse time with the
+offending key path. An unknown top-level table is kept with the manifest but
+affects nothing.
 
 There is not yet a generated JSON Schema for this filename. App manifests and
 agent configuration/includes are two related parser families, and validation
@@ -71,6 +88,41 @@ repo resync can bootstrap, as the empty `production` table above does. Manage
 the environment's cluster binding and runtime configuration through the
 control plane; arbitrary nested override keys are not a supported deployment
 contract yet.
+
+### `[app]`
+
+| Key | Read by | Meaning |
+|---|---|---|
+| `slug` | `astro app register` | The app slug sent to registration; required by the CLI |
+| `display_name` | `astro app register` | The registered name; required by the CLI |
+| `kind` | server | What the app is for, separate from how it runs. Omit it for a generic app. The one registered kind is `mimwell`, a brain-serving app; the older `web` and `worker` values are still accepted and mean a generic app |
+| `expires_in` | both | Makes the app temporary: `30m`, `4h`, `7d`, `6w` or `3mo` (30 days) from registration. The organization's temporary-app policy applies; see [Temporary apps](../guides/temporary-apps.md) |
+
+### `[brain]`
+
+```toml
+[brain]
+slug = "handbook"
+```
+
+`slug` names the hosted brain this app reads. The manifest only names it; the
+grant that lets the app read the brain is made by someone who can grant it.
+`slug` is the table's only key.
+
+### `[env]`
+
+```toml
+[env]
+LOG_FORMAT = "json"
+FEATURE_FLAGS = "beta-search"
+```
+
+App-wide literals, materialized into a per-environment Kubernetes Secret the
+app's containers read. Precedence from lowest to highest: `[env]`, app secret
+bundles, managed-service connection envelopes, then
+`[workloads.containers.env]`. A document still carrying the masked placeholder
+from a masked read is refused wherever it is applied, so a secret is never
+replaced by the mask.
 
 ## Workloads
 
@@ -91,9 +143,13 @@ Common fields:
 | `hpa_min`, `hpa_max` | unset | HPA bounds |
 | `hpa_target_cpu_pct` | `80` | HPA CPU target |
 | `storage_class`, `storage_size` | unset | Legacy workload storage defaults |
+| `gpu` | `0` | Whole GPUs (0 to 16) requested on the primary container, or MIG slices when `mig_profile` is set |
+| `gpu_type` | unset | Pins the GPU product label, such as `nvidia-l4`; needs `gpu >= 1` |
+| `mig_profile` | unset | A MIG slice such as `3g.47gb`; needs `gpu >= 1` |
+| `fs_group` | platform default | Pod `fsGroup` for a workload that mounts a PVC. Falls back to `run_as_user` from `[workloads.security]`, then to the platform default. Emitted only when the workload mounts a PVC |
 
 A `cronjob` additionally requires `schedule` and accepts
-`concurrency_policy = "forbid" | "queue" | "replace"`.
+`concurrency_policy = "forbid" | "queue" | "replace"` (default `forbid`).
 
 ## Metrics
 
@@ -142,8 +198,8 @@ panels empty:
   | Traffic, errors, status codes | `http_requests_total` | counter, with a `code` label |
   | Latency quantiles | `http_request_duration_seconds_bucket` | histogram |
 
-  Both must carry an `app="<app-slug>"` label, and — to answer the
-  per-environment and per-workload views — `environment` and `workload`
+  Both must carry an `app="<app-slug>"` label and, to answer the
+  per-environment and per-workload views, `environment` and `workload`
   labels matching those slugs. The standard Prometheus client library for
   your language emits both metrics under these names; the labels are yours
   to add.
@@ -174,14 +230,14 @@ email = "x-qsr-email"
 | Key | Meaning |
 |---|---|
 | `gateway_secret_header` | Header the gate's shared secret is stamped on for this app. The *value* is never declared here; it comes from the cluster's auth config |
-| `identity_headers` | `identity = header-name` pairs. Valid identities are `user`, `email` and `access_token` — the ones the gate forwards |
+| `identity_headers` | `identity = header-name` pairs. Valid identities are `user`, `email` and `access_token`, the ones the gate forwards |
 
 The block is app-level, not per workload: every managed hostname for an app
 shares one Ingress.
 
 Header names must be valid HTTP header names; the value is written into the
 ingress controller's configuration, so anything else is refused at parse time.
-An identity the gate does not forward is refused too — a mapping for a header
+An identity the gate does not forward is refused too; a mapping for a header
 that never arrives would render configuration that silently forwards nothing.
 
 This is deliberately a mapping rather than a raw configuration snippet. A
@@ -242,7 +298,8 @@ The rule is enforced on clusters using the Envoy edge. On any other edge the
 app is gated by login only, and `astro app access show` says the rule is not
 enforced yet.
 
-`astro app access` manages the same rule from the CLI:
+`astro app access` manages the same rule from the CLI. `my-app` is the app
+slug from `astro app list`:
 
 ```bash
 astro app access show my-app
@@ -250,6 +307,12 @@ astro app access allow my-app --group clinical-ops
 astro app access deny my-app --user former@example.com
 astro app access clear my-app
 ```
+
+`show` prints `my-app: open to every signed-in user of the cluster's central
+auth.` for an open app, or `my-app: only these may enter.` followed by the
+`groups:` and `users:` lines. `allow` and `deny` print how many users would
+lose access and wait for `y`; when the manifest declares `[ingress.access]`
+they are refused, and the fix is to edit the manifest and sync it.
 
 | Manifest state | Effect |
 |---|---|
@@ -304,7 +367,12 @@ port = 8080
 
 When no container is explicitly primary, normalization selects the first. An
 explicit primary is clearer. A portless worker does not receive a fabricated
-HTTP probe.
+HTTP probe; a container with a `port` and no healthcheck gets the platform's
+default HTTP probe on `/health`.
+
+`dockerfile_path` and `build_context` must be repo-relative; an absolute path
+is refused. Only one image is built per app, so two containers declaring
+different non-default values for either field are refused at parse time.
 
 ## Jobs and tasks shorthand
 
@@ -326,7 +394,11 @@ command = ["python", "-m", "jobs.reindex"]
 ```
 
 `[[jobs]]` becomes a single-container cronjob. `[[tasks]]` becomes a
-single-container one-shot Job and has no schedule.
+single-container one-shot Job and has no schedule. Both accept `name`,
+`image_ref`, `dockerfile_path` (or its alias `dockerfile`), `build_context`,
+`command`, `args`, `env`, and the `cpu_*` and `memory_*` quantities; a job also
+requires `schedule` and accepts `concurrency_policy`. Neither exposes a port
+or carries a probe.
 
 ## Volumes
 
@@ -344,6 +416,8 @@ durability = "zonal"
 
 PVC volumes require `size`. `config_map` and `secret` require `source_name`.
 `empty_dir` may set `size_limit`. Paths must be absolute mount paths.
+`performance_tier` is `standard`, `balanced` (default), `high_iops` or
+`extreme`; `durability` is `local`, `zonal` (default) or `regional`.
 
 ## Managed services
 
@@ -376,8 +450,20 @@ registration can return before the database exists.
 | `owner_scope` | `app` | `app`: the app owns the service. `project`: a shared project resource the app attaches to |
 | `environment` | `production` | App environment the service belongs to. Registration creates it; a later sync refuses an environment that does not exist |
 | `bind_workloads` | `["*"]` | Workloads that receive the binding |
-| `size` | `small` | `small`, `medium`, `large`, `xlarge` or `custom` |
+| `size` | `small` | `small`, `medium`, `large`, `xlarge` or `custom` (`tier` is an accepted alias) |
+| `config` | `{}` | Provider configuration table, such as `version`. The top-level `version` and `inject_as` keys are accepted and folded into it |
+| `isolation` | catalogue default | `shared` or `dedicated` |
+| `auth_mode` | catalogue default | `password`, `iam` or `mtls` |
+| `extensions` | `{}` | A string array of extensions to enable, or a provider-extension table |
+| `networking`, `retention`, `backup` | `{}` | Provider option tables |
+| `restore` | `{}` | Restores from a snapshot; requires both `snapshot_id` and `source_handle` |
 | `deletion_policy` | `retain` | `delete` also requires `confirm_delete = true` |
+
+`scope` is an accepted alias for `owner_scope`. Any of these tables may carry
+secret *references*; a key named like a secret value (`password`, `token`,
+`api_key`, `connection_string`, and so on) is refused unless its name ends in
+`_ref`, `_name`, `_id` or `_path`. Anything else is refused as unknown;
+provider-specific options belong in `extensions`.
 
 With `owner_scope = "app"` the service belongs to this app and environment, and
 appears under `astro app services`. Removing the entry from the manifest
@@ -405,6 +491,14 @@ agent secret references.
 
 Agent workload fields are `run_family = "task" | "service"`, `max_retries`
 (default 5), `tool_timeout_seconds` (300), and `result_ttl_hours` (72).
+`run_mode` declares how the agent is triggered: `once`, `loop`, `schedule`,
+`trigger` or `persistent`; `schedule` requires `run_cron_expression`, which is
+validated as a cron expression at parse time. Leaving `run_mode` out keeps
+whatever the registration or an operator set. `brains` lists the hosted brains
+(by slug, at most 10) every run reads; `brains_allowed` lists the brains a
+launch may add (at most 100). Without `brains_allowed` a launch may add any
+brain the launcher can read; an empty list allows none. All of these are
+refused on a non-agent workload.
 
 A workflow-worker workload requires `workflow_type` and `task_queue`; it also
 accepts `temporal_namespace`, `max_concurrent_activities`, and
@@ -446,9 +540,22 @@ directory, and apply only while the app-level value is still the default. See
 
 ## Validate and render
 
+Registration and sync are covered in [Set up an application](../guides/app-setup.md)
+and the dashboard's [manifest page](../working-with-apps.md#edit-and-synchronize-the-manifest).
+To see what the server renders from the registered manifest, from CI or a shell:
+
 ```bash
-astro ci render --app orders-api
+export ASTROLIFT_API_URL="https://<your-control-plane>"   # the URL astro status prints
+export ASTROLIFT_DEPLOY_TOKEN="<deploy token>"            # from the app's Tokens page
+export ASTROLIFT_APP_SLUG="orders-api"                    # the app slug
+astro ci render
 ```
+
+Success prints the rendered Kubernetes resources as JSON and exits 0. Exit 2
+with `ASTROLIFT_API_URL, ASTROLIFT_DEPLOY_TOKEN, ASTROLIFT_APP_SLUG` named is a
+missing variable. Exit 1 with `manifest render error at <key path>: ...` names
+the manifest key to fix; `app "orders-api" not found or has no manifest to
+render` means the slug is wrong or the app was registered without a manifest.
 
 The target control plane is authoritative because provider capabilities and
 organization defaults participate in normalization and rendering. TOML syntax

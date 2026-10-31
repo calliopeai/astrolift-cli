@@ -1,68 +1,88 @@
 # Astrolift documentation
 
-> Astrolift is a multi-tenant control plane for applications, agents, workflows, and portable Kubernetes deployments.
+> Astrolift is a multi-tenant control plane for applications, agents, workflows, and portable Kubernetes deployments. This file indexes every page of the public documentation at https://astrolift.dev/, grouped as the site navigation is.
 
-Use these plain-Markdown references as the current public contract. The target installation's GraphQL schema and server-side validators remain authoritative.
+The pages are plain Markdown. Where a machine-readable source exists, prefer it over prose:
 
-## Start here
+- GraphQL schema: `backend/schema.graphql` in https://github.com/calliopeai/astrolift-app; the installation's own schema is authoritative.
+- CLI: `astro --help` and `astro <command> --help` on the installed binary; `astro docs list`, `astro docs show <topic>`, `astro docs search <query>` and `astro docs export <directory>` give the release-matched offline reference.
+- MCP: call `tools/list` on the installation's endpoint (`https://<install-host>/api/mcp/v1/`, see the MCP reference) rather than hard-coding tool names or input schemas.
+- Declarative formats: the astrolift.toml and Workflow TOML reference pages below list every key the current parsers consume.
 
-- [Domains and DNS diagnostics](https://astrolift.dev/guides/domains-dns/): five-step read-only Cloudflare OAuth/token connection, protected zone binding, operator prerequisites, provider records, public delegation, app routing and bounded DNS/network checks
+## Home
 
-- [Choose a client](https://astrolift.dev/guides/clients/): dashboard, CLI, API, and MCP decision guide
-- [Platform reference](https://astrolift.dev/reference/): reference index and versioning rules
-- [Getting started](https://astrolift.dev/getting-started/): install, authenticate, register, and deploy
+- [Astrolift](https://astrolift.dev/): what the platform is, what you get, and the entry points for app developers, platform operators, and reference readers
 
-## Client contracts
+## Getting Started
 
-- [CLI](https://astrolift.dev/reference/cli/): commands, auth, CI, offline docs, Markdown export, and man pages
-- [Control API](https://astrolift.dev/reference/api/): GraphQL endpoint, REST boundaries, bearer auth, tenancy, and errors
-- [MCP](https://astrolift.dev/reference/mcp/): Streamable HTTP endpoint, scopes, tools, resources, and protocol checks
+- [Getting Started](https://astrolift.dev/getting-started/): install the CLI, authenticate, select an organization, create a manifest, register and deploy a first app, with expected output and failure signatures
 
-## Declarative formats
+## Dashboard
 
-- [astrolift.toml](https://astrolift.dev/reference/astrolift-toml/): app and workload schema, monorepos, and validation
-- [Agent packages](https://astrolift.dev/reference/agent-packages/): briefs, skills, tools, payload slices, imports, and federation
-- [Workflow TOML](https://astrolift.dev/reference/workflow-toml/): ordered stages, agent binding, outputs, and repo reconciliation
-
-## Setup and final notifications
-
-- [Install alert SMTP](https://astrolift.dev/guides/install-alert-mail/): private verified-TLS install setup, eight own-event preferences, current operator source review, stable nonce and acceptance-only history; no automatic resend
-
-- [Email delivery](https://astrolift.dev/guides/email-delivery/): exact app-bound SES service, reviewed version and stable request nonce, suppression, content-free cursor history and signed observations; acceptance is not delivery
-
-- [Capabilities](https://astrolift.dev/guides/capabilities/): discover server version, API surface, provider support, and permissions
-- [App setup](https://astrolift.dev/guides/app-setup/): source registration, image deployment, health, and shared bindings
-- [Temporary apps](https://astrolift.dev/guides/temporary-apps/): creation deadlines, extensions, expiry policy, durable timers and retained data
-- [Source-to-brain hosting](https://astrolift.dev/guides/source-to-brain/): immutable Builder artifact then fresh original-person hosting, project-isolated operator target, explicit deployment observation and ephemeral SQLite
-- [Agent setup](https://astrolift.dev/guides/agent-setup/): packages, environments, secret references, dispatch, and observation
-- [Agent inbox](https://astrolift.dev/guides/agent-inbox/): current recipient access, questions, approval replies, CLI follow and run-scoped messaging
-- [Platform notifications](https://astrolift.dev/guides/platform-notifications/): authorized catch-up, signed cursors, resumable streams and historical expiry warnings
-- [Workflow setup](https://astrolift.dev/guides/workflow-setup/): author, validate, bind, configure, and run ordered stages
-- [Bounded workflows](https://astrolift.dev/guides/bounded-workflows/): finite attempts, review return edges, serial collection bodies, exact identities and source-import limits
-- [Reviewed starts](https://astrolift.dev/guides/reviewed-starts/): exact workflow definitions and pipeline runs, typed JSON inputs, durable request identity, read-only recovery and cancellation state
-- [Complete workflow review](https://astrolift.dev/guides/atomic-workflow-review/): atomic native graph and schedule captures, separate definition activation, exact person consent, revocable timer authority and unconfirmed engine state
-- [Shared services](https://astrolift.dev/guides/shared-services/): catalogue discovery, provision once, attach apps and agents, and inspect readiness
-- [Model hosting](https://astrolift.dev/guides/model-hosting/): admin-gated Hugging Face or immutable local sources, separate access/license/runtime/hardware checks, readiness and app subscriptions
-- [Native model connections](https://astrolift.dev/guides/native-model-connections/): existing Bedrock sources, exact account/region identities, immutable registration, workload-identity bindings and shared app connection policy
-- [Agent completion callbacks](https://astrolift.dev/guides/agent-completion-callbacks/): signed final events, retries for 24 hours, replay, key rotation, and Python verification
-
-## Operational guides
-
-- [Working with apps](https://astrolift.dev/working-with-apps/)
-- [Reviewed environment controls](https://astrolift.dev/guides/environment-actions/): exact-target restart, scale, shell attachment and disconnect behavior
-- [Running an organization](https://astrolift.dev/running-an-org/)
+- [Using the Dashboard](https://astrolift.dev/using-the-dashboard/): the main and projects rails, the functions per area, app and agent tab layouts, keyboard shortcuts, language and theme, and how permissions shape what you see
+- [Working with Apps](https://astrolift.dev/working-with-apps/): registration, app tabs, manifest sync, deploy, secrets and bundles, environments and logs, managed services, domains, webhooks, tokens, edge access, temporary apps, members and deregistration
+- [Running an Organization](https://astrolift.dev/running-an-org/): organization settings and trusted domains, access and team membership, infrastructure, usage and governance, platform signals, Zentinelle, secrets administration, and CLI equivalents
 - [Action safety](https://astrolift.dev/guides/action-safety/): confirmation and fresh sign-in on sensitive actions, organization/team/app/person rules, approval for destructive deletes and `APPROVAL_REQUIRED`
-- [Operator quickstart](https://astrolift.dev/operators/quickstart/)
-- [Install Astrolift](https://astrolift.dev/operators/install/)
-- [Install by blueprint (AWS)](https://astrolift.dev/operators/blueprints/): the Deployment Manager, its setup screens, console apply and teardown, and known blockers; guides for Astrolift standalone, Zentinelle in Astrolift, Workbench on Astrolift and the Full loop
 
-## Portable release-matched copy
+## For Operators
 
-The astro CLI embeds a release-matched Markdown snapshot. Run `astro docs list`, `astro docs show <topic>`, or `astro docs export <directory>`. Generated CLI Markdown and man pages come from the executing command tree.
+- [For Operators](https://astrolift.dev/operators/): what an Astrolift install looks like and the install paths per cloud
+- [Operator Quickstart](https://astrolift.dev/operators/quickstart/): the honest evaluation paths, from the local Compose stack and a kind cluster to a real cloud install runbook
+- [Installing Astrolift](https://astrolift.dev/operators/install/): pick a cloud and follow its install runbook
+- [Install by blueprint (AWS)](https://astrolift.dev/operators/blueprints/): the Deployment Manager, its setup screens, console apply and teardown, and known blockers shared by every blueprint
+- [Astrolift standalone (AWS)](https://astrolift.dev/operators/blueprints/astrolift-standalone/): Astrolift alone on a dedicated VPC, Aurora cluster, Temporal, load balancer and EKS tenant cluster
+- [Zentinelle in Astrolift (AWS)](https://astrolift.dev/operators/blueprints/zentinelle-in-astrolift/): Zentinelle joining Astrolift's network and running as pods on the tenant cluster with its own Temporal
+- [Workbench on Astrolift (AWS)](https://astrolift.dev/operators/blueprints/workbench-on-astrolift/): the Calliope AI Workbench hub and user servers as pods on the tenant cluster, adopting existing account infrastructure
+- [The Full loop (AWS)](https://astrolift.dev/operators/blueprints/full-loop/): Workbench, Astrolift and Zentinelle on one perimeter
+- [Wiring metrics](https://astrolift.dev/operators/metrics/): Prometheus endpoints per cluster, provider fallbacks, and what makes the panels light up
+- [Operator Runbooks](https://astrolift.dev/operators/runbooks/): diagnosis paths for registered-but-unmanaged clusters, apps that run but answer the ingress default 404, and other operator incidents, starting from the dashboard and audit records
 
-- [Exact preview targets](https://astrolift.dev/guides/preview-targets/): Exact preview and environment GUID/version bindings, explicit runtime resource reads, historical polling, reviewed live streams and credential-bound exports.
-- [Cluster keep-alive installation](https://astrolift.dev/guides/cluster-agent-install/): Server-owned private-network installation, original reviewed request recovery and authenticated heartbeat confirmation; separate from application agent dispatch.
-- [Environment logs and traces](https://astrolift.dev/guides/logs-traces/): Persisted app/environment placement, bounded historical logs and scoped trace envelopes, trusted collector attribution and explicit availability.
-- [Workload signals](https://astrolift.dev/guides/workload-signals/): Per-signal scope, runtime membership, instrumentation, collectors, limits and unavailable states.
+## Developer Guides
 
-- [Reviewed CloudWatch collector installation](https://astrolift.dev/guides/cluster-log-collector/): Exact server-owned installation, private original request recovery, unattached reader policy and post-pod-loss activation receipt; Linux EC2 only, not health or tracing.
+- [Choose an Astrolift client](https://astrolift.dev/guides/clients/): dashboard, CLI, API, and MCP decision guide
+- [Discover installation capabilities](https://astrolift.dev/guides/capabilities/): server version, API surface, provider support, and permissions
+- [Set up an application](https://astrolift.dev/guides/app-setup/): source registration, image deployment, health, and shared bindings
+- [Temporary apps](https://astrolift.dev/guides/temporary-apps/): creation deadlines, extensions, expiry policy, durable timers and retained data
+- [Build source and host it on an existing brain](https://astrolift.dev/guides/source-to-brain/): immutable Builder artifact then fresh original-person hosting, project-isolated operator target, explicit deployment observation and ephemeral SQLite
+- [Build a monorepo app in CI](https://astrolift.dev/guides/monorepo-ci/): a manifest in a subdirectory with `ci_pushed` build mode, the build context, and the GitHub Actions workflow that pushes the image
+- [Review and act on an exact app environment](https://astrolift.dev/guides/environment-actions/): exact-target restart, scale, shell attachment and disconnect behavior
+- [Set up and dispatch an agent](https://astrolift.dev/guides/agent-setup/): packages, environments, secret references, dispatch, and observation
+- [Messages between agents and people](https://astrolift.dev/guides/agent-inbox/): current recipient access, questions, approval replies, CLI follow and run-scoped messaging
+- [Read platform notifications](https://astrolift.dev/guides/platform-notifications/): authorized catch-up, signed cursors, resumable streams and historical expiry warnings
+- [Set up and run a workflow](https://astrolift.dev/guides/workflow-setup/): author, validate, bind, configure, and run ordered stages
+- [Bounded review loops and serial collections](https://astrolift.dev/guides/bounded-workflows/): finite attempts, review return edges, serial collection bodies, exact identities and source-import limits
+- [Review exact workflow and pipeline starts](https://astrolift.dev/guides/reviewed-starts/): exact workflow definitions and pipeline runs, typed JSON inputs, durable request identity, read-only recovery and cancellation state
+- [Review a complete workflow and approve its schedule](https://astrolift.dev/guides/atomic-workflow-review/): atomic native graph and schedule captures, separate definition activation, exact person consent, revocable timer authority and unconfirmed engine state
+- [Provision shared services and attach consumers](https://astrolift.dev/guides/shared-services/): catalogue discovery, provision once, attach apps and agents, and inspect readiness
+- [Host a shared model from Hugging Face or local files](https://astrolift.dev/guides/model-hosting/): admin-gated Hugging Face or immutable local sources, separate access/license/runtime/hardware checks, readiness and app subscriptions
+- [Connect an existing Bedrock model](https://astrolift.dev/guides/native-model-connections/): existing Bedrock sources, exact account/region identities, immutable registration, workload-identity bindings and shared app connection policy
+- [Connect domains and inspect DNS](https://astrolift.dev/guides/domains-dns/): five-step read-only Cloudflare OAuth/token connection, protected zone binding, operator prerequisites, provider records, public delegation, app routing and bounded DNS/network checks
+- [Test an exact email service](https://astrolift.dev/guides/email-delivery/): exact app-bound SES service, reviewed version and stable request nonce, suppression, content-free cursor history and signed observations; acceptance is not delivery
+- [Set up and test install alert SMTP](https://astrolift.dev/guides/install-alert-mail/): private verified-TLS install setup, eight own-event preferences, current operator source review, stable nonce and acceptance-only history; no automatic resend
+- [Exact preview identity and explicit runtime reads](https://astrolift.dev/guides/preview-targets/): exact preview and environment GUID/version bindings, explicit runtime resource reads, historical polling, reviewed live streams and credential-bound exports
+- [Install the cluster keep-alive agent through the server](https://astrolift.dev/guides/cluster-agent-install/): server-owned private-network installation, original reviewed request recovery and authenticated heartbeat confirmation; separate from application agent dispatch
+- [Install the reviewed CloudWatch log collector](https://astrolift.dev/guides/cluster-log-collector/): exact server-owned installation, private original request recovery, unattached reader policy and post-pod-loss activation receipt; Linux EC2 only, not health or tracing
+- [Read logs and traces from an exact environment](https://astrolift.dev/guides/logs-traces/): persisted app/environment placement, bounded historical logs and scoped trace envelopes, trusted collector attribution and explicit availability
+- [Workload golden signals](https://astrolift.dev/guides/workload-signals/): per-signal scope, runtime membership, instrumentation, collectors, limits and unavailable states
+- [Signed agent completion callbacks](https://astrolift.dev/guides/agent-completion-callbacks/): signed final events, retries for 24 hours, replay, key rotation, and Python verification
+- [Webhook signature verification](https://astrolift.dev/guides/webhook-signature-verification/): the HMAC-SHA256 receiver contract for generic outbound webhooks, a reproducible test vector, and the current control-plane signing-key defect
+- [Provider plugin SDK cookbook](https://astrolift.dev/guides/plugin-sdk-cookbook/): writing a provider plugin package for the `astrolift.providers` entry-point group, typed drivers and the `ProviderPlugin` manifest
+
+## Architecture
+
+- [Agent architecture](https://astrolift.dev/architecture-agent-layer/): how agent definitions, skills, environment recipes, tasks, workflows, secrets, and dispatch records live inside the main control plane
+
+## Pipelines
+
+- [Pipeline definitions: current implementation status](https://astrolift.dev/pipelines-dsl-spec/): what the pipeline TOML reader executes today, what is persisted per run, and which parts are not yet a public contract
+
+## Reference
+
+- [Platform reference](https://astrolift.dev/reference/): the index of client contracts, setup guides, and versioning rules
+- [`astro` CLI reference](https://astrolift.dev/reference/cli/): install, auth, common app/agent/workflow flows, reprovision and reachability, CI, offline docs, Markdown export, and man pages
+- [Control API reference](https://astrolift.dev/reference/api/): GraphQL endpoint, REST boundaries, bearer auth, tenancy, errors, and compatibility
+- [MCP reference](https://astrolift.dev/reference/mcp/): Streamable HTTP endpoint, scopes, tools, resources, and protocol checks
+- [`astrolift.toml` reference](https://astrolift.dev/reference/astrolift-toml/): app and workload schema, monorepos, and validation
+- [Agent Package and repository reference](https://astrolift.dev/reference/agent-packages/): briefs, skills, tools, payload slices, imports, and federation
+- [Workflow TOML reference](https://astrolift.dev/reference/workflow-toml/): ordered stages, agent binding, outputs, and repo reconciliation
+- [Release smoke scenarios](https://astrolift.dev/demo-scenarios/): the maintainers' release checklist, one scenario per surface with the exact commands, expected output, and evidence to retain

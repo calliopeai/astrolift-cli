@@ -1,5 +1,18 @@
 # Control API reference
 
+!!! note "Agent notes"
+
+    The installed server is the truth: run introspection or
+    `astro api graphql -q 'query { astroliftServerInfo { version capabilities } }'`
+    before trusting this page, and read the SDL at
+    `backend/schema.graphql` in `calliopeai/astrolift-app` (pin a tag or SHA).
+    Fields the SDL marks `@deprecated` (for example `astroliftWebhookSubscriptions`,
+    capped at 200 rows) have a named replacement; prefer it. A capability key only
+    says a surface exists, never that this credential may use it.
+    Common mistakes: omitting `X-Astrolift-Organization` when the identity belongs
+    to several organizations; reading `data` without checking `ok` and `errors`
+    on a mutation envelope; passing a slug where the schema types a `GUID`.
+
 Domain setup reads include an exact GUID/version query,
 `astroliftManagedDomainDiagnostics` and `astroliftManagedDomainProbe`. They
 separate provider inventory, public delegation, recorded routes and bounded
@@ -67,9 +80,16 @@ Given an install at `https://astrolift.example.com`:
 | GraphQL HTTP/explorer | `https://astrolift.example.com/app/gql/config/` |
 | Anonymous installation discovery | `https://astrolift.example.com/app/gql/config/public/` |
 | GraphQL subscriptions | `wss://astrolift.example.com/app/gql/config/ws/` |
-| CLI device flow | `https://astrolift.example.com/api/cli/v1/auth/...` |
+| CLI device flow | `https://astrolift.example.com/api/cli/v1/auth/{start,complete,refresh,signout}` |
+| CI deploy (deploy token) | `https://astrolift.example.com/api/cli/v1/apps/<app-slug>/deploy/` |
+| Builder source-to-brain | `https://astrolift.example.com/api/builder/v1/` |
+| Agent dispatch controller | `https://astrolift.example.com/api/dispatch/v1/` |
 | MCP | `https://astrolift.example.com/api/mcp/v1/` |
 | Health | `https://astrolift.example.com/health/` |
+
+The dispatch controller is called by running agents with task-scoped keys, not
+by people; see the [agent architecture](../architecture-agent-layer.md#container-contract-and-callbacks).
+The CI deploy route is shown in [monorepo CI](../guides/monorepo-ci.md).
 
 Before login, POST `query { astroliftServerInfo { version apiVersion capabilities } }`
 to the public discovery endpoint without bearer, organization or cookie headers.
@@ -87,7 +107,9 @@ curl -sS -H 'Accept: application/json' https://astrolift.example.com/
 ## Authentication and tenancy
 
 User API tokens start with `alft_at_`. App-scoped deploy tokens start with
-`alft_dt_` and are accepted only by their intended CI/deploy routes.
+`alft_dt_` and are accepted only by their intended CI/deploy routes. Task-scoped
+`alft_cb_` callback keys are minted per agent dispatch and accepted only by the
+dispatch controller routes of that one task.
 
 ```http
 Authorization: Bearer alft_at_...
@@ -100,18 +122,26 @@ more than one. Never use a slug where the API requires a GUID. The token's
 scopes narrow the user's RBAC grants; requests must pass both checks.
 
 The reviewed server scope catalogue includes `read:apps`, `write:apps`,
-`read:clusters`, `write:clusters`, `manage:clusters`, `manage:auth-users`,
-`write:app-access`, `agent-env-spec:write`, `project:write`, `team:write`,
-`app:onboard`, `secret:read`, `secret:write`, `workflow:write`,
-`workflow:trigger`, `mcp:read`, `mcp:dispatch`, `mcp:write`, and `admin`.
+`read:clusters`, `write:clusters`, `manage:clusters`, `read:zentinelle`,
+`manage:auth-users`, `write:app-access`, `agent-env-spec:write`,
+`project:write`, `team:write`, `app:onboard`, `secret:read`, `secret:write`,
+`workflow:write`, `workflow:trigger`, `mcp:read`, `mcp:dispatch`, `mcp:write`,
+and `admin`.
 The selected installation's token catalogue is authoritative; a listed scope
 is not necessarily part of the default device-flow credential. Use the smallest
 set that supports the integration. `astro auth login --scope` selects documented
-CLI profiles (currently `clusters`), not an arbitrary comma-separated scope list.
+CLI profiles (`clusters`, `zentinelle` for read-only Zentinelle access on servers
+advertising `identity.zentinelle_read_scope`, and `admin`, a 12-hour platform
+operator sign-in), not an arbitrary comma-separated scope list.
 Account grants from `astro whoami --permissions --json` are informational and
 cannot establish this credential's ceiling or exact target authority.
 
 ## GraphQL request
+
+`ASTROLIFT_TOKEN` is an `alft_at_` token minted under **Settings > API tokens**
+(or `astro auth login`, whose stored credential `astro api graphql` reuses).
+`ASTROLIFT_ORG_ID` is the organization GUID from `astro org current --json`
+(`id`), never its slug.
 
 ```bash
 curl -sS https://astrolift.example.com/app/gql/config/ \
@@ -125,6 +155,12 @@ curl -sS https://astrolift.example.com/app/gql/config/ \
 }
 JSON
 ```
+
+Expected: HTTP 200 with `data.astroliftServerInfo.version` set. HTTP 401 means
+the bearer token is missing, malformed, expired or revoked; mint or refresh it.
+HTTP 200 with an `errors` entry whose `extensions.code` is `PERMISSION_DENIED`
+means the credential is valid but the organization header, token scope or RBAC
+grant does not cover the field (see [permission refusals](#permission-refusals)).
 
 A successful HTTP response can still contain GraphQL `errors`; check that
 array before reading `data`. Mutations generally return an envelope with
@@ -259,6 +295,12 @@ query TeamRoster($team: GUID!) {
 {"team":"00000000-0000-4000-8000-000000000001"}
 ```
 
+Replace the placeholder with the team GUID from
+`astroliftTeamMembershipTeam(slug: "<team-slug>")` or `astro team list --json`.
+Expected: `totalCount` and an `items` array; an empty array with HTTP 200 means
+the team is visible but has no direct members on this page, while a
+`PERMISSION_DENIED` error means the caller cannot see that team.
+
 The mutation input carries `requestId`, `kind`, `teamId`, `orgMemberId`,
 `expectedSource`, and `roleId` for `ADD`. Obtain the digest from the exact review;
 do not compute it from roster text. Preserve the original UUID and reviewed input
@@ -277,7 +319,9 @@ Existing API-token scope definitions are unchanged.
 ## Agent completion callbacks
 
 `runAstroliftAgent` accepts optional `callbackUrl`, `callbackSecretRef`,
-`correlationId` (at most 128 characters), and `callbackMode` (`FULL` or `NOTIFY`).
+`correlationId` (at most 128 characters), and `callbackMode` (`FULL` or `NOTIFY`),
+alongside `clientRequestId`, `environmentSpecId`, `triggerPayload`,
+`timeoutSeconds` and `brainSlugs` (semantic layers the run reads as the caller).
 The organization configures HTTPS destinations with
 `configureAgentTaskCallbacks(allowedHosts)` and writes a signing secret with
 `setAgentTaskCallbackSecret(name, value)`. Query `agentTaskCallbackPolicy` for
@@ -288,6 +332,18 @@ the configured host allow-list. Never send the signing key in dispatch input.
 without rerunning the agent. Read the [completion callback guide](../guides/agent-completion-callbacks.md)
 for the exact signed wire contract, durable 24-hour backoff, authorization,
 retention, rotation, and Python verification snippet.
+
+## Semantic layers (brains)
+
+Hosted semantic layers are apps of a brain kind. `astroliftBrainsPage`,
+`astroliftBrain(slug)`, `astroliftBrainStatus`, `astroliftBrainCells`,
+`astroliftBrainEdition` and `astroliftBrainCreation(id)` read them;
+`createBrain`, `rebuildBrain`, `updateBrainSubstrate`, `shareBrain`,
+`unshareBrain` and `archiveBrain` manage them, and `hostAppOnBrain` creates a
+hosted app bound to one. `issueBrainReadToken(slug)` returns a 15-minute read
+token and the `X-Astrolift-Brain-Token` header for the brain's `/mcp` route.
+`astroliftBrainsPage` is the bounded form of `astroliftBrains`. The same operations are exposed as `astro brain`
+commands and as MCP tools in the [MCP reference](mcp.md#semantic-layers-brains-and-hosted-apps).
 
 ## Bounded workflow authoring and execution metadata
 
