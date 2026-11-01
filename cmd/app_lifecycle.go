@@ -29,6 +29,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -286,6 +287,48 @@ type appDetail struct {
 	ProvisioningError  string             `json:"provisioningError"`
 	LastDeployedAt     *string            `json:"lastDeployedAt"`
 	LatestDeployment   *deploymentSummary `json:"latestDeployment"`
+
+	// SourceConnection is what the organization's records say about a source
+	// connection for the repository's owner (astrolift-app#2579). A server
+	// that does not report it reads as UNKNOWN, never as a missing field.
+	SourceConnection *appSourceConnection `json:"sourceConnection"`
+}
+
+// appSourceConnection mirrors AstroliftAppSourceConnection.
+type appSourceConnection struct {
+	State  string `json:"state"`
+	Owner  string `json:"owner"`
+	Detail string `json:"detail"`
+}
+
+// sourceConnectionUnreported is the detail of the UNKNOWN that stands in for a
+// source connection the server did not report.
+const sourceConnectionUnreported = "The server did not report the source connection."
+
+// sourceConnectionLabel renders a source connection for humans, as
+// reachabilityLabel does reachability: the state in lower case, then the owner.
+func sourceConnectionLabel(connection *appSourceConnection) string {
+	label := strings.ToLower(strings.ReplaceAll(connection.State, "_", " "))
+	if connection.Owner != "" {
+		label += " (" + connection.Owner + ")"
+	}
+	return label
+}
+
+// queryAppShow reads an app's detail with sourceConnection beside expiresAt and
+// reachabilityStatus. A server without sourceConnection rejects the selection
+// before executing it; only that narrow error falls back to
+// queryWithReachability with the original read. Authorization and transport
+// failures surface.
+func queryAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slug string, result *appShowResult) (bool, error) {
+	vars := map[string]interface{}{"slug": slug}
+	enhanced := strings.Replace(withReachabilityFields(astroliftAppShowQuery),
+		"    provisioningError\n", "    provisioningError\n    sourceConnection { state owner detail }\n", 1)
+	err := client.GraphQL(ctx, enhanced, vars, result)
+	if !errors.Is(err, api.ErrSchemaMismatch) {
+		return err == nil, err
+	}
+	return queryWithReachability(cmd, ctx, client, astroliftAppShowQuery, vars, result, false)
 }
 
 type appWorkload struct {
@@ -530,7 +573,11 @@ var appShowCmd = &cobra.Command{
 	Long: `Fetches one app via the astroliftApp GraphQL query plus its workloads
 and environments, and prints a summary. The app slug comes from the positional
 argument, then --app, then the local astrolift.toml. Use --json for the raw
-combined record.`,
+combined record.
+
+Connection is the source connection the organization has for the repository's
+owner: connected, not connected (with the console step that adds one), or
+unknown, which a server that does not report it also reads as.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
@@ -554,8 +601,7 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 	defer cancel()
 
 	var result appShowResult
-	expiryAvailable, err := queryWithReachability(cmd, showCtx, client, astroliftAppShowQuery,
-		map[string]interface{}{"slug": slug}, &result, false)
+	expiryAvailable, err := queryAppShow(cmd, showCtx, client, slug, &result)
 	if err != nil {
 		return fmt.Errorf("fetching app: %w", err)
 	}
@@ -564,6 +610,9 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 	}
 
 	result.App.ExpiryAvailable = expiryAvailable
+	if result.App.SourceConnection == nil {
+		result.App.SourceConnection = &appSourceConnection{State: "UNKNOWN", Detail: sourceConnectionUnreported}
+	}
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, result)
 	}
@@ -588,6 +637,10 @@ func runAppShow(cmd *cobra.Command, ctx context.Context, client *api.Client, slu
 		source = fmt.Sprintf("%s %s", a.SourceKind, a.SourceRepo)
 	}
 	fmt.Fprintf(out, "Source:       %s\n", source)
+	fmt.Fprintf(out, "Connection:   %s\n", sourceConnectionLabel(a.SourceConnection))
+	if a.SourceConnection.Detail != "" {
+		fmt.Fprintf(out, "              %s\n", a.SourceConnection.Detail)
+	}
 	if a.DefaultBranch != "" {
 		fmt.Fprintf(out, "Branch:       %s\n", a.DefaultBranch)
 	}

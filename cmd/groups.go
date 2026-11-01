@@ -13,6 +13,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"text/tabwriter"
@@ -117,12 +118,18 @@ var operatorFederationCmd = &cobra.Command{Use: "federation", Short: "Cross-inst
 var scmCmd = &cobra.Command{Use: "scm", Short: "Source-control webhook commands (#11)"}
 var scmListCmd = &cobra.Command{
 	Use: "list", Aliases: []string{"ls"}, Short: "List configured SCM connections",
+	Long: `Lists the organization's source connections and your own personal ones.
+
+It needs scm.read, which only the admin sign-in carries:
+astro auth login --scope admin, once the platform operator approves it.
+A refusal for the sign-in's scopes says so. The web console lists the same
+connections on the Providers page, Source tab.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
 		if err != nil {
 			return err
 		}
-		return runScmList(cmd, cmd.Context(), client)
+		return permissionCommandError(cmd, runScmList(cmd, cmd.Context(), client))
 	},
 }
 var scmDisconnectCmd = &cobra.Command{
@@ -399,7 +406,7 @@ func runScmList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 	}
 	query := `query { astroliftSourceConnections { id kind name displayName accountLogin isActive isPersonal } }`
 	if err := client.GraphQL(ctx, query, nil, &resp); err != nil {
-		return fmt.Errorf("listing SCM connections: %w", err)
+		return fmt.Errorf("listing SCM connections: %w", scmCredentialError(err))
 	}
 	if boolFlag(cmd, "json") {
 		return renderJSON(cmd, resp.Connections)
@@ -423,6 +430,30 @@ func runScmList(cmd *cobra.Command, ctx context.Context, client *api.Client) err
 			c.Kind, dashIfEmpty(c.AccountLogin), dashIfEmpty(name), scope, yesNo(c.IsActive), c.ID)
 	}
 	return w.Flush()
+}
+
+// scmCredentialError adds the sign-in advice when the server refused a
+// source-connection permission for the credential's scopes, not the account's
+// roles (astrolift-app#2579). Only the admin scope carries one. Every other
+// error, an account refusal included, passes through unchanged.
+func scmCredentialError(err error) error {
+	var failure *api.GraphQLResponseError
+	if !errors.As(err, &failure) {
+		return err
+	}
+	for _, item := range failure.Errors {
+		if item.Code != "PERMISSION_DENIED" || item.Reason != tokenScopeRefusal || !strings.HasPrefix(item.Permission, "scm.") {
+			continue
+		}
+		hint := fmt.Sprintf("This credential's scopes do not allow %s, and your account's roles cannot widen them, whatever astro perms diagnose shows. "+
+			"The default and --scope clusters sign-ins carry no source-connection permission; astro auth login --scope admin does, once the platform operator approves it. "+
+			"An API token works when its own scopes allow %s. The web console lists source connections on the Providers page, Source tab.", item.Permission, item.Permission)
+		return &credentialScopeError{
+			advice: credentialAdvice{Permission: item.Permission, LoginScope: "admin", Hint: hint},
+			err:    err,
+		}
+	}
+	return err
 }
 
 // ---- scm disconnect (disconnectSource) -------------------------------------
