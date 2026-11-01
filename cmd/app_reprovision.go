@@ -263,13 +263,17 @@ func reachabilityLabel(status string) string {
 // the CLI made before reachability existed. Authorization and transport
 // failures surface.
 func queryWithReachability(cmd *cobra.Command, ctx context.Context, client *api.Client, query string, vars map[string]interface{}, target interface{}, expiryRequired bool) (bool, error) {
-	enhanced := strings.Replace(query, "    slug\n", "    slug\n    expiresAt\n", 1)
-	enhanced = strings.Replace(enhanced, "    provisioningStatus\n", "    provisioningStatus\n    reachabilityStatus\n", 1)
-	err := client.GraphQL(ctx, enhanced, vars, target)
+	err := client.GraphQL(ctx, withReachabilityFields(query), vars, target)
 	if !errors.Is(err, api.ErrSchemaMismatch) {
 		return err == nil, err
 	}
 	return queryWithExpiry(cmd, ctx, client, query, vars, target, expiryRequired)
+}
+
+// withReachabilityFields selects expiresAt and reachabilityStatus in an app read.
+func withReachabilityFields(query string) string {
+	enhanced := strings.Replace(query, "    slug\n", "    slug\n    expiresAt\n", 1)
+	return strings.Replace(enhanced, "    provisioningStatus\n", "    provisioningStatus\n    reachabilityStatus\n", 1)
 }
 
 func init() {
