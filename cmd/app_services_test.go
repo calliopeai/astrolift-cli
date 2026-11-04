@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/spf13/cobra"
 )
 
 // ---- fixtures ---------------------------------------------------------------
@@ -212,5 +214,240 @@ func TestAppServicesListSurfacesGraphQLError(t *testing.T) {
 	err := runAppServicesList(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
 	if err == nil || !strings.Contains(err.Error(), "unavailable") {
 		t.Fatalf("err = %v, want a static refusal without server diagnostics", err)
+	}
+}
+
+// ---- match -------------------------------------------------------------------
+
+const testMatchChangesPlan = `{"appSlug":"web","digest":"d1","blocked":false,"changes":[{"action":"create","ownerScope":"app","environment":"production","kind":"postgres","name":"web-db","reason":"declared but not provisioned"}]}`
+
+func matchPlanData(blocked bool, changes []map[string]interface{}) map[string]interface{} {
+	if changes == nil {
+		changes = []map[string]interface{}{}
+	}
+	return map[string]interface{}{"appSlug": "web", "digest": "d1", "blocked": blocked, "changes": changes}
+}
+
+var testCreateChange = map[string]interface{}{"action": "create", "ownerScope": "app", "environment": "production", "kind": "postgres", "name": "web-db", "reason": "declared but not provisioned"}
+
+// matchServer answers the preview with plan and the apply with applyResult.
+func matchServer(t *testing.T, plan map[string]interface{}, applyResult map[string]interface{}, captured *[]gqlRequest) *httptest.Server {
+	t.Helper()
+	return gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+		*captured = append(*captured, req)
+		if strings.Contains(req.Query, "applyManagedServiceMatch(") {
+			return map[string]interface{}{"applyManagedServiceMatch": applyResult}
+		}
+		return map[string]interface{}{"previewManagedServiceMatch": map[string]interface{}{"ok": true, "errors": []interface{}{}, "data": plan}}
+	})
+}
+
+func resetAppServicesMatchFlags() { appServicesMatchYes = false }
+
+func TestAppServicesMatchYesAppliesWithPreviewDigest(t *testing.T) {
+	resetAppServicesMatchFlags()
+	defer resetAppServicesMatchFlags()
+	appServicesMatchYes = true
+
+	var captured []gqlRequest
+	applied := map[string]interface{}{"ok": true, "errors": []interface{}{}, "data": map[string]interface{}{"appSlug": "web", "digest": "d2", "changes": []interface{}{testCreateChange}}}
+	srv := matchServer(t, matchPlanData(false, []map[string]interface{}{testCreateChange}), applied, &captured)
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	if err := runAppServicesMatch(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web"); err != nil {
+		t.Fatalf("runAppServicesMatch: %v", err)
+	}
+	if len(captured) != 2 {
+		t.Fatalf("expected preview then apply, got %d requests", len(captured))
+	}
+	if captured[0].Variables["input"].(map[string]interface{})["appSlug"] != "web" {
+		t.Errorf("preview input = %v", captured[0].Variables)
+	}
+	input := captured[1].Variables["input"].(map[string]interface{})
+	if input["appSlug"] != "web" || input["expectedDigest"] != "d1" {
+		t.Errorf("apply input = %v, want appSlug web and expectedDigest d1", input)
+	}
+	got := out.String()
+	for _, want := range []string{"ACTION", "create", "web-db", "postgres", "Applied 1 change(s) to app \"web\"."} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestAppServicesMatchBlockedPrintsPlanAndDoesNotApply(t *testing.T) {
+	resetAppServicesMatchFlags()
+	defer resetAppServicesMatchFlags()
+	appServicesMatchYes = true
+
+	var captured []gqlRequest
+	srv := matchServer(t, matchPlanData(true, []map[string]interface{}{{"action": "blocked", "ownerScope": "project", "environment": "production", "kind": "redis", "name": "shared-cache", "reason": "project service not attached"}}), nil, &captured)
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	err := runAppServicesMatch(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
+	if err == nil || !strings.Contains(err.Error(), "blocked") {
+		t.Fatalf("expected blocked error, got %v", err)
+	}
+	if len(captured) != 1 {
+		t.Errorf("blocked plan must not apply; got %d requests", len(captured))
+	}
+	if !strings.Contains(out.String(), "shared-cache") {
+		t.Errorf("blocked plan should still list changes:\n%s", out.String())
+	}
+}
+
+func TestAppServicesMatchNoChangesDoesNotApply(t *testing.T) {
+	resetAppServicesMatchFlags()
+	defer resetAppServicesMatchFlags()
+
+	var captured []gqlRequest
+	srv := matchServer(t, matchPlanData(false, nil), nil, &captured)
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	if err := runAppServicesMatch(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web"); err != nil {
+		t.Fatalf("runAppServicesMatch: %v", err)
+	}
+	if len(captured) != 1 {
+		t.Errorf("nothing to apply; got %d requests", len(captured))
+	}
+	if !strings.Contains(out.String(), "already match") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestAppServicesMatchNoPromptRequiresYes(t *testing.T) {
+	resetAppServicesMatchFlags()
+	defer resetAppServicesMatchFlags()
+
+	var captured []gqlRequest
+	srv := matchServer(t, matchPlanData(false, []map[string]interface{}{testCreateChange}), nil, &captured)
+	defer srv.Close()
+
+	cmd, _ := appTestCmd()
+	if err := cmd.Root().PersistentFlags().Set("no-prompt", "true"); err != nil {
+		t.Fatal(err)
+	}
+	err := runAppServicesMatch(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
+	if err == nil || !strings.Contains(err.Error(), "pass --yes") {
+		t.Fatalf("expected --yes requirement, got %v", err)
+	}
+	if len(captured) != 1 {
+		t.Errorf("must not apply without confirmation; got %d requests", len(captured))
+	}
+}
+
+func TestAppServicesMatchDeclinedPromptDoesNotApply(t *testing.T) {
+	resetAppServicesMatchFlags()
+	defer resetAppServicesMatchFlags()
+
+	var captured []gqlRequest
+	srv := matchServer(t, matchPlanData(false, []map[string]interface{}{testCreateChange}), nil, &captured)
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	cmd.SetIn(strings.NewReader("n\n"))
+	if err := runAppServicesMatch(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web"); err != nil {
+		t.Fatalf("runAppServicesMatch: %v", err)
+	}
+	if len(captured) != 1 {
+		t.Errorf("declined prompt must not apply; got %d requests", len(captured))
+	}
+	if !strings.Contains(out.String(), "Aborted.") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestAppServicesMatchConflictIsExplained(t *testing.T) {
+	resetAppServicesMatchFlags()
+	defer resetAppServicesMatchFlags()
+	appServicesMatchYes = true
+
+	var captured []gqlRequest
+	applied := map[string]interface{}{"ok": false, "errors": []interface{}{map[string]interface{}{"code": "CONFLICT", "message": "digest moved", "field": "expectedDigest"}}, "data": nil}
+	srv := matchServer(t, matchPlanData(false, []map[string]interface{}{testCreateChange}), applied, &captured)
+	defer srv.Close()
+
+	cmd, _ := appTestCmd()
+	err := runAppServicesMatch(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
+	if err == nil || !strings.Contains(err.Error(), "changed since it was previewed") {
+		t.Fatalf("expected CONFLICT explanation, got %v", err)
+	}
+}
+
+// ---- reprovision -------------------------------------------------------------
+
+const testServiceID = "7d6e2c1a-4b5f-4c3d-8e9f-0a1b2c3d4e5f"
+
+func serviceRowData(ownerScope, appSlug string) map[string]interface{} {
+	return map[string]interface{}{
+		"id": testServiceID, "name": "web-db", "kind": "postgres", "ownerScope": ownerScope,
+		"registeredAppSlug": appSlug, "registeredAppId": "app-1", "contextRevision": "rev-1",
+	}
+}
+
+func reprovisionCmd(t *testing.T) *cobra.Command {
+	t.Helper()
+	cmd, _ := appTestCmd()
+	cmd.Flags().String("expected-context-revision", "", "")
+	return cmd
+}
+
+func TestAppServicesReprovisionSendsManagedServiceID(t *testing.T) {
+	var captured []gqlRequest
+	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+		captured = append(captured, req)
+		if strings.Contains(req.Query, "reprovisionManagedService(") {
+			return map[string]interface{}{"reprovisionManagedService": map[string]interface{}{"ok": true, "errors": []interface{}{}, "data": map[string]interface{}{"id": testServiceID, "name": "web-db", "kind": "postgres", "status": "active"}}}
+		}
+		return map[string]interface{}{"astroliftManagedService": serviceRowData("app", "web")}
+	})
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	cmd.Flags().String("expected-context-revision", "", "")
+	if err := runAppServicesReprovision(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", testServiceID); err != nil {
+		t.Fatalf("runAppServicesReprovision: %v", err)
+	}
+	if len(captured) != 2 {
+		t.Fatalf("expected ownership read then reprovision, got %d requests", len(captured))
+	}
+	input := captured[1].Variables["input"].(map[string]interface{})
+	if input["managedServiceId"] != testServiceID {
+		t.Errorf("managedServiceId = %v", input["managedServiceId"])
+	}
+	if _, ok := input["expectedContextRevision"]; ok {
+		t.Errorf("expectedContextRevision should be omitted when the flag is unset")
+	}
+	if !strings.Contains(out.String(), "Reprovisioned web-db (postgres) on app \"web\".") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestAppServicesReprovisionRefusesProjectOwnedService(t *testing.T) {
+	var captured []gqlRequest
+	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+		captured = append(captured, req)
+		return map[string]interface{}{"astroliftManagedService": serviceRowData("project", "web")}
+	})
+	defer srv.Close()
+
+	cmd := reprovisionCmd(t)
+	err := runAppServicesReprovision(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", testServiceID)
+	if err == nil || !strings.Contains(err.Error(), "resource context unavailable") {
+		t.Fatalf("expected ownership refusal, got %v", err)
+	}
+	if len(captured) != 1 {
+		t.Errorf("must not reprovision a project-owned service; got %d requests", len(captured))
+	}
+}
+
+func TestAppServicesReprovisionRejectsNonGUID(t *testing.T) {
+	cmd := reprovisionCmd(t)
+	err := runAppServicesReprovision(cmd, context.Background(), api.NewClient("http://127.0.0.1:1", "tok", false), "web", "web-db")
+	if err == nil || !strings.Contains(err.Error(), "exact resource GUID") {
+		t.Fatalf("expected GUID refusal, got %v", err)
 	}
 }
