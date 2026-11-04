@@ -36,7 +36,7 @@ func appMoveServer(t *testing.T, app, result map[string]interface{}, seen *[]gql
 		case strings.Contains(req.Query, "astroliftApp("):
 			return map[string]interface{}{"astroliftApp": app}
 		case strings.Contains(req.Query, "astroliftProjects"):
-			return map[string]interface{}{"astroliftProjects": twoTeamProjects()}
+			return projectsAnswer(req)
 		}
 		return map[string]interface{}{"assignAstroliftAppToProject": result}
 	})
@@ -226,7 +226,7 @@ func TestAppMoveTakesTheDestinationFromItsProjectFlag(t *testing.T) {
 		case strings.Contains(req.Query, "astroliftApp("):
 			return map[string]interface{}{"astroliftApp": placedApp("core", "legacy", legacyProjectGUID)}
 		case strings.Contains(req.Query, "astroliftProjects"):
-			return map[string]interface{}{"astroliftProjects": twoTeamProjects()}
+			return projectsAnswer(req)
 		}
 		return map[string]interface{}{"assignAstroliftAppToProject": movedTo("core", "web", webProjectGUID)}
 	})

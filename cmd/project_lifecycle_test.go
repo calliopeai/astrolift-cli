@@ -30,6 +30,18 @@ func twoTeamProjects() []map[string]interface{} {
 	}
 }
 
+// projectsAnswer answers the project lookup with twoTeamProjects. Like the
+// platform, it sends each project's team only when the query selects it.
+func projectsAnswer(req gqlRequest) map[string]interface{} {
+	projects := twoTeamProjects()
+	if !strings.Contains(req.Query, "team { slug name }") {
+		for _, p := range projects {
+			delete(p, "team")
+		}
+	}
+	return map[string]interface{}{"astroliftProjects": projects}
+}
+
 // projectMutationServer answers the project lookup with twoTeamProjects and
 // the named mutation with result, recording every request.
 func projectMutationServer(t *testing.T, mutation string, result map[string]interface{}, seen *[]gqlRequest) *api.Client {
@@ -37,7 +49,7 @@ func projectMutationServer(t *testing.T, mutation string, result map[string]inte
 	srv := gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
 		*seen = append(*seen, req)
 		if strings.Contains(req.Query, "astroliftProjects") {
-			return map[string]interface{}{"astroliftProjects": twoTeamProjects()}
+			return projectsAnswer(req)
 		}
 		return map[string]interface{}{mutation: result}
 	})
@@ -58,7 +70,7 @@ func projectCommandServer(t *testing.T, mutation string, result map[string]inter
 				{"id": projectTestOrgGUID, "slug": "acme", "name": "Acme"},
 			}}
 		case strings.Contains(req.Query, "astroliftProjects"):
-			return map[string]interface{}{"astroliftProjects": twoTeamProjects()}
+			return projectsAnswer(req)
 		}
 		return map[string]interface{}{mutation: result}
 	})
