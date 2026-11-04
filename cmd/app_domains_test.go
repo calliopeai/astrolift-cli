@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -141,5 +142,129 @@ func TestAppDomainsListSurfacesGraphQLError(t *testing.T) {
 	err := runAppDomainsList(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web")
 	if err == nil || !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("err = %v, want the server's message surfaced", err)
+	}
+}
+
+// ---- pause / resume ------------------------------------------------------------
+
+func pauseServer(t *testing.T, rows []appDomain, result map[string]interface{}, mut *gqlRequest) *httptest.Server {
+	t.Helper()
+	return gqlServerFunc(t, func(req gqlRequest) map[string]interface{} {
+		if strings.Contains(req.Query, "setCustomDomainPaused") {
+			if mut != nil {
+				*mut = req
+			}
+			return map[string]interface{}{"setCustomDomainPaused": result}
+		}
+		return domainsListData(rows)
+	})
+}
+
+func pauseResult(hostname string, paused bool) map[string]interface{} {
+	return map[string]interface{}{
+		"ok": true, "errors": []interface{}{},
+		"data": map[string]interface{}{"id": "d1", "hostname": hostname, "isPaused": paused},
+	}
+}
+
+var pauseRows = []appDomain{
+	{ID: "d1", Hostname: "app.example.com"},
+	{ID: "d2", Hostname: "www.example.com"},
+}
+
+func TestAppDomainsPauseResolvesHostnameAndSendsInput(t *testing.T) {
+	var mut gqlRequest
+	srv := pauseServer(t, pauseRows, pauseResult("app.example.com", true), &mut)
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	if err := runAppDomainSetPaused(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "APP.Example.com", true); err != nil {
+		t.Fatalf("pause: %v", err)
+	}
+	input, _ := mut.Variables["input"].(map[string]interface{})
+	if input["id"] != "d1" || input["paused"] != true {
+		t.Errorf("input = %v, want id d1 paused true", input)
+	}
+	for _, want := range []string{"app.example.com is now paused", "503", "resume"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output missing %q: %s", want, out.String())
+		}
+	}
+}
+
+func TestAppDomainsResumeSendsPausedFalse(t *testing.T) {
+	var mut gqlRequest
+	srv := pauseServer(t, pauseRows, pauseResult("www.example.com", false), &mut)
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	if err := runAppDomainSetPaused(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "www.example.com", false); err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+	input, _ := mut.Variables["input"].(map[string]interface{})
+	if input["id"] != "d2" || input["paused"] != false {
+		t.Errorf("input = %v, want id d2 paused false", input)
+	}
+	if !strings.Contains(out.String(), "www.example.com is now resumed") {
+		t.Errorf("output = %s", out.String())
+	}
+}
+
+func TestAppDomainsPauseUnknownHostnameListsHostnames(t *testing.T) {
+	var mut gqlRequest
+	srv := pauseServer(t, pauseRows, pauseResult("x", true), &mut)
+	defer srv.Close()
+
+	cmd, _ := appTestCmd()
+	err := runAppDomainSetPaused(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "nope.example.com", true)
+	if err == nil || !strings.Contains(err.Error(), "app.example.com, www.example.com") {
+		t.Fatalf("err = %v, want the app's hostnames listed", err)
+	}
+	if mut.Query != "" {
+		t.Error("mutation must not be sent for an unknown hostname")
+	}
+}
+
+func TestAppDomainsPauseSurfacesMutationError(t *testing.T) {
+	res := map[string]interface{}{
+		"ok": false, "data": nil,
+		"errors": []map[string]interface{}{{"code": "forbidden", "message": "permission denied: app.write"}},
+	}
+	srv := pauseServer(t, pauseRows, res, nil)
+	defer srv.Close()
+
+	cmd, _ := appTestCmd()
+	err := runAppDomainSetPaused(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "app.example.com", true)
+	if err == nil || !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("err = %v, want the server's message surfaced", err)
+	}
+}
+
+func TestAppDomainsPauseSurfacesGraphQLError(t *testing.T) {
+	srv := graphQLErrorServer(t, "boom")
+	defer srv.Close()
+
+	cmd, _ := appTestCmd()
+	err := runAppDomainSetPaused(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "app.example.com", true)
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("err = %v, want boom", err)
+	}
+}
+
+func TestAppDomainsPauseJSON(t *testing.T) {
+	srv := pauseServer(t, pauseRows, pauseResult("app.example.com", true), nil)
+	defer srv.Close()
+
+	cmd, out := appTestCmd()
+	_ = cmd.Flags().Set("json", "true")
+	if err := runAppDomainSetPaused(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "web", "app.example.com", true); err != nil {
+		t.Fatalf("pause --json: %v", err)
+	}
+	var decoded appDomainPauseState
+	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
+		t.Fatalf("decoding json output: %v", err)
+	}
+	if decoded.Hostname != "app.example.com" || !decoded.IsPaused {
+		t.Errorf("decoded = %+v", decoded)
 	}
 }
