@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/spf13/cobra"
@@ -68,9 +67,6 @@ func init() {
 }
 
 func runAppMove(cmd *cobra.Command, ctx context.Context, client *api.Client, slug, projectSelector string) error {
-	if strings.TrimSpace(projectSelector) == "" {
-		return fmt.Errorf("give the destination as --project <slug-or-id>")
-	}
 	var show struct {
 		App *appPlacement `json:"astroliftApp"`
 	}

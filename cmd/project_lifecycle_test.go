@@ -139,14 +139,26 @@ func TestProjectRenameSendsOnlyTheFieldsGiven(t *testing.T) {
 	for _, tc := range []struct {
 		name, slug, display string
 		want                map[string]interface{}
+		after               map[string]interface{}
+		output              string
 	}{
-		{"slug only", "storefront", "", map[string]interface{}{"id": webProjectGUID, "slug": "storefront"}},
-		{"name only", "", "Storefront", map[string]interface{}{"id": webProjectGUID, "name": "Storefront"}},
+		{
+			"slug only", "storefront", "",
+			map[string]interface{}{"id": webProjectGUID, "slug": "storefront"},
+			renamedProject("storefront", "Web"),
+			"Project renamed: web (Web) -> storefront (Web) in team core\n",
+		},
+		{
+			"name only", "", "Storefront",
+			map[string]interface{}{"id": webProjectGUID, "name": "Storefront"},
+			renamedProject("web", "Storefront"),
+			"Project renamed: web (Web) -> web (Storefront) in team core\n",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var seen []gqlRequest
-			client := projectMutationServer(t, "updateProject", renamedProject("storefront", "Storefront"), &seen)
-			cmd, _ := groupsTestCmd()
+			client := projectMutationServer(t, "updateProject", tc.after, &seen)
+			cmd, out := groupsTestCmd()
 			if err := runProjectRename(cmd, context.Background(), client, "web", tc.slug, tc.display); err != nil {
 				t.Fatalf("runProjectRename: %v", err)
 			}
@@ -154,7 +166,29 @@ func TestProjectRenameSendsOnlyTheFieldsGiven(t *testing.T) {
 			if input, _ := req.Variables["input"].(map[string]interface{}); !reflect.DeepEqual(input, tc.want) {
 				t.Errorf("updateProject input = %v, want %v", input, tc.want)
 			}
+			if got := out.String(); got != tc.output {
+				t.Errorf("output = %q, want %q", got, tc.output)
+			}
 		})
+	}
+}
+
+func TestProjectRenameRunsInTheWorkingOrganization(t *testing.T) {
+	var seen []gqlRequest
+	projectCommandServer(t, "updateProject", renamedProject("storefront", "Storefront"), &seen)
+	t.Cleanup(func() { projectRenameSlug, projectRenameName = "", "" })
+
+	out, err := runCmd(t, "project", "rename", "web", "--slug", "storefront", "--name", "Storefront")
+	if err != nil {
+		t.Fatalf("project rename: %v (%s)", err, out)
+	}
+	req, ok := sentMutation(seen, "updateProject")
+	if !ok || req.Organization != projectTestOrgGUID {
+		t.Fatalf("updateProject sent=%v organization=%q", ok, req.Organization)
+	}
+	want := map[string]interface{}{"id": webProjectGUID, "slug": "storefront", "name": "Storefront"}
+	if input, _ := req.Variables["input"].(map[string]interface{}); !reflect.DeepEqual(input, want) {
+		t.Errorf("updateProject input = %v, want %v", input, want)
 	}
 }
 

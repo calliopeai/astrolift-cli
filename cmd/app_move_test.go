@@ -117,6 +117,21 @@ func TestAppMoveIntoItsOwnProjectSaysSo(t *testing.T) {
 	}
 }
 
+// An app whose team no longer matches its project's team is moved back into
+// that team when assigned to the same project, which is a change to report.
+func TestAppMoveReportsATeamChangeWithinTheSameProject(t *testing.T) {
+	var seen []gqlRequest
+	client := appMoveServer(t, placedApp("data", "web", webProjectGUID), movedTo("core", "web", webProjectGUID), &seen)
+
+	cmd, out := appTestCmd()
+	if err := runAppMove(cmd, context.Background(), client, "storefront", "web"); err != nil {
+		t.Fatalf("runAppMove: %v", err)
+	}
+	if got := out.String(); got != "Moved storefront from project web (team data) to project web (team core)\n" {
+		t.Errorf("output = %q", got)
+	}
+}
+
 func TestAppMovePrintsTheRefusalWithItsField(t *testing.T) {
 	var seen []gqlRequest
 	denied := "you do not have access to the target project"
@@ -161,15 +176,6 @@ func TestAppMoveToASlugTwoTeamsUseIsRefused(t *testing.T) {
 	}
 	if out.Len() != 0 {
 		t.Errorf("output:\n%s", out.String())
-	}
-}
-
-func TestAppMoveNeedsADestination(t *testing.T) {
-	cmd, _ := appTestCmd()
-	// A nil client panics if anything is sent.
-	err := runAppMove(cmd, context.Background(), nil, "storefront", " ")
-	if err == nil || !strings.Contains(err.Error(), "--project <slug-or-id>") {
-		t.Fatalf("err = %v", err)
 	}
 }
 

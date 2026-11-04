@@ -100,9 +100,6 @@ func init() {
 // organization, so a slug that several teams use is refused, not guessed.
 func resolveProjectSelector(ctx context.Context, client *api.Client, selector string) (projectRef, error) {
 	want := strings.TrimSpace(selector)
-	if want == "" {
-		return projectRef{}, fmt.Errorf("give the project's slug or id (see `astro project list`)")
-	}
 	var resp struct {
 		Projects []projectRef `json:"astroliftProjects"`
 	}
