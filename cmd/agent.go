@@ -148,6 +148,8 @@ type agentTask struct {
 	VNCURL            string             `json:"vncUrl"`
 	SnapshotURL       *string            `json:"snapshotUrl"`
 	Brains            []agentTaskBrain   `json:"brains,omitempty"`
+	// Artifacts are the evidence the run attached to its result (#2488), without content.
+	Artifacts []agentTaskArtifact `json:"artifacts,omitempty"`
 }
 
 // agentTaskBrain mirrors AstroliftAgentTaskBrain (#2432): a brain the run
@@ -157,6 +159,17 @@ type agentTaskBrain struct {
 	Source        string  `json:"source"`
 	RevokedAt     *string `json:"revokedAt"`
 	RevokedReason string  `json:"revokedReason"`
+}
+
+// agentTaskArtifact mirrors AstroliftAgentTaskArtifact (#2488). SizeBytes and
+// SHA256 describe the UTF-8 bytes of the content agentTaskArtifact returns.
+type agentTaskArtifact struct {
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	MediaType string `json:"mediaType"`
+	SizeBytes int    `json:"sizeBytes"`
+	SHA256    string `json:"sha256"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // noneMutationResult is the NoneTypeMutationResult envelope (cancelTask). Its
@@ -440,8 +453,10 @@ var agentInspectCmd = &cobra.Command{
 	Short: "Print the full AgentTask record",
 	Long: `Fetches one AgentTask by GUID via the agentTask GraphQL query and
 prints its record: status, timestamps, VNC relay path, the brains the run
-reads (slug, source, and when and why a brain was revoked), and terminal
-result payload (if any). Use --json for the raw record.
+reads (slug, source, and when and why a brain was revoked), the artifacts
+the run attached to its result (name, kind, media type, size and SHA-256;
+'astro agent artifact' prints one), and terminal result payload (if any).
+Use --json for the raw record.
 
 When the organization is connected to Zentinelle, it adds the agent's
 policies in effect and its last 24 hours of blocks, violations and
@@ -529,6 +544,12 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 			fmt.Fprintln(out, line)
 		}
 	}
+	if len(t.Artifacts) > 0 {
+		fmt.Fprintln(out, "Artifacts:")
+		for _, a := range t.Artifacts {
+			fmt.Fprintf(out, "  %s (%s, %s, %d bytes) sha256:%s\n", a.Name, a.Kind, a.MediaType, a.SizeBytes, a.SHA256)
+		}
+	}
 	printInspectGovernance(out, governance)
 	if t.Result != nil {
 		enc, err := json.MarshalIndent(t.Result, "", "  ")
@@ -539,13 +560,26 @@ func runAgentInspect(cmd *cobra.Command, ctx context.Context, client *api.Client
 	return nil
 }
 
-// queryAgentTaskWithBrains reads agentTaskQuery plus the run's brains (#2432).
-// A server older than #2432 has no brains field; it gets the query without it.
+// queryAgentTaskWithBrains reads agentTaskQuery plus the run's brains (#2432)
+// and artifacts (#2488). A server older than #2432 has no brains field; it gets
+// the query without it.
 func queryAgentTaskWithBrains(ctx context.Context, client *api.Client, vars map[string]interface{}, target interface{}) error {
 	query := strings.Replace(agentTaskQuery, "    status\n", "    status\n    brains { slug source revokedAt revokedReason }\n", 1)
-	err := queryAgentCallbackState(ctx, client, query, vars, target)
+	err := queryAgentTaskWithArtifacts(ctx, client, query, vars, target)
 	if err != nil && errors.Is(err, api.ErrSchemaMismatch) && strings.Contains(strings.ToLower(err.Error()), "brains") {
 		return queryAgentCallbackState(ctx, client, agentTaskQuery, vars, target)
+	}
+	return err
+}
+
+// queryAgentTaskWithArtifacts adds the artifacts the run attached to its result
+// (#2488) to query. A server older than #2488 has no artifacts field; it gets
+// query without it.
+func queryAgentTaskWithArtifacts(ctx context.Context, client *api.Client, query string, vars map[string]interface{}, target interface{}) error {
+	extended := strings.Replace(query, "    status\n", "    status\n    artifacts { name kind mediaType sizeBytes sha256 createdAt }\n", 1)
+	err := queryAgentCallbackState(ctx, client, extended, vars, target)
+	if err != nil && errors.Is(err, api.ErrSchemaMismatch) && strings.Contains(strings.ToLower(err.Error()), "artifacts") {
+		return queryAgentCallbackState(ctx, client, query, vars, target)
 	}
 	return err
 }
