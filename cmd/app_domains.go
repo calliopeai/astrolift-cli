@@ -5,8 +5,9 @@
 // `astro app domains list` printed the generic sub-resource blurb and did
 // nothing.
 //
-// Read-only for now: astroliftAppDomains(appSlug) is the only domain query
-// in the schema, and #91 only asked for "list". addAppDomain /
+// "pause" / "resume" call setCustomDomainPaused. The rest of the group is
+// read-only: astroliftAppDomains(appSlug) is the only domain query in the
+// schema, and #91 only asked for "list". addAppDomain /
 // addWildcardDomain / removeAppDomain / recheckDomainValidation exist on
 // the Mutation type but are out of scope here -- neither #91 nor #99 asked
 // for domain mutation, and adding one wasn't requested.
@@ -51,6 +52,14 @@ const appDomainsListQuery = `query($appSlug: String!) {
   }
 }`
 
+const setCustomDomainPausedMutation = `mutation($input: SetCustomDomainPausedInput!) {
+  setCustomDomainPaused(input: $input) {
+    ok
+    errors { code message field }
+    data { id hostname isPaused }
+  }
+}`
+
 // ---- response shapes (GraphQL camelCase) ------------------------------------
 
 // appDomainRequiredRecord mirrors AstroliftAppDomainRequiredRecord: the DNS
@@ -91,8 +100,10 @@ var appDomainsCmd = &cobra.Command{
 	Long: `Lists the custom domains bound to an app -- hostname, DNS validation
 state, certificate state and expiry -- via astroliftAppDomains.
 
-Read-only: adding, removing, and reissuing a domain's certificate remain
-console-only for now.`,
+"pause" and "resume" take one custom domain out of service and put it back
+(setCustomDomainPaused): a paused host answers 503 instead of the app, and
+the app's other hosts are unaffected. Adding, removing, and reissuing a
+domain's certificate remain console-only for now.`,
 }
 
 var appDomainsListCmd = &cobra.Command{
@@ -152,6 +163,100 @@ func runAppDomainsList(cmd *cobra.Command, ctx context.Context, client *api.Clie
 	return nil
 }
 
+// appDomainPauseState is what setCustomDomainPaused returns.
+type appDomainPauseState struct {
+	ID       string `json:"id"`
+	Hostname string `json:"hostname"`
+	IsPaused bool   `json:"isPaused"`
+}
+
+var appDomainsPauseCmd = &cobra.Command{
+	Use:   "pause <hostname> [app]",
+	Short: "Pause one custom domain (the host answers 503 until resumed)",
+	Long: `Pauses one custom domain of an app: the host answers 503 ("Astrolift: app is
+paused") instead of the app until it is resumed. The app's other hosts are
+unaffected. Pausing an already paused domain succeeds and changes nothing.`,
+	Args: cobra.RangeArgs(1, 2),
+	RunE: func(cmd *cobra.Command, args []string) error { return runAppDomainsSetPaused(cmd, args, true) },
+}
+
+var appDomainsResumeCmd = &cobra.Command{
+	Use:   "resume <hostname> [app]",
+	Short: "Resume a paused custom domain",
+	Long: `Resumes a custom domain paused with "astro app domains pause", so the host
+serves the app again. Resuming a domain that is not paused succeeds and
+changes nothing.`,
+	Args: cobra.RangeArgs(1, 2),
+	RunE: func(cmd *cobra.Command, args []string) error { return runAppDomainsSetPaused(cmd, args, false) },
+}
+
+func runAppDomainsSetPaused(cmd *cobra.Command, args []string, paused bool) error {
+	slug, err := resolveAppSlug(cmd, firstArg(args[1:]))
+	if err != nil {
+		return err
+	}
+	client, _, _, err := loadActiveClient(cmd.Context(), boolFlag(cmd, "debug"))
+	if err != nil {
+		return err
+	}
+	return runAppDomainSetPaused(cmd, cmd.Context(), client, slug, args[0], paused)
+}
+
+func runAppDomainSetPaused(cmd *cobra.Command, ctx context.Context, client *api.Client, appSlug, hostname string, paused bool) error {
+	verb := "pausing"
+	if !paused {
+		verb = "resuming"
+	}
+	var list struct {
+		Domains []appDomain `json:"astroliftAppDomains"`
+	}
+	if err := client.GraphQL(ctx, appDomainsListQuery, map[string]interface{}{"appSlug": appSlug}, &list); err != nil {
+		return fmt.Errorf("listing domains for %s: %w", appSlug, err)
+	}
+	var target *appDomain
+	names := make([]string, 0, len(list.Domains))
+	for i := range list.Domains {
+		names = append(names, list.Domains[i].Hostname)
+		if strings.EqualFold(list.Domains[i].Hostname, strings.TrimSpace(hostname)) {
+			target = &list.Domains[i]
+		}
+	}
+	if target == nil {
+		have := "the app has no custom domains"
+		if len(names) > 0 {
+			have = "its domains: " + strings.Join(names, ", ")
+		}
+		return fmt.Errorf("no custom domain %q on app %s; %s", hostname, appSlug, have)
+	}
+
+	var resp struct {
+		Result struct {
+			Ok     bool                 `json:"ok"`
+			Errors []mutationError      `json:"errors"`
+			Data   *appDomainPauseState `json:"data"`
+		} `json:"setCustomDomainPaused"`
+	}
+	vars := map[string]interface{}{"input": map[string]interface{}{"id": target.ID, "paused": paused}}
+	if err := client.GraphQL(ctx, setCustomDomainPausedMutation, vars, &resp); err != nil {
+		return fmt.Errorf("%s %s: %w", verb, target.Hostname, err)
+	}
+	if !resp.Result.Ok || resp.Result.Data == nil {
+		return fmt.Errorf("%s was not changed: %s", target.Hostname, firstDeployError(resp.Result.Errors))
+	}
+
+	after := resp.Result.Data
+	if boolFlag(cmd, "json") {
+		return renderJSON(cmd, after)
+	}
+	out := cmd.OutOrStdout()
+	if after.IsPaused {
+		fmt.Fprintf(out, "%s is now paused: the host answers 503 until you run `astro app domains resume %s`.\n", after.Hostname, after.Hostname)
+	} else {
+		fmt.Fprintf(out, "%s is now resumed and serves the app again.\n", after.Hostname)
+	}
+	return nil
+}
+
 func init() {
-	appDomainsCmd.AddCommand(appDomainsListCmd)
+	appDomainsCmd.AddCommand(appDomainsListCmd, appDomainsPauseCmd, appDomainsResumeCmd)
 }
