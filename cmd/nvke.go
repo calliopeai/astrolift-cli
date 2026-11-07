@@ -72,7 +72,7 @@ Accepted and awaiting-ready operations are not finished infrastructure changes.`
 		}
 		return nvkeJSON(cmd, contract)
 	})}
-	root.AddCommand(catalog, newNVKESiteCommand(), newNVKEOperationCommand(), newNVKEToolingCommand())
+	root.AddCommand(catalog, newNVKESiteCommand(), newNVKEOperationCommand(), newNVKEResourceCommand(), newNVKEToolingCommand())
 	// Full pinned native vocabulary is discoverable offline. Leaf commands use
 	// the same durable admission path; they never invoke an upstream executable.
 	pinned := nvkecatalog.Pinned()
@@ -237,7 +237,7 @@ func newNVKEOperationCommand() *cobra.Command {
 		return nvkeJSON(cmd, page)
 	})}
 	nvkePageFlags(list)
-	group.AddCommand(list, newNVKERequestCommand("request ACTION_KEY", ""))
+	group.AddCommand(list, newNVKERequestCommand("request ACTION_KEY", ""), newNVKERecoverCommand(), newNVKEDiagnosticsCommand())
 	for _, verb := range []string{"get", "wait", "result", "cancel", "resume"} {
 		selected := verb
 		action := &cobra.Command{Use: verb + " OPERATION_GUID", Short: verb + " an exact operation", Args: cobra.ExactArgs(1), RunE: nvkeScoped(func(cmd *cobra.Command, ctx context.Context, c *api.Client, args []string) error {
@@ -303,7 +303,7 @@ func waitNVKEOperation(cmd *cobra.Command, ctx context.Context, c *api.Client, r
 		if err != nil {
 			return err
 		}
-		if next.ID != row.ID || next.SiteID != row.SiteID || next.RequestID != row.RequestID || next.OperationKey != row.OperationKey {
+		if next.ID != row.ID || next.SiteID != row.SiteID || next.RequestID != row.RequestID || next.OperationKey != row.OperationKey || next.IsInventory != row.IsInventory || !sameNVKESource(next.ResourceSource, row.ResourceSource) {
 			return errors.New("NVKE operation observation identity changed")
 		}
 		row = next
@@ -319,14 +319,15 @@ func runNVKEOperation(cmd *cobra.Command, ctx context.Context, c *api.Client, id
 		if file == "" {
 			return errors.New("--output is required for sensitive native results; use - explicitly for stdout")
 		}
-		data, err := c.NVKEOperationResult(ctx, id)
+		data, err := c.NVKEOperationResultText(ctx, id)
 		if err != nil {
 			return err
 		}
 		if file == "-" {
-			return nvkeJSON(cmd, data)
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), data)
+			return err
 		}
-		if err := writeNVKEExclusive(file, append(data, '\n')); err != nil {
+		if err := writeNVKEExclusive(file, append([]byte(data), '\n')); err != nil {
 			return err
 		}
 		if boolFlag(cmd, "json") {

@@ -80,7 +80,7 @@ func nvkeParameterDigest(parameters []byte) string {
 	return hex.EncodeToString(digest[:])
 }
 func validateNVKERecovery(r *reviewedStartRequest) error {
-	if r.Format != 1 || r.Kind != nvkeRequestKind || r.Version < 1 || r.IntervalSeconds < 30 || r.IntervalSeconds > 86400 || r.ActorUserID < 1 || r.Ref == "" || !nvkeDigestPattern.MatchString(r.ExpectedSource) || !nvkeRevisionPattern.MatchString(r.Revision) {
+	if r.NVKESource != nil || r.Format != 1 || r.Kind != nvkeRequestKind || r.Version < 1 || r.IntervalSeconds < 30 || r.IntervalSeconds > 86400 || r.ActorUserID < 1 || r.Ref == "" || !nvkeDigestPattern.MatchString(r.ExpectedSource) || !nvkeRevisionPattern.MatchString(r.Revision) {
 		return errors.New("NVKE recovery file lacks its original reviewed tuple; preserve it for investigation")
 	}
 	if err := nvkeGUID(r.TargetID); err != nil {
@@ -99,12 +99,19 @@ func newNVKERequestCommand(use, fixedKey string) *cobra.Command {
 	command := &cobra.Command{Use: use, Short: "Submit an exact native operation with a durable recovery identity", Long: `Submit an NVKE operation through the Astrolift API. --file contains the complete
 native JSON parameter envelope: HTTP operations use path/query/body/resource_version;
 datastore operations use name/document/resource_version/uid and their declared options.
-Omit --file for an empty parameter object. Use catalog to inspect all native fields.
+Omit --file for an empty parameter object. New requests retain exact UTF-8 text and
+check the reviewed actor at admission. Use --inventory for a complete saved list;
+use --source-operation/--source-version and optional --resource-key to bind an
+existing-resource action. The API supplies immutable targets and preconditions.
+Use catalog to inspect all native fields.
 
 --request-file is created privately and flushed before admission. It stores only the
 server, organization, actor, site/version, action, revision, timeout, parameters digest
 and request UUID. Native inputs and credentials are not saved in that recovery record.
-After a lost reply, retry with the same recovery file and identical original input.
+After a lost reply, the original receipt is checked before reading input. If no
+receipt is visible, retry needs the identical original text. Existing legacy
+recovery files retain their canonical JSON protocol. operation recover only
+looks up a receipt and never re-admits native work.
 Do not replace the file or refresh its reviewed version while an outcome is unknown.
 
 Requests return metadata, never sensitive native results. Use operation result with
@@ -123,11 +130,13 @@ completion; a local wait timeout does not cancel the server operation.`, Args: a
 	_ = command.MarkFlagRequired("request-file")
 	command.Flags().Int("site-version", 0, "Assert a specific site version on first admission; recovery retains the original")
 	command.Flags().Int("operation-timeout", 7200, "Server operation timeout in seconds (30–86400)")
+	command.Flags().Bool("inventory", false, "Collect a complete native inventory instead of an ordinary list")
+	nvkeSourceFlags(command)
 	command.Flags().Bool("wait", false, "Wait for observed completion after admission")
 	nvkeWaitFlags(command)
 	return command
 }
-func runNVKERequest(cmd *cobra.Command, ctx context.Context, c *api.Client, key string, pinnedCommand bool) error {
+func runNVKELegacyRequest(cmd *cobra.Command, ctx context.Context, c *api.Client, key string, pinnedCommand bool) error {
 	siteID := resourceStringFlag(cmd, "site")
 	if err := nvkeGUID(siteID); err != nil {
 		return err

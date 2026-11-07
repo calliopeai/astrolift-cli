@@ -221,3 +221,58 @@ NVKE_TEST_OPSCODE=/path/to/opscode \
 
 This drives real bundle preparation, native spec utilities, mutation-rejecting
 management dry-run, and SIGINT/recovery behavior through the compiled executable.
+
+
+## Reviewed resources and typed observations
+
+New request files use exact-text, actor-checked admission. Parameter files must
+contain one UTF-8 JSON object and retain their original bytes (including whitespace)
+while an admission is unresolved. Legacy `nvke-operation` recovery files continue
+using their original canonical JSON protocol. They cannot switch to inventory or
+resource mode. No recovery file is overwritten or cleared automatically.
+
+```sh
+astro nvke datastore list-machine-image --site SITE_GUID --inventory \
+  --request-file inventory-request.json --wait
+astro nvke resource list SNAPSHOT_GUID --site SITE_GUID --search image-a --limit 50
+astro nvke resource get SNAPSHOT_GUID --site SITE_GUID --resource-key SIGNED_KEY
+astro nvke resource editor datastore.replaceMachineImage --site SITE_GUID \
+  --source-operation SNAPSHOT_GUID --source-version 7 --resource-key SIGNED_KEY \
+  --output private-edit.json
+astro nvke datastore replace-machine-image --site SITE_GUID \
+  --source-operation SNAPSHOT_GUID --source-version 7 --resource-key SIGNED_KEY \
+  --file private-edit.json --request-file replace-request.json --wait
+astro nvke operation recover --request-file replace-request.json
+astro nvke operation diagnostics READ_OPERATION_GUID --site SITE_GUID --version 9 --limit 50
+```
+
+All ordinary pinned native commands accept these source flags. Omit resource-key
+when the source is a successful single-resource GET. Use the source operation's
+actual returned version, not the site's version or a Kubernetes resource version.
+The API owns native schemas, immutable target binding, ETag/resource-version/UID
+preconditions, authority checks and conflict detection. The CLI does not apply
+native configuration directly. Controller edits retain their weaker observed-only
+concurrency; the editor reports that limitation.
+
+An editor may return a preparationActionKey instead of parameter text. Admit that
+read with the same original source flags and its own new request file, wait for it
+to succeed, then load the editor using that successful read's ID/version without
+a resource-key. SPIRE is one such flow. The CLI never launches this read or retries
+a mutation implicitly. Editor text and native documents require an explicit new
+private output path, or `--output -` to deliberately print sensitive JSON. When
+printing parameter text to stdout, the concurrency note goes to stderr. When a
+preparation read is required, metadata is printed and no editor file is created.
+
+Retrying a new-protocol request first looks up its exact actor-bound receipt.
+A confirmed matching receipt returns the original operation even if the input file
+has been removed. An absent receipt does not prove no effect: only the same action,
+mode, source, reviewed versions, timeout and exact text can re-use that nonce.
+Changes require a different explicit request file after the old outcome is resolved.
+`operation recover` only reads a receipt and never re-admits native work.
+
+Saved inventory/resource/diagnostic commands perform no native I/O. Pagination
+cursors and search remain server-side; use the returned nextCursor with --after.
+Diagnostic counts stay strings, missing booleans/counts stay null, and the views
+remain historical. Free-text messages, history values and credentials remain in
+the explicit native result download. `operation result` uses the text endpoint to
+preserve native values without a floating-point round trip.

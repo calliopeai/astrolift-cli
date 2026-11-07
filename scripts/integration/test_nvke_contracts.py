@@ -246,6 +246,128 @@ async def test_compiled_cli_runs_native_crud_and_recovers_original_requests(
             assert "PRIVATE_NATIVE_SCRIPT" in output.read_text()
             metadata = result["observation"]["data"]["metadata"]
             assert metadata["uid"]
+
+            filters = tmp_path / "inventory-filters.json"
+            filters.write_text(
+                json.dumps({"label_selector": f"astrolift.test/run={state.site.guid}"})
+            )
+            filters.chmod(0o600)
+            snapshot = await run(
+                "datastore",
+                "list-machine-image",
+                "--inventory",
+                "--site",
+                state.site.guid,
+                "--file",
+                filters,
+                "--request-file",
+                tmp_path / "inventory-recovery.json",
+                "--wait",
+                "--poll-interval",
+                "500ms",
+                "--wait-timeout",
+                "15s",
+            )
+            assert snapshot["isInventory"] is True
+            inventory = await run(
+                "resource",
+                "list",
+                snapshot["id"],
+                "--site",
+                state.site.guid,
+                "--search",
+                name,
+            )
+            assert inventory["totalCount"] == 1
+            key = inventory["items"][0]["key"]
+            resource = await run(
+                "resource",
+                "get",
+                snapshot["id"],
+                "--site",
+                state.site.guid,
+                "--resource-key",
+                key,
+            )
+            assert resource["item"]["name"] == name
+            native_document = tmp_path / "private-resource-document.json"
+            assert (
+                await run(
+                    "resource",
+                    "document",
+                    snapshot["id"],
+                    "--site",
+                    state.site.guid,
+                    "--resource-key",
+                    key,
+                    "--output",
+                    native_document,
+                )
+            )["saved"]
+            assert "PRIVATE_NATIVE_SCRIPT" in native_document.read_text()
+            editor_path = tmp_path / "private-editor.json"
+            editor = await run(
+                "resource",
+                "editor",
+                "datastore.replaceMachineImage",
+                "--site",
+                state.site.guid,
+                "--source-operation",
+                snapshot["id"],
+                "--source-version",
+                resource["operationVersion"],
+                "--resource-key",
+                key,
+                "--output",
+                editor_path,
+            )
+            assert (
+                editor["concurrency"] == "native_version"
+                and "parametersText" not in editor
+            )
+            draft = json.loads(editor_path.read_text())
+            draft["document"]["metadata"]["annotations"] = {
+                "astrolift.test/reviewed": "yes"
+            }
+            editor_path.write_text(json.dumps(draft))
+            replaced = await run(
+                "datastore",
+                "replace-machine-image",
+                "--site",
+                state.site.guid,
+                "--source-operation",
+                snapshot["id"],
+                "--source-version",
+                resource["operationVersion"],
+                "--resource-key",
+                key,
+                "--file",
+                editor_path,
+                "--request-file",
+                tmp_path / "replace-recovery.json",
+                "--wait",
+                "--poll-interval",
+                "500ms",
+                "--wait-timeout",
+                "15s",
+            )
+            assert replaced["resourceSource"]["operationId"] == snapshot["id"]
+            replaced_result = tmp_path / "private-replaced-result.json"
+            await run(
+                "operation", "result", replaced["id"], "--output", replaced_result
+            )
+            metadata = json.loads(replaced_result.read_text())["observation"]["data"][
+                "metadata"
+            ]
+            assert metadata["annotations"]["astrolift.test/reviewed"] == "yes"
+            editor_path.unlink()
+            recovered = await run(
+                "operation",
+                "recover",
+                "--request-file",
+                tmp_path / "replace-recovery.json",
+            )
+            assert recovered["id"] == replaced["id"]
             assert (await run("operation", "cancel", operation["id"]))[
                 "status"
             ] == "SUCCEEDED"
@@ -335,3 +457,148 @@ async def test_compiled_cli_runs_native_crud_and_recovers_original_requests(
             assert site["isActive"]
             await run("site", "remove", site["id"], "--version", site["version"])
             await run("site", "get", site["id"], ok=False)
+
+
+@pytest.fixture
+def controller_site(world):
+    from astrolift_clusters.tests.test_nvke_access import controller
+    from astrolift_clusters.tests.test_nvke_operations import (
+        configured as configured_fixture,
+    )
+    from astrolift_clusters.tests.test_nvke_sites import context, put
+
+    state = configured_fixture.__wrapped__(world)
+    identity = str(uuid4())
+    details = {
+        "control_plane": {
+            "config": {"desiredCount": 9007199254740993},
+            "status": {
+                "nodeCount": 1,
+                "readyNodeCount": 0,
+                "kubernetesVersion": "1.36.0",
+                "controlPlaneUpgrading": {
+                    "status": "Unknown",
+                    "message": "PRIVATE_NATIVE_MESSAGE",
+                },
+                "cpNodesRecycling": {"status": "False"},
+                "deletingNodeCount": 0,
+                "deleteRequestedNodeCount": 0,
+            },
+        }
+    }
+    with controller({"body": {"name": "diagnostic-cluster"}}, identity, details) as (
+        endpoint,
+        _,
+        _,
+    ):
+        with context(world):
+            put(
+                state.site,
+                expected_connection_version=state.connection.version,
+                endpoint=endpoint,
+                allow_http=True,
+            )
+            state.site.refresh_from_db()
+        yield state, identity
+
+
+async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(
+    binary, tmp_path, asgi_endpoint, controller_site, monkeypatch
+):
+    from astrolift_workflows import client as workflow_client
+    from astrolift_workflows.activities.nvke import nvke_operation_attempt
+    from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow
+
+    state, identity = controller_site
+    issued = mint_token()
+    await sync_to_async(ApiToken.objects.create)(
+        user=state.world.user,
+        organization=state.world.org,
+        name="owned NVKE diagnostic CLI",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["admin"],
+    )
+
+    async def run(*args):
+        result = await asyncio.to_thread(
+            invoke,
+            binary,
+            tmp_path,
+            asgi_endpoint,
+            issued.plaintext,
+            state.world.org.slug,
+            *args,
+        )
+        assert result.returncode == 0, result.stderr
+        return json.loads(result.stdout)
+
+    async with temporal_test_env() as env:
+        queue = "nvke-cli-diagnostics-" + uuid4().hex
+
+        async def get_client():
+            return env.client
+
+        monkeypatch.setattr(workflow_client, "_get_client_async", get_client)
+        monkeypatch.setattr(workflow_client, "_temporal_enabled", lambda: True)
+        monkeypatch.setattr(workflow_client, "_task_queue", lambda: queue)
+        async with temporal_worker(
+            env,
+            task_queue=queue,
+            workflows=[NvkeOperationWorkflow],
+            activities=[nvke_operation_attempt],
+        ):
+            native = tmp_path / "get-cluster.json"
+            native.write_text(json.dumps({"path": {"clusterID": identity}}))
+            native.chmod(0o600)
+            source = await run(
+                "controller",
+                "get-cluster",
+                "--site",
+                state.site.guid,
+                "--file",
+                native,
+                "--request-file",
+                tmp_path / "source-recovery.json",
+                "--wait",
+                "--poll-interval",
+                "500ms",
+                "--wait-timeout",
+                "15s",
+            )
+            read = await run(
+                "controller",
+                "get-cluster-control-plane",
+                "--site",
+                state.site.guid,
+                "--source-operation",
+                source["id"],
+                "--source-version",
+                source["version"],
+                "--request-file",
+                tmp_path / "diagnostic-recovery.json",
+                "--wait",
+                "--poll-interval",
+                "500ms",
+                "--wait-timeout",
+                "15s",
+            )
+            page = await run(
+                "operation",
+                "diagnostics",
+                read["id"],
+                "--site",
+                state.site.guid,
+                "--version",
+                read["version"],
+                "--limit",
+                "1",
+            )
+            assert page["summary"]["clusterId"] == identity
+            counts = {item["name"]: item["value"] for item in page["summary"]["counts"]}
+            assert (
+                counts["desiredCount"] == "9007199254740993"
+                and counts["readyNodeCount"] == "0"
+            )
+            assert counts["managedNodeCount"] is None
+            assert "PRIVATE" not in json.dumps(page)
