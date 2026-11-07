@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/calliopeai/astrolift-cli/internal/api"
 	"strings"
 	"testing"
+
+	"github.com/calliopeai/astrolift-cli/internal/api"
 )
 
 func TestPreviewExactIDBypassesRecentCatalogAndRuntimeReads(t *testing.T) {
