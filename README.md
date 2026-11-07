@@ -280,6 +280,13 @@ continue to verify live Kubernetes ownership.
 typed historical renewal/rotation state, workflow identity and retained-lock
 evidence. It preserves missing values as null and never starts native work.
 
+`temporal get/configure/verify/enable/disable/remove` manages the separate native
+Temporal authority. Configuration requires an explicit address, namespace, queue,
+and reviewed site/authority versions. Credentials use a private JSON file or stdin;
+omitting the file preserves them and `--clear-credentials` clears them. Verification
+proves namespace access only. After a lost configuration reply, inspect metadata
+before reviewing another change. These commands do not start or reset workflows.
+
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.
 

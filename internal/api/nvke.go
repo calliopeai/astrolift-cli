@@ -78,10 +78,11 @@ type NVKEAction struct {
 	Path         string `json:"path"`
 }
 type NVKEContract struct {
-	Revision          string           `json:"revision"`
-	Actions           []NVKEAction     `json:"actions"`
-	Collections       []NVKECollection `json:"collections"`
-	ControllerOpenAPI json.RawMessage  `json:"controllerOpenapi"`
+	NativeWorkflows   []NVKENativeWorkflow `json:"nativeWorkflows"`
+	Revision          string               `json:"revision"`
+	Actions           []NVKEAction         `json:"actions"`
+	Collections       []NVKECollection     `json:"collections"`
+	ControllerOpenAPI json.RawMessage      `json:"controllerOpenapi"`
 	Resources         []struct {
 		Kind       string          `json:"kind"`
 		Namespaced bool            `json:"namespaced"`
@@ -148,7 +149,7 @@ func (c *Client) NVKEContract(ctx context.Context) (*NVKEContract, error) {
 	var response struct {
 		Contract *NVKEContract `json:"astroliftNvkeContract"`
 	}
-	err := c.GraphQL(ctx, `query { astroliftNvkeContract { revision actions { key surface verb resourceKind mutates permission path } collections { key surface resourceKind namespaced permission defaultParametersText actions { key surface verb resourceKind mutates permission path } } controllerOpenapi resources { kind namespaced schema } } }`, nil, &response)
+	err := c.GraphQL(ctx, `query { astroliftNvkeContract { revision actions { key surface verb resourceKind mutates permission path } nativeWorkflows { name inputType source permission inputSchema } collections { key surface resourceKind namespaced permission defaultParametersText actions { key surface verb resourceKind mutates permission path } } controllerOpenapi resources { kind namespaced schema } } }`, nil, &response)
 	if err != nil || response.Contract == nil {
 		return nil, errors.New("NVKE contract unavailable; check server support and organization permissions")
 	}
