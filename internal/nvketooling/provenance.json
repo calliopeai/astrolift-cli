@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "sourceRevision": "17bd5532b72cbf76ae961912318ec0fb8202fa95",
+  "upstreamRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "runnerSha256": "0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd",
+  "commands": [
+    "bootstrap site",
+    "generate oidc-kubeconfig",
+    "generate sitespec",
+    "get bootstrap-manifest",
+    "inspect nvkr-release",
+    "inspect sitespec",
+    "inspect stack-config",
+    "inspect values",
+    "management check",
+    "management configure-access",
+    "management install",
+    "render deploy-path",
+    "validate sitespec",
+    "version"
+  ]
+}

@@ -126,9 +126,10 @@ JSON result to stdout. `--json` is available on every command.
 
 ## Qualification and maintenance
 
-The 88 API/resource actions are wired through the durable API. Bootstrap/install,
-node preparation, local spec/render utilities, telemetry and managed workload
-access remain part of the broader integration work; these native commands alone
+The 88 API/resource actions are wired through the durable API. Local native tooling
+is exposed through `astro nvke tooling` as described below. Live bootstrap/install,
+node preparation, telemetry and managed workload access remain part of the broader
+integration work; these commands alone
 do not claim their completion. A controller create whose response/ID is lost
 requires operator investigation. OIDC enablement lacks a direct upstream read-back
 field, and declared pool readiness counters are not all populated by the pinned
@@ -155,3 +156,68 @@ ASTROLIFT_NVKE_CLI=/path/to/astro NVKE_TEST_KUBECONFIG=/path/to/local-envtest.ya
 ```
 
 The harness refuses non-loopback Kubernetes and never contacts production.
+
+## Native operator toolchain
+
+`astro nvke tooling catalog` returns the offline runner provenance and supported
+commands. The runner is embedded at an immutable source commit, with its SHA-256
+checked against the CLI's pinned upstream revision. Refresh/check the snapshot with:
+
+```bash
+python3 scripts/vendor-nvke-tooling.py --check
+python3 scripts/vendor-nvke-tooling.py --source /path/to/opscode \
+  --revision FULL_IMMUTABLE_COMMIT
+```
+
+`tooling prepare --checkout DIR --output NEW_DIR` builds the native binary from a
+pristine archive of the pinned upstream commit. Git and Go are required; Go downloads
+the declared toolchain and locked dependencies. The resulting owner-only bundle holds
+source/licenses, native CLI, source-tree/binary hashes, CAPI pin and private build log.
+
+`tooling run --bundle DIR --workspace DIR -- NATIVE_COMMAND ...` accepts:
+
+- `bootstrap site` and its full native options, including dry-run.
+- `generate sitespec`, `generate oidc-kubeconfig`, `validate sitespec`.
+- `inspect sitespec`, `inspect stack-config`, `inspect values`, `inspect nvkr-release`.
+- `render deploy-path`, `get bootstrap-manifest`, `version`.
+- `management install`, `management check`, `management configure-access`.
+
+Paths in native parameters resolve from the private workspace. Put all native flags
+after `--`; put Astro flags (including `--json`) before it. Python 3.12+ is detected
+automatically or selected with `--python`. Native operator execution supports Linux
+and macOS. Use the managed API commands on every supported CLI platform.
+Native stdin is forwarded, including CSV input through `generate sitespec --nodes -`.
+
+Management commands delegate to the pinned installer, site preflight/diagnostics and
+CAPI SPIFFE exec-auth scripts. They require an explicit private kubeconfig. The runner
+flattens/minifies that context into a per-run snapshot, removes ambient Helm connection
+overrides, and refuses credential-changing Helm passthrough. The verified source tree
+is copied for each run so renders and chart dependency builds preserve the bundle.
+Management installation defaults to the native NICo deploy path, with native release,
+architecture, stack config, additional values and custom deploy-path options intact.
+
+Native stdout/stderr remain private files. CLI stdout contains only run metadata and
+artifact paths. Astro API-token environment variables are not forwarded to native
+tools. Effectful bootstrap/install/access attempts are flushed before execution and
+cannot be blindly repeated in the same workspace. Interruption kills the local process
+group and preserves its attempt record; remote outcomes still require investigation.
+Process completion is distinct from infrastructure readiness.
+
+The local test evidence includes real native spec utilities and full management-stack
+dry-run through a Kubernetes proxy that rejects mutation requests. Actual installation,
+verified release supply chain, provider/hardware qualification and access/readiness
+observations remain required before the full integration is qualified.
+
+Run the compiled local native qualification (the Kubernetes target must be loopback):
+
+```bash
+ASTROLIFT_NVKE_CLI=/path/to/astro \
+NVKE_TEST_NATIVE_BUNDLE=/private/native-bundle \
+NVKE_TEST_KUBECONFIG=/private/local-test.kubeconfig \
+NVKE_TEST_UPSTREAM=/path/to/pinned/nvke \
+NVKE_TEST_OPSCODE=/path/to/opscode \
+  python3 -m unittest discover -s scripts/integration -p test_nvke_tooling.py -v
+```
+
+This drives real bundle preparation, native spec utilities, mutation-rejecting
+management dry-run, and SIGINT/recovery behavior through the compiled executable.
