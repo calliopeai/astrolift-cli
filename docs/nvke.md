@@ -368,5 +368,56 @@ or HTTP-credential fallback. `--connection-timeout` bounds connection/inspection
 (1–300 seconds), not native workflow duration. `NAMESPACE_VERIFIED` proves access
 to that namespace, not a polling worker or workflow availability. `catalog`
 includes the three separately declared native workflow input schemas alongside
-the 88 HTTP/datastore actions. Dedicated native start/reset CLI controls remain
-pending; authority commands do not start, reset, retire nodes, or clear locks.
+the 88 HTTP/datastore actions. Authority commands do not start, reset, retire
+nodes, or clear locks; reviewed submissions use the separate commands below.
+
+## Native maintenance submissions and recovery
+
+```sh
+astro nvke temporal workflow renew-k8s-certs-v2 --site SITE_GUID \
+  --site-version 8 --authority-version 1 \
+  --source-operation GET_CLUSTER_OPERATION_GUID --source-version 9 \
+  --file private-renewal-input.json --request-file renewal-recovery.json
+astro nvke temporal workflow recover --request-file renewal-recovery.json --wait
+```
+
+Named commands are `renew-k8s-certs-v2`, `rotate-etcd-encryption-key`, and
+`retire-lost-etcd-rotation-node`. `request WORKFLOW` accepts the exact native name
+from `catalog`: `RenewK8sCertsV2`, `RotateEtcdEncryptionKey`, or
+`RetireLostEtcdRotationNode`. Every input field remains available through private
+UTF-8 JSON (`--file -` for stdin), including native integer values and optional
+renewal scheduling. The server owns validation and live native admission.
+
+First submission requires explicit positive site/authority/source versions and
+a successful controller `get-cluster` observation of the exact cluster under
+current authority. The CLI checks current metadata and the pinned catalog before
+persisting a new recovery identity. It flushes the private recovery file before
+admission. That file holds actor/server/org/site, versions, source, workflow,
+schema/input digests, deadline and a request UUID; it does not store native input
+or credentials. Preserve both recovery file and original input after any uncertain
+reply. A pending retry retains the identical tuple and exact input text; it never
+refreshes a version, changes an owner, or generates another request ID.
+
+A repeated request first looks up the original receipt. When found, it returns
+that operation without rereading input or another admission. `workflow recover`
+always performs receipt lookup only and needs no site/version/input flags.
+An unavailable or incomplete receipt reply is refused. An explicitly absent
+receipt does not prove that an in-flight request had no effect: retain the
+original identity and input. Existing HTTP/resource recovery files and native
+workflow files have separate protocols and cannot replace each other.
+
+Retirement additionally requires `--acknowledge-lost-node-teardown`. Its input
+must name the exact native `clusterID`, retained `rotationWorkflowID`, and lost
+`nodeID`. The server checks the reviewed failed retained owner/phase and closed
+native rotation; the native workflow then performs live node/quorum checks and
+can permanently remove that control-plane node. Keep backups and retained locks;
+this command does not reset the owner or release its lock.
+
+`--operation-timeout` (30–86400 seconds) bounds Astro observation, not the native
+workflow's execution or six-hour rewrite. `--wait-timeout` only bounds local
+waiting. Neither timeout cancels native work. Use existing `operation get/wait`,
+`operation resume --version ...`, and explicit private `operation result --output`
+for metadata, continued observation and native execution references. Successful
+native execution is not proof of changed certificates, encryption convergence
+or site health; collect fresh controller/metrics and qualification evidence.
+Native history reset controls remain pending.

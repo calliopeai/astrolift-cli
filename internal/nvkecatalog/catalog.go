@@ -18,8 +18,14 @@ type Action struct {
 	Permission string `json:"permission"`
 }
 type Catalog struct {
-	Revision string   `json:"revision"`
-	Actions  []Action `json:"actions"`
+	NativeWorkflows []NativeWorkflow `json:"nativeWorkflows"`
+	Revision        string           `json:"revision"`
+	Actions         []Action         `json:"actions"`
+}
+
+type NativeWorkflow struct {
+	Name       string `json:"name"`
+	Permission string `json:"permission"`
 }
 
 func Pinned() Catalog {

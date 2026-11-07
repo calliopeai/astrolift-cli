@@ -39,6 +39,7 @@ Namespace verification does not prove a worker is polling the configured queue.`
 		nvkeTemporalWriteFlags(leaf, false)
 		group.AddCommand(leaf)
 	}
+	group.AddCommand(newNVKENativeWorkflowCommand())
 	return group
 }
 

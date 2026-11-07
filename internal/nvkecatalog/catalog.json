@@ -1,5 +1,19 @@
 {
   "revision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "nativeWorkflows": [
+    {
+      "name": "RenewK8sCertsV2",
+      "permission": "nvke.admin"
+    },
+    {
+      "name": "RotateEtcdEncryptionKey",
+      "permission": "nvke.admin"
+    },
+    {
+      "name": "RetireLostEtcdRotationNode",
+      "permission": "nvke.admin"
+    }
+  ],
   "actions": [
     {
       "key": "createCluster",

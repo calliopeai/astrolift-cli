@@ -19,6 +19,8 @@ from uuid import uuid4
 import pytest
 import uvicorn
 from asgiref.sync import sync_to_async
+from temporalio import workflow
+from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from astrolift_clusters.tests.test_nvke_operations import (
     datastore_site as _datastore_site,
@@ -111,10 +113,14 @@ def invoke(binary, tmp_path, endpoint, bearer, org, *arguments):
 
 def test_pinned_cli_vocabulary_matches_every_paired_server_action():
     from nvke.contract import upstream_revision
+    from nvke.native_workflows import workflows
     from nvke.operations import actions
 
     snapshot = json.loads((CLI_ROOT / "internal/nvkecatalog/catalog.json").read_text())
     assert snapshot["revision"] == upstream_revision()
+    assert snapshot["nativeWorkflows"] == [
+        {"name": item["name"], "permission": item["permission"]} for item in workflows()
+    ]
     assert snapshot["actions"] == [
         {
             "key": item.key,
@@ -653,7 +659,225 @@ def controller_site(world):
             )
             state.site.refresh_from_db()
         state.native_calls = calls
+        state.native_details = details
         yield state, identity
+
+
+@workflow.defn(name="RenewK8sCertsV2")
+class NativeRenewalFixture:
+    @workflow.run
+    async def run(self, parameters: dict) -> None:
+        return None
+
+
+@workflow.defn(name="RotateEtcdEncryptionKey")
+class NativeRotationFixture:
+    @workflow.run
+    async def run(self, parameters: dict) -> None:
+        return None
+
+
+@workflow.defn(name="RetireLostEtcdRotationNode")
+class NativeRetirementFixture:
+    @workflow.run
+    async def run(self, parameters: dict) -> None:
+        return None
+
+
+@pytest.mark.parametrize(
+    "kind", ["RenewK8sCertsV2", "RotateEtcdEncryptionKey", "RetireLostEtcdRotationNode"]
+)
+async def test_compiled_cli_native_workflow_admission_and_receipt_recovery(
+    binary, tmp_path, asgi_endpoint, controller_site, monkeypatch, kind
+):
+    from astrolift_clusters.models import NvkeOperation
+    from astrolift_workflows import client as workflow_client
+    from astrolift_workflows.activities.nvke import nvke_operation_attempt
+    from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow
+
+    state, identity = controller_site
+    issued = mint_token()
+    await sync_to_async(ApiToken.objects.create)(
+        user=state.world.user,
+        organization=state.world.org,
+        name="owned native workflow CLI",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["admin"],
+    )
+
+    async def run(*arguments, ok=True):
+        result = await asyncio.to_thread(
+            invoke,
+            binary,
+            tmp_path,
+            asgi_endpoint,
+            issued.plaintext,
+            state.world.org.slug,
+            *arguments,
+        )
+        assert "PRIVATE" not in result.stdout + result.stderr
+        if ok:
+            assert result.returncode == 0, result.stderr
+            return json.loads(result.stdout)
+        assert result.returncode != 0
+        return result
+
+    async with temporal_test_env() as env:
+        native_queue, astro_queue = (
+            "native-cli-" + uuid4().hex,
+            "astro-native-cli-" + uuid4().hex,
+        )
+
+        async def get_client():
+            return env.client
+
+        monkeypatch.setattr(workflow_client, "_get_client_async", get_client)
+        monkeypatch.setattr(workflow_client, "_temporal_enabled", lambda: True)
+        monkeypatch.setattr(workflow_client, "_task_queue", lambda: astro_queue)
+        authority = await run(
+            "temporal",
+            "configure",
+            "--site",
+            state.site.guid,
+            "--site-version",
+            state.site.version,
+            "--address",
+            env.client.service_client.config.target_host,
+            "--namespace",
+            env.client.namespace,
+            "--task-queue",
+            native_queue,
+            "--plaintext",
+        )
+        owner_id = "retained-更新-" + uuid4().hex
+        if kind == "RetireLostEtcdRotationNode":
+            state.native_details["parent_override"]["conditions"] = {
+                "updateInProgress": {"type": "etcd_key_rotation"},
+                "etcdKeyRotation": {
+                    "state": "failed",
+                    "workflowID": owner_id,
+                    "phase": "rewrite",
+                },
+            }
+            owner = await env.client.start_workflow(
+                "RotateEtcdEncryptionKey",
+                {"clusterID": identity},
+                id=owner_id,
+                task_queue=native_queue,
+            )
+            await owner.terminate()
+        async with (
+            Worker(
+                env.client,
+                task_queue=native_queue,
+                workflows=[
+                    NativeRenewalFixture,
+                    NativeRotationFixture,
+                    NativeRetirementFixture,
+                ],
+                workflow_runner=UnsandboxedWorkflowRunner(),
+            ),
+            temporal_worker(
+                env,
+                task_queue=astro_queue,
+                workflows=[NvkeOperationWorkflow],
+                activities=[nvke_operation_attempt],
+            ),
+        ):
+            read_input = tmp_path / "read-cluster.json"
+            read_input.write_text(json.dumps({"path": {"clusterID": identity}}))
+            read_input.chmod(0o600)
+            source = await run(
+                "controller",
+                "get-cluster",
+                "--site",
+                state.site.guid,
+                "--file",
+                read_input,
+                "--request-file",
+                tmp_path / "read-recovery.json",
+                "--wait",
+                "--wait-timeout",
+                "15s",
+                "--poll-interval",
+                "500ms",
+            )
+            parameters = {"clusterID": identity}
+            if kind == "RenewK8sCertsV2":
+                parameters.update(thresholdDays=120, force=True)
+            if kind == "RetireLostEtcdRotationNode":
+                parameters.update(nodeID=str(uuid4()), rotationWorkflowID=owner_id)
+            native_input = tmp_path / "native-input.json"
+            native_input.write_text(json.dumps(parameters, ensure_ascii=False))
+            native_input.chmod(0o600)
+            recovery = tmp_path / "native-recovery.json"
+            flags = (
+                "--site",
+                state.site.guid,
+                "--site-version",
+                authority["siteVersion"],
+                "--authority-version",
+                authority["version"],
+                "--source-operation",
+                source["id"],
+                "--source-version",
+                source["version"],
+                "--file",
+                native_input,
+                "--request-file",
+                recovery,
+            )
+            if kind == "RetireLostEtcdRotationNode":
+                refused = await run(
+                    "temporal", "workflow", "request", kind, *flags, ok=False
+                )
+                assert "teardown acknowledgement" in refused.stderr
+                assert not recovery.exists()
+                flags += ("--acknowledge-lost-node-teardown",)
+            row = await run("temporal", "workflow", "request", kind, *flags)
+            assert row["operationKey"] == "temporal." + kind
+            record = json.loads(recovery.read_text())
+            assert (
+                record["authorityVersion"] == authority["version"]
+                and record["sourceVersion"] == source["version"]
+            )
+            assert (
+                "clusterID" not in recovery.read_text()
+                and "parametersText" not in recovery.read_text()
+            )
+            operation = await sync_to_async(NvkeOperation.objects.get)(guid=row["id"])
+            astro_handle = env.client.get_workflow_handle(operation.workflow_id)
+            assert (
+                await asyncio.wait_for(astro_handle.result(), timeout=45) == "succeeded"
+            )
+            assert identity not in (await astro_handle.fetch_history()).to_json()
+            native_handle = env.client.get_workflow_handle("astro-nvke-" + row["id"])
+            started = (
+                (await native_handle.fetch_history())
+                .events[0]
+                .workflow_execution_started_event_attributes
+            )
+            assert await env.client.data_converter.decode(started.input.payloads) == [
+                parameters
+            ]
+            native_input.unlink()
+            repeated = await run("temporal", "workflow", "request", kind, *flags)
+            recovered = await run(
+                "temporal", "workflow", "recover", "--request-file", recovery, "--wait"
+            )
+            assert (
+                repeated["id"] == recovered["id"] == row["id"]
+                and recovered["status"] == "SUCCEEDED"
+            )
+            assert (
+                await sync_to_async(
+                    NvkeOperation.objects.filter(
+                        site=state.site, operation_key="temporal." + kind
+                    ).count
+                )()
+                == 1
+            )
 
 
 async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(

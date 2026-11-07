@@ -285,7 +285,11 @@ Temporal authority. Configuration requires an explicit address, namespace, queue
 and reviewed site/authority versions. Credentials use a private JSON file or stdin;
 omitting the file preserves them and `--clear-credentials` clears them. Verification
 proves namespace access only. After a lost configuration reply, inspect metadata
-before reviewing another change. These commands do not start or reset workflows.
+before reviewing another change. `temporal workflow request WORKFLOW` submits the
+three pinned native maintenance workflows with an explicit cluster observation,
+authority version, private input and durable request file. `temporal workflow
+recover` only looks up that original receipt. Lost-node retirement additionally
+requires explicit teardown acknowledgement. Native history reset remains pending.
 
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.

@@ -22,10 +22,15 @@ def main():
         parser.error("select the paired App backend/providers directory")
     sys.path.insert(0, str(providers))
     from nvke.contract import upstream_revision
+    from nvke.native_workflows import workflows
     from nvke.operations import actions
 
     document = {
         "revision": upstream_revision(),
+        "nativeWorkflows": [
+            {"name": item["name"], "permission": item["permission"]}
+            for item in workflows()
+        ],
         "actions": [
             {
                 "key": action.key,
