@@ -219,8 +219,6 @@ func TestAppServicesListSurfacesGraphQLError(t *testing.T) {
 
 // ---- match -------------------------------------------------------------------
 
-const testMatchChangesPlan = `{"appSlug":"web","digest":"d1","blocked":false,"changes":[{"action":"create","ownerScope":"app","environment":"production","kind":"postgres","name":"web-db","reason":"declared but not provisioned"}]}`
-
 func matchPlanData(blocked bool, changes []map[string]interface{}) map[string]interface{} {
 	if changes == nil {
 		changes = []map[string]interface{}{}

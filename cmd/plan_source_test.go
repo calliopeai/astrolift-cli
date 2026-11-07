@@ -3,13 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/calliopeai/astrolift-cli/internal/api"
-	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/calliopeai/astrolift-cli/internal/api"
+	"github.com/spf13/cobra"
 )
 
 func planFixture(t *testing.T) (*cobra.Command, *api.Client, string) {
