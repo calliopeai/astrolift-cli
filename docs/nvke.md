@@ -276,3 +276,43 @@ Diagnostic counts stay strings, missing booleans/counts stay null, and the views
 remain historical. Free-text messages, history values and credentials remain in
 the explicit native result download. `operation result` uses the text endpoint to
 preserve native values without a floating-point round trip.
+
+## Imported workload access
+
+Use a successful controller `get-cluster` operation to explicitly enroll a
+controller-managed cluster created outside Astro. Enrollment requires both admin
+and read authority. Use the exact returned observation and current site versions;
+the CLI never refreshes these versions on your behalf after a conflict.
+
+```sh
+astro nvke controller get-cluster --site SITE_GUID --file private-cluster-read.json \
+  --request-file imported-cluster-read.json --wait
+astro nvke site get SITE_GUID
+astro nvke access enroll SOURCE_OPERATION_GUID --site SITE_GUID \
+  --site-version 7 --source-version 9
+astro nvke access list --site SITE_GUID --limit 50
+astro nvke access revoke BINDING_GUID --site SITE_GUID --site-version 7 --version 1
+```
+
+The private read input contains `{"path":{"clusterID":"NATIVE_CLUSTER_UUID"}}`.
+The API verifies that the encrypted successful response matches that exact UUID
+and current controller authority; a list result, name match, caller-supplied
+ownership claim or uncertain create is insufficient. This does not reconcile an
+uncertain create. The current actor is captured immediately before admission and
+checked again by the server.
+
+Bindings contain metadata, not credentials. `access list` uses the server's
+nextCursor with `--after`; no page is filtered or combined locally. A binding can
+retain its original sourceOperationId when enrollment from a newer read returns
+the same existing grant. It survives source observation soft deletion and
+credential rotation on the same controller connection. Controller replacement
+invalidates its authority. Enrollment performs no native I/O or credential
+download; every `datastore get-workload-kubeconfig` still verifies live CAPI UID,
+Secret owner reference and exact UUID/name/admin-mode labels. Unlabelled Secrets
+remain refused.
+
+Revocation withdraws the imported grant. Independent native CRD or Astro-create
+proof can still authorize access. Re-enrollment requires a new successful read
+completed after revocation, so an old enrollment retry cannot restore a revoked
+grant. After a lost reply, inspect `access list` before retrying the original
+site/source or binding/version tuple. Neither write retries automatically.

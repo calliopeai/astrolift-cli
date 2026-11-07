@@ -270,6 +270,12 @@ reads typed historical status; `operation recover` checks the original receipt
 without the native input file or another admission. Existing recovery files keep
 their original protocol and cannot change mode.
 
+`access list/enroll/revoke` manages explicit imported workload access grants.
+Enrollment uses a successful controller `get-cluster` observation with explicit
+site and source versions; revocation uses the reviewed binding version. These
+commands never fetch a kubeconfig or change native infrastructure. Downloads
+continue to verify live Kubernetes ownership.
+
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.
 
