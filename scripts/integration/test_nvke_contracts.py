@@ -489,7 +489,7 @@ def controller_site(world):
     with controller({"body": {"name": "diagnostic-cluster"}}, identity, details) as (
         endpoint,
         _,
-        _,
+        calls,
     ):
         with context(world):
             put(
@@ -499,6 +499,7 @@ def controller_site(world):
                 allow_http=True,
             )
             state.site.refresh_from_db()
+        state.native_calls = calls
         yield state, identity
 
 
@@ -520,7 +521,7 @@ async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(
         scopes=["admin"],
     )
 
-    async def run(*args):
+    async def run(*args, ok=True):
         result = await asyncio.to_thread(
             invoke,
             binary,
@@ -530,8 +531,11 @@ async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(
             state.world.org.slug,
             *args,
         )
-        assert result.returncode == 0, result.stderr
-        return json.loads(result.stdout)
+        if ok:
+            assert result.returncode == 0, result.stderr
+            return json.loads(result.stdout)
+        assert result.returncode != 0
+        return result
 
     async with temporal_test_env() as env:
         queue = "nvke-cli-diagnostics-" + uuid4().hex
@@ -566,6 +570,43 @@ async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(
                 "--wait-timeout",
                 "15s",
             )
+            access_scope = ("--site", state.site.guid)
+            enrollment = (
+                "access",
+                "enroll",
+                source["id"],
+                *access_scope,
+                "--site-version",
+                state.site.version,
+                "--source-version",
+                source["version"],
+            )
+            native_calls = len(state.native_calls)
+            assert (await run("access", "list", *access_scope))["totalCount"] == 0
+            binding = await run(*enrollment)
+            assert binding["clusterId"] == identity
+            assert binding["sourceOperationId"] == source["id"]
+            assert (await run(*enrollment))["id"] == binding["id"]
+            page = await run("access", "list", *access_scope, "--limit", "1")
+            assert page["totalCount"] == 1
+            assert page["items"][0]["id"] == binding["id"]
+            revoke = (
+                "access",
+                "revoke",
+                binding["id"],
+                *access_scope,
+                "--site-version",
+                state.site.version,
+                "--version",
+            )
+            stale = await run(*revoke, binding["version"] + 1, ok=False)
+            assert "VERSION_MISMATCH" in stale.stderr
+            revoked = await run(*revoke, binding["version"])
+            assert revoked["deletedAt"] is not None
+            assert (await run("access", "list", *access_scope))["totalCount"] == 0
+            replay = await run(*enrollment, ok=False)
+            assert "SOURCE_CHANGED" in replay.stderr
+            assert len(state.native_calls) == native_calls
             read = await run(
                 "controller",
                 "get-cluster-control-plane",
