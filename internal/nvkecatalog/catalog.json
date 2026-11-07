@@ -1,0 +1,621 @@
+{
+  "revision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "actions": [
+    {
+      "key": "createCluster",
+      "surface": "controller",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "createNodePool",
+      "surface": "controller",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "deleteCluster",
+      "surface": "controller",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "deleteNode",
+      "surface": "controller",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "deleteNodePool",
+      "surface": "controller",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "getCluster",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "getClusterControlPlane",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "getClusterControlPlaneConfigHistory",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "getClusterSpireServer",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "getNode",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "getNodePool",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "getNodeSet",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "listClusters",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "listConfigProfiles",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "listNodePools",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "listNodeSets",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "listNodes",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "listReleases",
+      "surface": "controller",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "operator.createClusterRelease",
+      "surface": "operator",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.createClusterReleaseChannel",
+      "surface": "operator",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.createControlPlaneClass",
+      "surface": "operator",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.createMachineImage",
+      "surface": "operator",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.createNodePoolRelease",
+      "surface": "operator",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.deleteClusterRelease",
+      "surface": "operator",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.deleteClusterReleaseChannel",
+      "surface": "operator",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.deleteControlPlaneClass",
+      "surface": "operator",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.deleteMachineImage",
+      "surface": "operator",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.deleteNodePoolRelease",
+      "surface": "operator",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.getClusterRelease",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.getClusterReleaseChannel",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.getControlPlaneClass",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.getMachineImage",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.getNodePoolRelease",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.healthz",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.listClusterRelease",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.listClusterReleaseChannel",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.listControlPlaneClass",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.listMachineImage",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.listNodePoolRelease",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.readyz",
+      "surface": "operator",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.updateClusterRelease",
+      "surface": "operator",
+      "verb": "PUT",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.updateClusterReleaseChannel",
+      "surface": "operator",
+      "verb": "PUT",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.updateControlPlaneClass",
+      "surface": "operator",
+      "verb": "PUT",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.updateMachineImage",
+      "surface": "operator",
+      "verb": "PUT",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "operator.updateNodePoolRelease",
+      "surface": "operator",
+      "verb": "PUT",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "tenant.createNVKECluster",
+      "surface": "tenant",
+      "verb": "POST",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "tenant.deleteNVKECluster",
+      "surface": "tenant",
+      "verb": "DELETE",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "tenant.getNVKECluster",
+      "surface": "tenant",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "tenant.healthz",
+      "surface": "tenant",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "tenant.listNVKECluster",
+      "surface": "tenant",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "tenant.readyz",
+      "surface": "tenant",
+      "verb": "GET",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "tenant.updateNVKECluster",
+      "surface": "tenant",
+      "verb": "PUT",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "updateCluster",
+      "surface": "controller",
+      "verb": "PATCH",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "updateClusterSpireServer",
+      "surface": "controller",
+      "verb": "PATCH",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "updateNodePool",
+      "surface": "controller",
+      "verb": "PATCH",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "datastore.getClusterReleaseChannel",
+      "surface": "datastore",
+      "verb": "get",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.listClusterReleaseChannel",
+      "surface": "datastore",
+      "verb": "list",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.createClusterReleaseChannel",
+      "surface": "datastore",
+      "verb": "create",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.replaceClusterReleaseChannel",
+      "surface": "datastore",
+      "verb": "replace",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.deleteClusterReleaseChannel",
+      "surface": "datastore",
+      "verb": "delete",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.getClusterRelease",
+      "surface": "datastore",
+      "verb": "get",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.listClusterRelease",
+      "surface": "datastore",
+      "verb": "list",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.createClusterRelease",
+      "surface": "datastore",
+      "verb": "create",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.replaceClusterRelease",
+      "surface": "datastore",
+      "verb": "replace",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.deleteClusterRelease",
+      "surface": "datastore",
+      "verb": "delete",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.getControlPlaneClass",
+      "surface": "datastore",
+      "verb": "get",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.listControlPlaneClass",
+      "surface": "datastore",
+      "verb": "list",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.createControlPlaneClass",
+      "surface": "datastore",
+      "verb": "create",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.replaceControlPlaneClass",
+      "surface": "datastore",
+      "verb": "replace",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.deleteControlPlaneClass",
+      "surface": "datastore",
+      "verb": "delete",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.getMachineImage",
+      "surface": "datastore",
+      "verb": "get",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.listMachineImage",
+      "surface": "datastore",
+      "verb": "list",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.createMachineImage",
+      "surface": "datastore",
+      "verb": "create",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.replaceMachineImage",
+      "surface": "datastore",
+      "verb": "replace",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.deleteMachineImage",
+      "surface": "datastore",
+      "verb": "delete",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.getNodePoolRelease",
+      "surface": "datastore",
+      "verb": "get",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.listNodePoolRelease",
+      "surface": "datastore",
+      "verb": "list",
+      "mutates": false,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.createNodePoolRelease",
+      "surface": "datastore",
+      "verb": "create",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.replaceNodePoolRelease",
+      "surface": "datastore",
+      "verb": "replace",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.deleteNodePoolRelease",
+      "surface": "datastore",
+      "verb": "delete",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.getNVKECluster",
+      "surface": "datastore",
+      "verb": "get",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "datastore.listNVKECluster",
+      "surface": "datastore",
+      "verb": "list",
+      "mutates": false,
+      "permission": "nvke.read"
+    },
+    {
+      "key": "datastore.createNVKECluster",
+      "surface": "datastore",
+      "verb": "create",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "datastore.replaceNVKECluster",
+      "surface": "datastore",
+      "verb": "replace",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "datastore.deleteNVKECluster",
+      "surface": "datastore",
+      "verb": "delete",
+      "mutates": true,
+      "permission": "nvke.manage"
+    },
+    {
+      "key": "datastore.deprecateClusterRelease",
+      "surface": "datastore",
+      "verb": "deprecate",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.deprecateNodePoolRelease",
+      "surface": "datastore",
+      "verb": "deprecate",
+      "mutates": true,
+      "permission": "nvke.admin"
+    },
+    {
+      "key": "datastore.getWorkloadKubeconfig",
+      "surface": "datastore",
+      "verb": "kubeconfig",
+      "mutates": false,
+      "permission": "nvke.admin"
+    }
+  ]
+}
