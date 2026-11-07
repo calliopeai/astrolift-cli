@@ -470,6 +470,23 @@ def controller_site(world):
     state = configured_fixture.__wrapped__(world)
     identity = str(uuid4())
     details = {
+        "parent_override": {
+            "nextCertRenewalDue": "2000-01-01T00:00:00Z",
+            "conditions": {
+                "provisioned": {"status": "True"},
+                "updateInProgress": {
+                    "type": "certificate_renewal",
+                    "message": "PRIVATE_MAINTENANCE_ERROR",
+                },
+                "certificateRenewal": {
+                    "cycleID": "operator-更新-" + identity,
+                    "state": "failed",
+                    "forced": False,
+                    "phase": "renew-node",
+                    "message": "PRIVATE_CREDENTIAL_DETAIL",
+                },
+            },
+        },
         "control_plane": {
             "config": {"desiredCount": 9007199254740993},
             "status": {
@@ -484,7 +501,7 @@ def controller_site(world):
                 "deletingNodeCount": 0,
                 "deleteRequestedNodeCount": 0,
             },
-        }
+        },
     }
     with controller({"body": {"name": "diagnostic-cluster"}}, identity, details) as (
         endpoint,
@@ -571,6 +588,24 @@ async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(
                 "15s",
             )
             access_scope = ("--site", state.site.guid)
+            before = len(state.native_calls)
+            maintenance = await run(
+                "operation",
+                "maintenance",
+                source["id"],
+                *access_scope,
+                "--version",
+                source["version"],
+            )
+            assert maintenance["clusterId"] == identity
+            assert maintenance["renewal"]["workflowId"] == "operator-更新-" + identity
+            assert maintenance["renewal"]["retainedMutationLock"] is True
+            assert maintenance["renewal"]["forced"] is False
+            assert maintenance["renewal"]["outcome"] is None
+            assert maintenance["etcdKeyRotation"] is None
+            assert maintenance["renewalScheduleOverdueAtObservation"] is True
+            assert len(state.native_calls) == before
+            assert "PRIVATE" not in json.dumps(maintenance)
             enrollment = (
                 "access",
                 "enroll",

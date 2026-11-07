@@ -276,6 +276,10 @@ site and source versions; revocation uses the reviewed binding version. These
 commands never fetch a kubeconfig or change native infrastructure. Downloads
 continue to verify live Kubernetes ownership.
 
+`operation maintenance OPERATION_GUID --site SITE_GUID --version VERSION` reads
+typed historical renewal/rotation state, workflow identity and retained-lock
+evidence. It preserves missing values as null and never starts native work.
+
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.
 
