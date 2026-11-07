@@ -127,6 +127,142 @@ def test_pinned_cli_vocabulary_matches_every_paired_server_action():
     ]
 
 
+async def test_compiled_cli_native_temporal_authority_lifecycle(
+    binary, tmp_path, asgi_endpoint, world
+):
+    from astrolift_clusters import nvke_temporal
+    from astrolift_clusters.models import NvkeTemporalAuthority
+
+    issued = mint_token()
+    await sync_to_async(ApiToken.objects.create)(
+        user=world.user,
+        organization=world.org,
+        name="owned native authority CLI",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["admin"],
+    )
+
+    async def run(*arguments, ok=True):
+        result = await asyncio.to_thread(
+            invoke,
+            binary,
+            tmp_path,
+            asgi_endpoint,
+            issued.plaintext,
+            world.org.slug,
+            *arguments,
+        )
+        assert "PRIVATE_NATIVE_CREDENTIAL" not in result.stdout + result.stderr
+        if ok:
+            assert result.returncode == 0, result.stderr
+            return json.loads(result.stdout)
+        assert result.returncode != 0
+        return result
+
+    catalog = await run("catalog")
+    assert {item["name"] for item in catalog["nativeWorkflows"]} == {
+        "RenewK8sCertsV2",
+        "RotateEtcdEncryptionKey",
+        "RetireLostEtcdRotationNode",
+    }
+    site = await run(
+        "site",
+        "create",
+        "--name",
+        "Native Temporal CLI",
+        "--slug",
+        "temporal-cli",
+        "--namespace",
+        "org-owned",
+    )
+    scope = ("--site", site["id"])
+    assert await run("temporal", "get", *scope) is None
+    credentials = tmp_path / "native-temporal.json"
+    credentials.write_text(
+        json.dumps(
+            {"apiKey": "PRIVATE_NATIVE_CREDENTIAL", "caPem": "PRIVATE_NATIVE_CA"}
+        )
+    )
+    credentials.chmod(0o600)
+
+    async with temporal_test_env() as env:
+        target = (
+            "--address",
+            env.client.service_client.config.target_host,
+            "--namespace",
+            env.client.namespace,
+            "--task-queue",
+            "native-cli-explicit",
+        )
+        row = await run(
+            "temporal",
+            "configure",
+            *scope,
+            "--site-version",
+            site["version"],
+            *target,
+            "--credentials-file",
+            credentials,
+        )
+        assert row["hasCredentials"] and row["useTls"] and row["verificationCode"] == ""
+        stored = await sync_to_async(NvkeTemporalAuthority.objects.get)(guid=row["id"])
+        assert (await sync_to_async(nvke_temporal.credentials_for)(stored))[
+            "api_key"
+        ] == "PRIVATE_NATIVE_CREDENTIAL"
+        original_ciphertext = bytes(stored.credential_ciphertext)
+        assert b"PRIVATE_NATIVE_CREDENTIAL" not in original_ciphertext
+
+        def review(value):
+            return (
+                *scope,
+                "--site-version",
+                value["siteVersion"],
+                "--authority-version",
+                value["version"],
+            )
+
+        row = await run("temporal", "configure", *review(row), *target)
+        await sync_to_async(stored.refresh_from_db)()
+        assert bytes(stored.credential_ciphertext) == original_ciphertext
+        refused = await run(
+            "temporal", "configure", *review(row), *target, "--plaintext", ok=False
+        )
+        assert "INVALID_INPUT" in refused.stderr
+        row = await run(
+            "temporal",
+            "configure",
+            *review(row),
+            *target,
+            "--plaintext",
+            "--clear-credentials",
+        )
+        assert not row["hasCredentials"] and not row["useTls"]
+        verified = await run("temporal", "verify", *review(row))
+        assert (
+            verified["verificationCode"] == "NAMESPACE_VERIFIED"
+            and verified["verifiedAt"]
+        )
+        assert (
+            verified["version"] == row["version"]
+            and verified["siteVersion"] == row["siteVersion"]
+        )
+        row = await run("temporal", "disable", *review(verified))
+        assert not row["isEnabled"] and row["verifiedAt"] is None
+        refused = await run("temporal", "verify", *review(row), ok=False)
+        assert "SOURCE_CHANGED" in refused.stderr
+        row = await run("temporal", "enable", *review(row))
+        assert row["isEnabled"] and row["verificationCode"] == ""
+        row = await run("temporal", "verify", *review(row))
+        stale = await run("temporal", "disable", *review(verified), ok=False)
+        assert "VERSION_MISMATCH" in stale.stderr
+        removed = await run("temporal", "remove", *review(row))
+        assert removed["id"] == row["id"] and removed["deletedAt"]
+        assert await run("temporal", "get", *scope) is None
+        await sync_to_async(stored.refresh_from_db)()
+        assert stored.deleted_at and not stored.is_enabled
+
+
 async def test_compiled_cli_runs_native_crud_and_recovers_original_requests(
     binary, tmp_path, asgi_endpoint, datastore_site, monkeypatch
 ):

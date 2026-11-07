@@ -337,3 +337,36 @@ unchanged cycle is a no-op, not renewed credentials. Provisioning status does no
 override a failed maintenance cycle or retained ownership. Run a new controller
 read for a new observation. This command performs no native I/O, downloads no
 raw result, and does not start, reset, retry or unlock native workflows.
+
+## Native Temporal authority
+
+```sh
+astro nvke temporal get --site SITE_GUID --org acme --json
+astro nvke temporal configure --site SITE_GUID --site-version 7 --authority-version 0 \
+  --address native-temporal.example.test:7233 --namespace native-controller \
+  --task-queue native-controller-tasks --credentials-file private-native-temporal.json
+astro nvke temporal verify --site SITE_GUID --site-version 8 --authority-version 1
+```
+
+Use the returned `siteVersion` and authority `version` for the next review.
+`authority-version` is zero only for a new authority. `enable`, `disable` and
+`remove` take the same site and reviewed versions as `verify`; removal soft-deletes
+the registration. Replacement gets a new identity. These writes do not retry
+automatically. If the reply is lost, run `temporal get` and review the resulting
+metadata before making another change.
+
+The private credential JSON accepts `apiKey`, `caPem`, `clientCertificatePem`,
+and `clientKeyPem`; certificate and key must be paired. It uses the same private
+file protections as other NVKE inputs, or `--credentials-file -` for stdin.
+Values never appear in normal command output. Omit credentials to preserve the
+encrypted bundle; use `--clear-credentials` to clear it. `--server-name` sets a
+TLS name override. `--plaintext` is explicit, cannot carry credentials or a TLS
+name, and requires clearing any existing credentials on the server.
+
+Native address, namespace and queue are always explicit, with no Astro Temporal
+or HTTP-credential fallback. `--connection-timeout` bounds connection/inspection
+(1–300 seconds), not native workflow duration. `NAMESPACE_VERIFIED` proves access
+to that namespace, not a polling worker or workflow availability. `catalog`
+includes the three separately declared native workflow input schemas alongside
+the 88 HTTP/datastore actions. Dedicated native start/reset CLI controls remain
+pending; authority commands do not start, reset, retire nodes, or clear locks.
