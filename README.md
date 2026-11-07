@@ -263,6 +263,25 @@ are sensitive and require an explicit output file, or `--output -` for stdout.
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.
 
+Local operator tools are available under `astro nvke tooling`. `tooling catalog`
+shows the immutable runner/source pins offline. `tooling prepare` builds the pinned
+native binary; `tooling run` invokes bootstrap, site-spec/render/inspection utilities,
+or management-stack installation/check/access setup with native arguments after `--`:
+
+```bash
+astro nvke tooling prepare --checkout /path/to/nvke --output /private/nvke-bundle --json
+mkdir -m 700 /private/site-workspace
+astro nvke tooling run --bundle /private/nvke-bundle --workspace /private/site-workspace \
+  --json -- management install --kubeconfig management.kubeconfig \
+  --sitespec site.yaml --stack-config stack.json --arch linux/amd64 --dry-run
+```
+
+These operator commands support Linux/macOS and require Python 3.12+ plus the upstream
+native toolchain (Git/Go for preparation; Kubernetes/Helm and bootstrap prerequisites
+for execution). `--python` selects a runtime explicitly. The CLI returns metadata and
+private output-file paths; native output is kept in the workspace. Preserve its attempt
+records after failure or interruption and inspect retained infrastructure before recovery.
+
 ### As an operator
 
 Operator commands configure the platform itself rather than tenant

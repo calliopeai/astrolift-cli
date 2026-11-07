@@ -72,7 +72,7 @@ Accepted and awaiting-ready operations are not finished infrastructure changes.`
 		}
 		return nvkeJSON(cmd, contract)
 	})}
-	root.AddCommand(catalog, newNVKESiteCommand(), newNVKEOperationCommand())
+	root.AddCommand(catalog, newNVKESiteCommand(), newNVKEOperationCommand(), newNVKEToolingCommand())
 	// Full pinned native vocabulary is discoverable offline. Leaf commands use
 	// the same durable admission path; they never invoke an upstream executable.
 	pinned := nvkecatalog.Pinned()
