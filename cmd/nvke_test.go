@@ -109,14 +109,14 @@ func TestNVKEDurableAdmissionAndLostReplyRecoverTheOriginalInput(t *testing.T) {
 	})
 	defer server.Close()
 	client := nvkeTestClient(server)
-	if err := runNVKERequest(cmd, context.Background(), client, "datastore.createMachineImage", false); err == nil || !strings.Contains(err.Error(), "preserve") || strings.Contains(err.Error(), "PRIVATE_RESPONSE") {
+	if err := runNVKELegacyRequest(cmd, context.Background(), client, "datastore.createMachineImage", false); err == nil || !strings.Contains(err.Error(), "preserve") || strings.Contains(err.Error(), "PRIVATE_RESPONSE") {
 		t.Fatalf("unsafe lost response: %v", err)
 	}
 	before, err := privatefile.ReadFile(file, 16384)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := runNVKERequest(cmd, context.Background(), client, "datastore.createMachineImage", false); err != nil {
+	if err := runNVKELegacyRequest(cmd, context.Background(), client, "datastore.createMachineImage", false); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := privatefile.ReadFile(file, 16384)
@@ -183,7 +183,7 @@ func TestNVKERecoveryRefusesChangedInputScopeOrExecutionTuple(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := runNVKERequest(cmd, context.Background(), client, key, false); err == nil || strings.Contains(err.Error(), "PRIVATE_CHANGED") {
+			if err := runNVKELegacyRequest(cmd, context.Background(), client, key, false); err == nil || strings.Contains(err.Error(), "PRIVATE_CHANGED") {
 				t.Fatalf("changed tuple accepted or leaked: %v", err)
 			}
 			if mutations != 0 {
@@ -200,7 +200,7 @@ func TestNVKERejectedInputDoesNotCreateRecoveryOrContactServer(t *testing.T) {
 			requests := 0
 			server := nvkeTestServer(t, func(_ gqlRequest, _ http.ResponseWriter) { requests++ })
 			defer server.Close()
-			if err := runNVKERequest(cmd, context.Background(), nvkeTestClient(server), "listClusters", false); err == nil || strings.Contains(err.Error(), "PRIVATE") {
+			if err := runNVKELegacyRequest(cmd, context.Background(), nvkeTestClient(server), "listClusters", false); err == nil || strings.Contains(err.Error(), "PRIVATE") {
 				t.Fatalf("unsafe invalid input: %v", err)
 			}
 			if requests != 0 {
@@ -276,7 +276,7 @@ func TestNVKESensitiveResultRequiresExplicitOutputAndNeverOverwrites(t *testing.
 	requests := 0
 	server := nvkeTestServer(t, func(_ gqlRequest, w http.ResponseWriter) {
 		requests++
-		writePipelineTestResponse(t, w, map[string]any{"astroliftNvkeOperationResult": map[string]any{"ok": true, "data": map[string]any{"kubeconfig": "PRIVATE_KUBECONFIG"}}})
+		writePipelineTestResponse(t, w, map[string]any{"astroliftNvkeOperationResultText": map[string]any{"ok": true, "data": `{"kubeconfig":"PRIVATE_KUBECONFIG"}`}})
 	})
 	defer server.Close()
 	client := nvkeTestClient(server)

@@ -10,7 +10,7 @@ import (
 
 const nvkeConnectionFields = `id version surface endpoint isEnabled allowHttp timeoutSeconds hasCredentials verifiedAt verificationCode`
 const nvkeSiteFields = `id version name slug organizationNamespace isActive upstreamRevision createdAt updatedAt connections { ` + nvkeConnectionFields + ` }`
-const nvkeOperationFields = `id version siteId requestId operationKey status stage generation errorCode errorMessage cancellationRequestedAt startedAt finishedAt deadline createdAt updatedAt`
+const nvkeOperationFields = `isInventory resourceSource { operationId version resourceKey } id version siteId requestId operationKey status stage generation errorCode errorMessage cancellationRequestedAt startedAt finishedAt deadline createdAt updatedAt`
 
 // NVKE credentials are write-only. Results may hold native scripts or kubeconfigs
 // and are fetched separately from the ordinary operation metadata.
@@ -38,23 +38,30 @@ type NVKESite struct {
 	CreatedAt             string           `json:"createdAt"`
 	UpdatedAt             string           `json:"updatedAt"`
 }
+type NVKEResourceSource struct {
+	OperationID string  `json:"operationId"`
+	Version     int     `json:"version"`
+	ResourceKey *string `json:"resourceKey"`
+}
 type NVKEOperation struct {
-	ID                      string  `json:"id"`
-	Version                 int     `json:"version"`
-	SiteID                  string  `json:"siteId"`
-	RequestID               string  `json:"requestId"`
-	OperationKey            string  `json:"operationKey"`
-	Status                  string  `json:"status"`
-	Stage                   string  `json:"stage"`
-	Generation              int     `json:"generation"`
-	ErrorCode               string  `json:"errorCode"`
-	ErrorMessage            string  `json:"errorMessage"`
-	CancellationRequestedAt *string `json:"cancellationRequestedAt"`
-	StartedAt               *string `json:"startedAt"`
-	FinishedAt              *string `json:"finishedAt"`
-	Deadline                string  `json:"deadline"`
-	CreatedAt               string  `json:"createdAt"`
-	UpdatedAt               string  `json:"updatedAt"`
+	IsInventory             bool                `json:"isInventory"`
+	ResourceSource          *NVKEResourceSource `json:"resourceSource"`
+	ID                      string              `json:"id"`
+	Version                 int                 `json:"version"`
+	SiteID                  string              `json:"siteId"`
+	RequestID               string              `json:"requestId"`
+	OperationKey            string              `json:"operationKey"`
+	Status                  string              `json:"status"`
+	Stage                   string              `json:"stage"`
+	Generation              int                 `json:"generation"`
+	ErrorCode               string              `json:"errorCode"`
+	ErrorMessage            string              `json:"errorMessage"`
+	CancellationRequestedAt *string             `json:"cancellationRequestedAt"`
+	StartedAt               *string             `json:"startedAt"`
+	FinishedAt              *string             `json:"finishedAt"`
+	Deadline                string              `json:"deadline"`
+	CreatedAt               string              `json:"createdAt"`
+	UpdatedAt               string              `json:"updatedAt"`
 }
 type NVKEPage[T any] struct {
 	Items      []T     `json:"items"`
@@ -71,9 +78,10 @@ type NVKEAction struct {
 	Path         string `json:"path"`
 }
 type NVKEContract struct {
-	Revision          string          `json:"revision"`
-	Actions           []NVKEAction    `json:"actions"`
-	ControllerOpenAPI json.RawMessage `json:"controllerOpenapi"`
+	Revision          string           `json:"revision"`
+	Actions           []NVKEAction     `json:"actions"`
+	Collections       []NVKECollection `json:"collections"`
+	ControllerOpenAPI json.RawMessage  `json:"controllerOpenapi"`
 	Resources         []struct {
 		Kind       string          `json:"kind"`
 		Namespaced bool            `json:"namespaced"`
@@ -140,7 +148,7 @@ func (c *Client) NVKEContract(ctx context.Context) (*NVKEContract, error) {
 	var response struct {
 		Contract *NVKEContract `json:"astroliftNvkeContract"`
 	}
-	err := c.GraphQL(ctx, `query { astroliftNvkeContract { revision actions { key surface verb resourceKind mutates permission path } controllerOpenapi resources { kind namespaced schema } } }`, nil, &response)
+	err := c.GraphQL(ctx, `query { astroliftNvkeContract { revision actions { key surface verb resourceKind mutates permission path } collections { key surface resourceKind namespaced permission defaultParametersText actions { key surface verb resourceKind mutates permission path } } controllerOpenapi resources { kind namespaced schema } } }`, nil, &response)
 	if err != nil || response.Contract == nil {
 		return nil, errors.New("NVKE contract unavailable; check server support and organization permissions")
 	}
