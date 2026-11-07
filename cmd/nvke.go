@@ -237,7 +237,7 @@ func newNVKEOperationCommand() *cobra.Command {
 		return nvkeJSON(cmd, page)
 	})}
 	nvkePageFlags(list)
-	group.AddCommand(list, newNVKERequestCommand("request ACTION_KEY", ""), newNVKERecoverCommand(), newNVKEDiagnosticsCommand())
+	group.AddCommand(list, newNVKERequestCommand("request ACTION_KEY", ""), newNVKERecoverCommand(), newNVKEDiagnosticsCommand(), newNVKEMaintenanceCommand())
 	for _, verb := range []string{"get", "wait", "result", "cancel", "resume"} {
 		selected := verb
 		action := &cobra.Command{Use: verb + " OPERATION_GUID", Short: verb + " an exact operation", Args: cobra.ExactArgs(1), RunE: nvkeScoped(func(cmd *cobra.Command, ctx context.Context, c *api.Client, args []string) error {

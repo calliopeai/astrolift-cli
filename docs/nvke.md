@@ -316,3 +316,24 @@ proof can still authorize access. Re-enrollment requires a new successful read
 completed after revocation, so an old enrollment retry cannot restore a revoked
 grant. After a lost reply, inspect `access list` before retrying the original
 site/source or binding/version tuple. Neither write retries automatically.
+
+## Historical credential maintenance
+
+```sh
+astro nvke operation maintenance GET_CLUSTER_OPERATION_GUID --site SITE_GUID --version 9
+```
+
+Use the ID and returned version of a successful controller `get-cluster`
+operation. The server checks the actor, organization, site, source version and
+fixed native cluster UUID before projecting the saved encrypted observation.
+Output includes the observation time, next scheduled renewal check, lock owner,
+renewal and etcd-rotation workflow IDs, lifecycle state, phase, timestamps and
+retained-lock evidence. Unknown values stay null; explicit false stays false.
+Native workflow IDs, including printable Unicode, remain intact.
+
+The scheduled check is not X.509 expiry. Schedule-overdue refers to the saved
+observation time and is false while a cycle is recorded as accepted. A successful
+unchanged cycle is a no-op, not renewed credentials. Provisioning status does not
+override a failed maintenance cycle or retained ownership. Run a new controller
+read for a new observation. This command performs no native I/O, downloads no
+raw result, and does not start, reset, retry or unlock native workflows.
