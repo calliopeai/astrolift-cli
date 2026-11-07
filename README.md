@@ -238,6 +238,31 @@ astro ci deploy                 # enqueues + polls until terminal state
 or set `ASTROLIFT_DEPLOY_TIMEOUT` (Go duration) to override the
 30-minute polling cap.
 
+### NVIDIA Kubernetes Engine
+
+`astro nvke` manages organization-owned NVKE sites through the Astrolift API.
+The `controller`, `tenant`, `operator`, and `datastore` groups expose all 88 pinned
+native API/resource actions. Complete native parameters, including provider,
+release, networking, authentication and opaque concurrency fields, use JSON
+files. `catalog` returns the connected server's schemas and exact permissions.
+
+```bash
+astro nvke catalog --org acme --json
+astro nvke site list --org acme --limit 50 --json
+astro nvke datastore create-machine-image --org acme --site SITE_GUID \
+  --file create-image.json --request-file image-recovery.json --wait --json
+astro nvke operation get OPERATION_GUID --org acme --json
+astro nvke operation result OPERATION_GUID --org acme --output private-result.json
+```
+
+Input files must be private (`0600` on POSIX or protected Windows ACLs); `--file -`
+reads stdin. Requests flush a private recovery identity before admission. Retry
+with that same file and unchanged input after a lost reply. Acceptance is distinct
+from readiness; a local wait timeout does not cancel remote work. Native results
+are sensitive and require an explicit output file, or `--output -` for stdout.
+See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
+reconciliation, the complete command families and qualification limits.
+
 ### As an operator
 
 Operator commands configure the platform itself rather than tenant
