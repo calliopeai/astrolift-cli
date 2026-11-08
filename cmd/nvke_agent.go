@@ -65,7 +65,7 @@ separate infrastructure health verification. Cancelling local waits does not can
 		nvkeAgentWriteFlags(leaf, false)
 		group.AddCommand(leaf)
 	}
-	group.AddCommand(newNVKEAgentRequestCommand(false), newNVKEAgentRequestCommand(true), newNVKEAgentReconcileCommand(), newNVKEAgentStopCommand(), newNVKEAgentArtifactCommand())
+	group.AddCommand(newNVKEAgentRequestCommand(false), newNVKEAgentRequestCommand(true), newNVKEAgentReconcileCommand(), newNVKEAgentStopCommand(), newNVKEAgentArtifactCommand(), newNVKEAgentInstallReviewCommand())
 	return group
 }
 

@@ -1566,3 +1566,12 @@ NVKE operation watchers stop on a read failure and report its safe category
 mismatch). They retain the original operation ID and a read-only
 `astro nvke operation get ID` recovery command. No retry or new native admission
 is performed; a stopped watcher does not cancel remote execution.
+
+`astro nvke agent install-review OPERATION_GUID --site GUID --site-version N
+--authority-version N --version N` prepares an audited review of the original
+uncertain management install under current administrator and read permissions.
+The reply must match the original operation and current verified agent identity,
+bundle and versions. It prints typed readiness facts, decimal-string counters
+and null unknowns, with no native inputs or raw diagnostics. A successful review
+keeps the original install uncertain and authorizes no continuation or guard
+release. Refresh source metadata after a refused or unavailable review.
