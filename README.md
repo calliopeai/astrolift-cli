@@ -1401,6 +1401,22 @@ astro docs search '"immutable manifest"' --json
 does not establish a live installation’s capability, storage setup or model
 health.
 
+### NVKE scoped login and automation
+
+`astro auth login --scope nvke-read` requests only NVKE read access.
+`astro auth login --scope nvke` requests NVKE read, resource management and
+administration, including workload credentials and native maintenance where
+your roles permit it. Both profiles carry only NVKE scopes, apply to the
+approved organization, and do not carry app access or the platform `admin`
+wildcard. The browser names the requested scopes before approval. Refresh keeps
+that profile; ordinary CLI sign-ins stay unchanged.
+
+The server must advertise `identity.nvke_scopes`; incompatible servers are refused
+before sign-in. For automation, create an expiring API token with `read:nvke`,
+`manage:nvke` and/or `admin:nvke` through the token picker. Each scope carries only
+its corresponding NVKE permission, so select read separately where required.
+Roles, organization membership, revocation and expiry continue to restrict it.
+
 ### Zentinelle read-only login
 
 `astro auth login --scope zentinelle` requests the usual CLI scopes plus

@@ -9,6 +9,11 @@ import (
 )
 
 func TestClientKindForScope(t *testing.T) {
+	for scope, want := range map[string]string{"nvke": "cli-nvke", " NVKE ": "cli-nvke", "nvke-read": "cli-nvke-read"} {
+		if got, err := ClientKindForScope(scope); err != nil || got != want {
+			t.Fatalf("ClientKindForScope(%q) = %q, %v; want %q", scope, got, err, want)
+		}
+	}
 	for scope, want := range map[string]string{"": "", "default": "", "clusters": "cli-operator", " Clusters ": "cli-operator", "admin": "cli-admin", "zentinelle": "cli-zentinelle", "ADMIN": "cli-admin"} {
 		got, err := ClientKindForScope(scope)
 		if err != nil || got != want {

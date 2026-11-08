@@ -1066,7 +1066,7 @@ async def test_compiled_cli_native_owner_history_and_reset_recovery(
         name="owned native reset CLI",
         token_hash=issued.token_hash,
         token_last_4=issued.last4,
-        scopes=["admin"],
+        scopes=["read:nvke", "admin:nvke"],
     )
 
     async def run(*arguments, ok=True):

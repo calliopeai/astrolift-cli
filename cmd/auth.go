@@ -50,6 +50,13 @@ A sign-in's scopes cap what it may do, whatever your roles allow, and
 the approval page lists them. --scope clusters adds updating and
 operating clusters to the CLI's usual scopes.
 
+--scope nvke-read requests only NVKE read access. --scope nvke requests
+NVKE read, resource management and administration, including workload
+credentials and native maintenance. Both are limited to the approved
+organization and your account's roles. They carry no app access or
+platform admin wildcard. The server must advertise identity.nvke_scopes;
+older servers are refused before login. Neither changes the default sign-in.
+
 --scope admin asks for full administrative access. Only the platform
 operator can approve it, and the sign-in lasts 12 hours; after that,
 run 'astro auth login --scope admin' again.
@@ -364,7 +371,7 @@ func init() {
 	authLoginCmd.Flags().BoolVar(&loginNoWait, "no-wait", false,
 		"start the flow, report the session, and exit without polling")
 	authLoginCmd.Flags().StringVar(&loginScope, "scope", "",
-		"ask for more than the CLI default: clusters, zentinelle (read only), or admin (platform operator, 12 hours)")
+		"scope profile: clusters, zentinelle (read only), nvke-read, nvke, or admin (platform operator, 12 hours)")
 	authLoginCmd.Flags().BoolVar(&loginNoBrowser, "no-browser", false,
 		"do not try to open a browser")
 
@@ -400,6 +407,11 @@ func openBrowser(url string) error {
 }
 
 func startScopedLogin(ctx context.Context, apiURL, clientKind string) (*auth.LoginSession, error) {
+	if clientKind == "cli-nvke" || clientKind == "cli-nvke-read" {
+		if err := requireServerFeature(ctx, api.NewClient(apiURL, "", false), "identity.nvke_scopes", "NVKE scoped sign-in"); err != nil {
+			return nil, err
+		}
+	}
 	if clientKind == "cli-zentinelle" {
 		if err := requireServerFeature(ctx, api.NewClient(apiURL, "", false), "identity.zentinelle_read_scope", "Zentinelle read sign-in"); err != nil {
 			return nil, err
