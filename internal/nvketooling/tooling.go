@@ -25,15 +25,19 @@ import (
 //go:embed tooling.py
 var runner []byte
 
+//go:embed nktp_backend.py
+var backendRenderer []byte
+
 //go:embed provenance.json
 var provenance []byte
 
 type Manifest struct {
-	Format           int      `json:"format"`
-	SourceRevision   string   `json:"sourceRevision"`
-	UpstreamRevision string   `json:"upstreamRevision"`
-	RunnerSHA256     string   `json:"runnerSha256"`
-	Commands         []string `json:"commands"`
+	Format                int      `json:"format"`
+	SourceRevision        string   `json:"sourceRevision"`
+	UpstreamRevision      string   `json:"upstreamRevision"`
+	RunnerSHA256          string   `json:"runnerSha256"`
+	BackendRendererSHA256 string   `json:"backendRendererSha256"`
+	Commands              []string `json:"commands"`
 }
 
 type Bundle struct {
@@ -61,12 +65,35 @@ type Result struct {
 func Info() (Manifest, error) {
 	var result Manifest
 	digest := sha256.Sum256(runner)
+	backendDigest := sha256.Sum256(backendRenderer)
 	if json.Unmarshal(provenance, &result) != nil || result.Format != 1 ||
 		result.UpstreamRevision != nvkecatalog.Pinned().Revision ||
-		result.RunnerSHA256 != hex.EncodeToString(digest[:]) || len(result.SourceRevision) != 40 {
+		result.RunnerSHA256 != hex.EncodeToString(digest[:]) ||
+		result.BackendRendererSHA256 != hex.EncodeToString(backendDigest[:]) || len(result.SourceRevision) != 40 {
 		return result, errors.New("embedded NVKE tooling provenance is invalid")
 	}
 	return result, nil
+}
+
+type BackendProfile struct {
+	Revision string `json:"revision"`
+	SHA256   string `json:"sha256"`
+}
+
+func RenderBackend(ctx context.Context, python, bundle, profile, output string) (*BackendProfile, error) {
+	data, status, err := invokeProgram(ctx, python, backendRenderer, []string{"--source", filepath.Join(bundle, "source"), "--profile", profile, "--output", output}, nil)
+	if err != nil {
+		return nil, err
+	}
+	var result BackendProfile
+	if status != 0 || decode(data, &result) != nil || result.Revision != nvkecatalog.Pinned().Revision {
+		return nil, errors.New("NKTP profile rendering failed; check the source pin, profile and new output path")
+	}
+	digest, err := hex.DecodeString(result.SHA256)
+	if err != nil || len(digest) != sha256.Size {
+		return nil, errors.New("NKTP profile digest was not confirmed")
+	}
+	return &result, nil
 }
 
 func Prepare(ctx context.Context, python, checkout, output string) (*Bundle, error) {
@@ -150,6 +177,10 @@ func (buffer *metadataBuffer) Write(data []byte) (int, error) {
 }
 
 func invoke(ctx context.Context, requestedPython string, args []string, input io.Reader) ([]byte, int, error) {
+	return invokeProgram(ctx, requestedPython, runner, args, input)
+}
+
+func invokeProgram(ctx context.Context, requestedPython string, program []byte, args []string, input io.Reader) ([]byte, int, error) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return nil, 0, errors.New("native NVKE operator tooling supports Linux and macOS")
 	}
@@ -171,7 +202,7 @@ func invoke(ctx context.Context, requestedPython string, args []string, input io
 	}
 	defer func() { _ = os.RemoveAll(directory) }()
 	filename := filepath.Join(directory, "tooling.py")
-	if err := privatefile.Write(filename, runner); err != nil {
+	if err := privatefile.Write(filename, program); err != nil {
 		return nil, 0, errors.New("could not prepare the private native runner")
 	}
 	command := exec.CommandContext(ctx, python, append([]string{"-I", filename}, args...)...)

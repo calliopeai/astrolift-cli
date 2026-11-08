@@ -22,7 +22,7 @@ func TestNVKEToolingCatalogIsAvailableOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	var catalog nvketooling.Manifest
-	if json.Unmarshal(output.Bytes(), &catalog) != nil || len(catalog.Commands) != 14 {
+	if json.Unmarshal(output.Bytes(), &catalog) != nil || len(catalog.Commands) != 15 {
 		t.Fatal("tooling catalog omitted the pinned native families")
 	}
 }

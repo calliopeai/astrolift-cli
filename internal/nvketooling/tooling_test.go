@@ -22,7 +22,7 @@ import (
 
 func TestInfoMatchesTheManagedCatalogAndCompleteNativeFamilies(t *testing.T) {
 	info, err := Info()
-	if err != nil || info.UpstreamRevision != nvkecatalog.Pinned().Revision || len(info.Commands) != 14 {
+	if err != nil || info.UpstreamRevision != nvkecatalog.Pinned().Revision || len(info.Commands) != 15 {
 		t.Fatalf("invalid native tool provenance: %v", err)
 	}
 	wanted := map[string]bool{"bootstrap site": false, "management install": false, "management configure-access": false, "inspect nvkr-release": false}

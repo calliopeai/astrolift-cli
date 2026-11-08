@@ -270,6 +270,31 @@ is copied for each run so renders and chart dependency builds preserve the bundl
 Management installation defaults to the native NICo deploy path, with native release,
 architecture, stack config, additional values and custom deploy-path options intact.
 
+Render the production NKTP export override with the embedded, source-pinned renderer:
+
+```bash
+astro nvke tooling nktp-backend --bundle /private/native-bundle \
+  --profile /private/backend-profile.json --output /private/nktp-backend.values.json
+```
+
+The JSON profile selects `protocol` (`grpc` or `http`) and `endpoint` (TLS host:port
+for gRPC; HTTPS base URL for HTTP). Optional `authorization` contains only `secret`
+and `key` references; that key holds the complete Authorization header. Optional
+`tls` contains `secret` and `caKey`, with paired `certKey`/`keyKey` for mutual TLS.
+The referenced Secrets must already exist in namespace `nktp`. No credentials are
+read by the renderer or accepted inline. Output is a new mode-0600 Helm values file;
+stdout contains only its digest and pinned revision. Pass the file to the existing
+management installation with `--values-for nktp=/private/nktp-backend.values.json`,
+retaining every other site override.
+
+The override disables the evaluation LGTM backend and configures all five outbound
+Collectors, including the watchdog sidecar. Source checks reject drift in pinned
+chart/site values and Collector composition. Actual chart renders check internal
+TLS mounts, receivers/processors, site labels and queue/retry settings for both
+protocols. These checks do not establish runtime Collector readiness or ingestion:
+validate certificates, all three signals, site identity and backend failure recovery
+on the installed site. Management NKTP does not collect workload-cluster-local data.
+
 Native stdout/stderr remain private files. CLI stdout contains only run metadata and
 artifact paths. Astro API-token environment variables are not forwarded to native
 tools. Effectful bootstrap/install/access attempts are flushed before execution and
