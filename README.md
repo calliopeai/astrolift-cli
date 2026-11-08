@@ -335,6 +335,15 @@ and SHA-256, and never prints artifact bytes. Failed downloads retain a private
 partial file. Increase `--max-bytes` explicitly for diagnostics larger than 64 MiB.
 Native process completion needs separate infrastructure readiness checks.
 
+`agent stop OPERATION_GUID --site GUID --site-version N --authority-version N
+--version N` uses reviewed current admin authority to stop/fence an uncertain
+original job after its observer has closed. A capable agent durably rejects a
+delayed submission of a provably never-admitted UUID/intent; legacy or incomplete
+admission history cannot certify absence. An admitted job stops only its owned
+process group; infrastructure effects can remain uncertain. An unconfirmed reply
+requires inspecting and reconciling the original operation. The command never
+replays native work or performs infrastructure rollback.
+
 Local operator tools are available under `astro nvke tooling`. `tooling catalog`
 shows the immutable runner/source pins offline. `tooling prepare` builds the pinned
 native binary; `tooling run` invokes bootstrap, site-spec/render/inspection utilities,

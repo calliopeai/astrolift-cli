@@ -135,6 +135,10 @@ func (c *Client) ReconcileNVKEAgentJob(ctx context.Context, input NVKEAgentJobRe
 	return nvkeMutation[NVKEOperation](ctx, c.nvkeAgentClient(), "reconcileNvkeOperatorJob", "NvkeOperatorJobReviewInput", nvkeOperationFields, input)
 }
 
+func (c *Client) StopNVKEAgentJob(ctx context.Context, input NVKEAgentJobReview) (*NVKEOperation, error) {
+	return nvkeMutation[NVKEOperation](ctx, c.nvkeAgentClient(), "stopNvkeOperatorJob", "NvkeOperatorJobReviewInput", nvkeOperationFields, input)
+}
+
 type NVKEAgentArtifactInput struct {
 	NVKEAgentJobReview
 	Name   string `json:"name"`
