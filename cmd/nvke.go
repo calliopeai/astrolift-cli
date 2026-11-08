@@ -72,7 +72,7 @@ Accepted and awaiting-ready operations are not finished infrastructure changes.`
 		}
 		return nvkeJSON(cmd, contract)
 	})}
-	root.AddCommand(catalog, newNVKESiteCommand(), newNVKEOperationCommand(), newNVKEResourceCommand(), newNVKEAccessCommand(), newNVKETemporalCommand(), newNVKEMetricsCommand(), newNVKEToolingCommand())
+	root.AddCommand(catalog, newNVKESiteCommand(), newNVKEOperationCommand(), newNVKEResourceCommand(), newNVKEAccessCommand(), newNVKETemporalCommand(), newNVKEMetricsCommand(), newNVKEProvidersCommand(), newNVKEToolingCommand())
 	// Full pinned native vocabulary is discoverable offline. Leaf commands use
 	// the same durable admission path; they never invoke an upstream executable.
 	pinned := nvkecatalog.Pinned()
@@ -303,7 +303,7 @@ func waitNVKEOperation(cmd *cobra.Command, ctx context.Context, c *api.Client, r
 		if err != nil {
 			return err
 		}
-		if next.ID != row.ID || next.SiteID != row.SiteID || next.RequestID != row.RequestID || next.OperationKey != row.OperationKey || next.IsInventory != row.IsInventory || !sameNVKESource(next.ResourceSource, row.ResourceSource) {
+		if next.ID != row.ID || next.SiteID != row.SiteID || next.RequestID != row.RequestID || next.OperationKey != row.OperationKey || next.IsInventory != row.IsInventory || !sameNVKESource(next.ResourceSource, row.ResourceSource) || !sameNVKEProviderSource(next.ProviderSource, row.ProviderSource) {
 			return errors.New("NVKE operation observation identity changed")
 		}
 		row = next

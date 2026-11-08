@@ -1456,3 +1456,46 @@ acceptance tests and target repository/branch. Remove `--dry-run` to submit it
 through normal agent dispatch. `--issue`, `--branch` and `--attempt` select its
 review identity. Missing references, blocked dependencies and stories without
 a test command are refused. This does not acquire a factory scheduler lease.
+
+
+### NVKE infrastructure providers
+
+`astro nvke providers` exposes the pinned NICo/LaunchLayer registry and saved
+installation, configuration, manager and credential-check observations. Collection
+uses an explicitly reviewed enabled management-Kubernetes (`DATASTORE`)
+connection; it never selects an ambient kubeconfig or another API surface.
+Both `nvke.read` and `nvke.admin` are required to collect and read private history.
+READ-only access can recover the original operation metadata.
+
+```sh
+astro nvke providers catalog
+astro nvke providers request --site <site-guid> --site-version 7 \
+  --connection <datastore-connection-guid> --connection-version 3 \
+  --request-file ./provider-request.json --wait
+astro nvke providers recover --request-file ./provider-request.json --wait
+astro nvke providers observation <operation-guid> --site <site-guid> --version 9
+astro nvke providers identities <operation-guid> --site <site-guid> --version 9 \
+  --provider nico --limit 25 --search ''
+```
+
+The new private request file is created exclusively and flushed before admission.
+It contains caller/server/organization/site metadata, connection ID/version, native
+pin, deadline and request UUID. Native endpoints, credentials and provider names or
+inventory are excluded. Keep this original file after a lost reply; retrying it
+checks the original receipt before live site/connection metadata. A missing
+receipt cannot change the tuple. `recover` never admits another collection and
+works after connection removal; successful receipts must report the exact frozen
+source. A local wait timeout does not cancel remote collection.
+
+History reads use the exact successful operation/version and admitted source,
+without reading a current connection. Times preserve nanoseconds and generations
+and counts remain decimal strings. Optional booleans remain null when unknown.
+Collection success can retain partial/unknown facts and does not certify provider
+readiness; credential health and manager availability are independent. Identity
+search covers the full saved list on the server. Pass `nextCursor` as `--after`
+with the same provider/search/page size and operation version; do not reuse it for
+another view. No historical command probes native services or exports Secret values.
+
+Native provider controllers, credentials and physical infrastructure require
+separate qualification; controlled native HTTP fixtures do not establish those
+outcomes. `--json` is available on every command.

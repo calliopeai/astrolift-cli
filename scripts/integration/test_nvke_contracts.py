@@ -1784,3 +1784,209 @@ async def test_compiled_cli_metrics_authority_observations_and_read_only_recover
             )
             assert len(metrics_listener.calls) == before_metrics + 1
             assert len(state.native_calls) == before_native + 2
+
+
+@pytest.fixture
+def provider_listener():
+    from astrolift_clusters.tests.test_nvke_provider_observations import peer
+
+    yield from peer.__wrapped__()
+
+
+@pytest.fixture
+def provider_site(provider_listener):
+    from astrolift_clusters.tests.test_nvke_provider_observations import configured
+
+    return configured.__wrapped__(provider_listener)
+
+
+async def test_compiled_cli_provider_collection_recovery_history_and_identity_pages(
+    binary, tmp_path, asgi_endpoint, provider_site, monkeypatch, dropped_cli_replies
+):
+    from astrolift_clusters.models import NvkeOperation
+    from astrolift_workflows import client as workflow_client
+    from astrolift_workflows.activities.nvke import nvke_operation_attempt
+    from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow
+
+    state = provider_site
+    issued, reader = mint_token(), mint_token()
+    for token, scopes in (
+        (issued, ["read:nvke", "admin:nvke"]),
+        (reader, ["read:nvke"]),
+    ):
+        await sync_to_async(ApiToken.objects.create)(
+            user=state.world.user,
+            organization=state.world.org,
+            name="owned provider CLI",
+            token_hash=token.token_hash,
+            token_last_4=token.last4,
+            scopes=scopes,
+        )
+
+    async def run(*arguments, ok=True, read_only=False):
+        result = await asyncio.to_thread(
+            invoke,
+            binary,
+            tmp_path,
+            asgi_endpoint,
+            reader.plaintext if read_only else issued.plaintext,
+            state.world.org.slug,
+            "providers",
+            *arguments,
+        )
+        for secret in (issued.plaintext, reader.plaintext, "PRIVATE"):
+            assert secret not in result.stdout + result.stderr
+        if ok:
+            assert result.returncode == 0, result.stderr
+            return json.loads(result.stdout)
+        assert result.returncode != 0
+        return result
+
+    async with temporal_test_env() as env:
+        queue = "nvke-cli-providers-" + uuid4().hex
+
+        async def get_client():
+            return env.client
+
+        monkeypatch.setattr(workflow_client, "_get_client_async", get_client)
+        monkeypatch.setattr(workflow_client, "_temporal_enabled", lambda: True)
+        monkeypatch.setattr(workflow_client, "_task_queue", lambda: queue)
+        async with temporal_worker(
+            env,
+            task_queue=queue,
+            workflows=[NvkeOperationWorkflow],
+            activities=[nvke_operation_attempt],
+        ):
+            catalog = await run("catalog", read_only=True)
+            assert (
+                catalog["infrastructureProviders"]["operationKey"]
+                == "infrastructure.providers"
+            )
+            scope = ("--site", state.site.guid)
+            recovery = tmp_path / "provider-request.json"
+            wait = ("--wait", "--poll-interval", "500ms", "--wait-timeout", "15s")
+            dropped_cli_replies["requestNvkeProviderObservation("] = 1
+            lost = await run(
+                "request",
+                *scope,
+                "--site-version",
+                state.site.version,
+                "--connection",
+                state.connection.guid,
+                "--connection-version",
+                state.connection.version,
+                "--request-file",
+                recovery,
+                ok=False,
+            )
+            assert "preserve" in lost.stderr
+            assert dropped_cli_replies["requestNvkeProviderObservation("] == 0
+            original = recovery.read_bytes()
+            assert recovery.stat().st_mode & 0o777 == 0o600
+            for private in (
+                state.peer.url.encode(),
+                b"PRIVATE",
+                b"capnico-system",
+                b"nico-credentials",
+            ):
+                assert private not in original
+            row = await run(
+                "recover", "--request-file", recovery, *wait, read_only=True
+            )
+            assert row["status"] == "SUCCEEDED"
+            assert row["providerSource"]["connectionId"] == str(state.connection.guid)
+            assert (
+                row["providerSource"]["connectionVersion"] == state.connection.version
+            )
+            assert (
+                await sync_to_async(
+                    NvkeOperation.objects.filter(
+                        site=state.site, operation_key="infrastructure.providers"
+                    ).count
+                )()
+                == 1
+            )
+            calls = len(state.peer.calls)
+            assert calls > 0
+            await sync_to_async(state.connection.soft_delete)()
+            await sync_to_async(state.site.save)()
+            again = await run("recover", "--request-file", recovery, read_only=True)
+            assert again["id"] == row["id"] and recovery.read_bytes() == original
+            observed = await run(
+                "observation", row["id"], *scope, "--version", row["version"]
+            )
+            health = observed["providers"][0]["credentials"]
+            assert health["identityGeneration"] == "9007199254740993"
+            assert health["lastCheckedTime"].endswith("123456789Z")
+            await run(
+                "observation",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                read_only=True,
+                ok=False,
+            )
+            first = await run(
+                "identities", row["id"], *scope, "--version", row["version"]
+            )
+            assert first["totalCount"] == 31 and len(first["items"]) == 25
+            second = await run(
+                "identities",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--after",
+                first["nextCursor"],
+            )
+            assert len(second["items"]) == 6
+            searched = await run(
+                "identities",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--search",
+                "extra-030",
+            )
+            assert (
+                searched["totalCount"] == 1
+                and searched["items"][0]["name"] == "extra-030"
+            )
+            await run(
+                "identities",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--search",
+                "extra-030",
+                "--after",
+                first["nextCursor"],
+                ok=False,
+            )
+            launchlayer = await run(
+                "identities",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--provider",
+                "launchlayer",
+            )
+            assert launchlayer["items"] == [] and launchlayer["totalCount"] == 0
+            assert len(state.peer.calls) == calls
+            operation = await sync_to_async(NvkeOperation.objects.get)(guid=row["id"])
+            history = (
+                await env.client.get_workflow_handle(
+                    operation.workflow_id
+                ).fetch_history()
+            ).to_json()
+            for private in (
+                "PRIVATE",
+                "capnico-system",
+                "nico-credentials",
+                "9007199254740993",
+            ):
+                assert private not in history
