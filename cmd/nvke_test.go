@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -347,5 +348,63 @@ func TestNVKEWaitObservesRuntimeAndNeverCancelsOrReplays(t *testing.T) {
 	}
 	if polls != 1 || time.Since(start) < 450*time.Millisecond || !strings.Contains(out.String(), "SUCCEEDED") {
 		t.Fatal("wait skipped runtime observation")
+	}
+}
+
+func TestNVKEWaitReadFailurePreservesOriginalAndNeverReadmits(t *testing.T) {
+	for _, test := range []struct{ name, response, want string }{
+		{"refusal", `{"errors":[{"message":"PRIVATE_REPLY"}]}`, "GraphQL refusal"},
+		{"missing", `{"data":{"astroliftNvkeOperation":null}}`, "receipt not visible"},
+		{"mismatch", `{"data":{"astroliftNvkeOperation":{"id":"PRIVATE_REPLY"}}}`, "receipt identity mismatch"},
+	} {
+		for _, initial := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/initial=%t", test.name, initial), func(t *testing.T) {
+				cmd, _, _, _ := nvkeTestCommand(t)
+				_ = cmd.Flags().Set("poll-interval", "500ms")
+				reads := 0
+				server := nvkeTestServer(t, func(body gqlRequest, w http.ResponseWriter) {
+					reads++
+					if !strings.HasPrefix(strings.TrimSpace(body.Query), "query") {
+						t.Error("watch submitted a mutation")
+					}
+					_, _ = w.Write([]byte(test.response))
+				})
+				defer server.Close()
+				var err error
+				if initial {
+					err = runNVKEOperation(cmd, context.Background(), nvkeTestClient(server), nvkeTestOperation, "wait")
+				} else {
+					row := &api.NVKEOperation{ID: nvkeTestOperation, SiteID: nvkeTestSite, RequestID: uuid.NewString(), OperationKey: "tooling.bootstrap.site", Status: "RUNNING"}
+					err = waitNVKEOperation(cmd, context.Background(), nvkeTestClient(server), row)
+				}
+				if err == nil || !strings.Contains(err.Error(), test.want) || !strings.Contains(err.Error(), "astro nvke operation get "+nvkeTestOperation) || !strings.Contains(err.Error(), "not been cancelled") || strings.Contains(err.Error(), "PRIVATE") || reads != 1 {
+					t.Fatalf("unsafe original recovery: reads=%d error=%v", reads, err)
+				}
+			})
+		}
+	}
+}
+
+func TestNVKEStoppedWatcherCanReadTheOriginalReceipt(t *testing.T) {
+	cmd, out, _, _ := nvkeTestCommand(t)
+	reads := 0
+	server := nvkeTestServer(t, func(body gqlRequest, w http.ResponseWriter) {
+		reads++
+		if !strings.HasPrefix(strings.TrimSpace(body.Query), "query") {
+			t.Error("recovery submitted a mutation")
+		}
+		if reads == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		writePipelineTestResponse(t, w, map[string]any{"astroliftNvkeOperation": map[string]any{"id": nvkeTestOperation, "siteId": nvkeTestSite, "status": "SUCCEEDED", "version": 25}})
+	})
+	defer server.Close()
+	client := nvkeTestClient(server)
+	if err := runNVKEOperation(cmd, context.Background(), client, nvkeTestOperation, "wait"); err == nil || reads != 1 {
+		t.Fatalf("wait did not stop: %v", err)
+	}
+	if err := runNVKEOperation(cmd, context.Background(), client, nvkeTestOperation, "get"); err != nil || reads != 2 || !strings.Contains(out.String(), "SUCCEEDED") || !strings.Contains(out.String(), nvkeTestOperation) {
+		t.Fatalf("original read recovery failed: %v", err)
 	}
 }

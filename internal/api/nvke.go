@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
 )
 
@@ -208,8 +209,32 @@ func (c *Client) NVKEOperation(ctx context.Context, id string) (*NVKEOperation, 
 		Operation *NVKEOperation `json:"astroliftNvkeOperation"`
 	}
 	err := c.GraphQL(ctx, `query($id:GUID!) { astroliftNvkeOperation(operationId:$id) { `+nvkeOperationFields+` } }`, map[string]interface{}{"id": id}, &response)
-	if err != nil || response.Operation == nil || response.Operation.ID != id {
-		return nil, errors.New("NVKE operation unavailable")
+	if err != nil {
+		// Keep failure classes, never the underlying error text: transport URLs,
+		// GraphQL messages and malformed response bytes can contain private data.
+		var refusal *GraphQLResponseError
+		var httpFailure *HTTPError
+		var transport net.Error
+		switch {
+		case errors.As(err, &refusal):
+			return nil, fmt.Errorf("NVKE operation unavailable (GraphQL refusal; HTTP %d)", refusal.Status)
+		case errors.As(err, &httpFailure):
+			return nil, fmt.Errorf("NVKE operation unavailable (HTTP %d)", httpFailure.Status)
+		case errors.Is(err, context.Canceled):
+			return nil, errors.New("NVKE operation unavailable (observation cancelled)")
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, errors.New("NVKE operation unavailable (observation deadline)")
+		case errors.As(err, &transport):
+			return nil, errors.New("NVKE operation unavailable (transport failure)")
+		default:
+			return nil, errors.New("NVKE operation unavailable (invalid or incomplete response)")
+		}
+	}
+	if response.Operation == nil {
+		return nil, errors.New("NVKE operation unavailable (receipt not visible)")
+	}
+	if response.Operation.ID != id {
+		return nil, errors.New("NVKE operation unavailable (receipt identity mismatch)")
 	}
 	return response.Operation, nil
 }

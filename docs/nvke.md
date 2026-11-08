@@ -724,3 +724,9 @@ file must match the complete hash. `--max-bytes` defaults to 64 MiB and can be
 increased for larger diagnostics. Nothing writes artifact contents to stdout.
 An interrupted or rejected download retains its protected partial file; inspect it
 before using any resulting credential. See the README for command flag examples.
+
+NVKE operation watchers stop on a read failure and report its safe category
+(transport, HTTP/GraphQL refusal, invalid response, unavailable receipt or identity
+mismatch). They retain the original operation ID and a read-only
+`astro nvke operation get ID` recovery command. No retry or new native admission
+is performed; a stopped watcher does not cancel remote execution.
