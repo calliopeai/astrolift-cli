@@ -249,6 +249,72 @@ async def test_compiled_cli_agent_configuration_original_recovery_and_private_ex
                     len(list((root / "state/workspace/runs").glob("*/started.json")))
                     == 1
                 )
+                from django.db import transaction
+                from nvke.client import NvkeError
+
+                from astrolift_clusters import nvke_operator_jobs as jobs
+                from astrolift_clusters.models import NvkeOperatorAuthority, NvkeSite
+                from astrolift_clusters.tests.test_nvke_sites import context
+
+                native = {
+                    "format": 1,
+                    "revision": catalog["revision"],
+                    "siteId": site["id"],
+                    "command": "bootstrap.site",
+                    "positionals": [],
+                    "options": {"sitespec": "input:site.yaml"},
+                    "files": {"site.yaml": "never-dispatch-cli-stop-fixture"},
+                }
+
+                def never_dispatched_original():
+                    current_site = NvkeSite.objects.get(guid=site["id"])
+                    current_authority = NvkeOperatorAuthority.objects.get(
+                        site=current_site
+                    )
+                    # The outbox sees uncertainty before its on-commit dispatch.
+                    with transaction.atomic(), context(world):
+                        original = jobs.reserve(
+                            site_id=current_site.guid,
+                            expected_actor_id=world.user.pk,
+                            expected_site_version=current_site.version,
+                            expected_authority_version=current_authority.version,
+                            request_id=uuid4(),
+                            request_text=json.dumps(native),
+                            acknowledge_infrastructure_change=True,
+                        )
+                        original.status = "uncertain"
+                        original.save(update_fields=["status", "version"])
+                    return original
+
+                for lose_stop_reply in (False, True):
+                    unknown = await sync_to_async(never_dispatched_original)()
+                    if lose_stop_reply:
+                        dropped_cli_replies["stopNvkeOperatorJob("] = 1
+                    stopped = await run(
+                        "agent",
+                        "stop",
+                        unknown.guid,
+                        *scope,
+                        *review,
+                        "--version",
+                        unknown.version,
+                        ok=not lose_stop_reply,
+                    )
+                    if lose_stop_reply:
+                        stopped = await run("operation", "get", unknown.guid)
+                    assert stopped["status"] == "CANCELLED"
+                    assert stopped["id"] == str(unknown.guid)
+                    with pytest.raises(NvkeError) as delayed:
+                        state.client.submit(
+                            str(unknown.guid), native, intent=unknown.request_digest
+                        )
+                    assert delayed.value.code == "OPERATOR_JOB_FENCED"
+                    assert (
+                        len(
+                            list((root / "state/workspace/runs").glob("*/started.json"))
+                        )
+                        == 1
+                    )
                 await sync_to_async(ApiToken.objects.filter(pk=token.pk).update)(
                     is_revoked=True
                 )
