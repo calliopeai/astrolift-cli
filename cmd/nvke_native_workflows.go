@@ -45,6 +45,7 @@ original receipt before input is read and never starts another native identity.
 Observation deadlines do not cancel native work or release retained locks.
 Successful native execution is not site/hardware qualification.`}
 	group.AddCommand(newNVKENativeRequestCommand("request WORKFLOW", ""))
+	group.AddCommand(newNVKENativeHistoryCommand(), newNVKENativeResetCommand())
 	for _, item := range nvkecatalog.Pinned().NativeWorkflows {
 		leaf := newNVKENativeRequestCommand(nativeNVKEName(item.Name), item.Name)
 		leaf.Aliases = []string{item.Name}
@@ -88,13 +89,27 @@ func newNVKENativeRequestCommand(use, fixed string) *cobra.Command {
 }
 
 func validateNVKENativeRecovery(r *nvkeNativeRequest) error {
-	if r == nil || r.Format != 1 || r.Kind != nvkeNativeRequestKind || r.NVKESource != nil || r.ActorUserID < 1 || r.Version < 1 || r.AuthorityVersion < 1 || r.SourceVersion < 1 || nvkeGUID(r.TargetID) != nil || nvkeGUID(r.RequestID) != nil || nvkeGUID(r.SourceOperationID) != nil || !nvkeKnownNativeWorkflow(r.Ref) || r.IntervalSeconds < 30 || r.IntervalSeconds > 86400 || !nvkeDigestPattern.MatchString(r.ExpectedSource) || !nvkeDigestPattern.MatchString(r.InputSchemaDigest) || !nvkeRevisionPattern.MatchString(r.Revision) || (r.Ref == "RetireLostEtcdRotationNode" && !r.AcknowledgeLostNodeTeardown) {
+	return validateNVKENativeRecoveryKind(r, nvkeNativeRequestKind)
+}
+
+func validateNVKENativeRecoveryKind(r *nvkeNativeRequest, kind string) error {
+	if kind != nvkeNativeRequestKind && kind != nvkeNativeResetKind {
+		return errors.New("unknown native recovery format")
+	}
+	if r == nil || r.Format != 1 || r.Kind != kind || r.NVKESource != nil || r.ActorUserID < 1 || r.Version < 1 || r.AuthorityVersion < 1 || r.SourceVersion < 1 || nvkeGUID(r.TargetID) != nil || nvkeGUID(r.RequestID) != nil || nvkeGUID(r.SourceOperationID) != nil || !nvkeKnownNativeWorkflow(r.Ref) || r.IntervalSeconds < 30 || r.IntervalSeconds > 86400 || !nvkeDigestPattern.MatchString(r.ExpectedSource) || !nvkeDigestPattern.MatchString(r.InputSchemaDigest) || !nvkeRevisionPattern.MatchString(r.Revision) || (r.Ref == "RetireLostEtcdRotationNode" && !r.AcknowledgeLostNodeTeardown) {
 		return errors.New("native workflow recovery metadata is invalid; preserve the original file")
+	}
+	if kind == nvkeNativeResetKind && (r.Ref != "RotateEtcdEncryptionKey" || r.AcknowledgeLostNodeTeardown || r.InputSchemaDigest != nvkeParameterDigest([]byte(nvkeNativeResetFormat))) {
+		return errors.New("reset recovery metadata does not match its declared format")
 	}
 	return nil
 }
 
 func readNVKENativeRecovery(filename string) (*nvkeNativeRequest, error) {
+	return readNVKENativeRecoveryKind(filename, nvkeNativeRequestKind)
+}
+
+func readNVKENativeRecoveryKind(filename, kind string) (*nvkeNativeRequest, error) {
 	data, err := privatefile.ReadFile(filename, 16384)
 	if err != nil {
 		return nil, err
@@ -109,14 +124,18 @@ func readNVKENativeRecovery(filename string) (*nvkeNativeRequest, error) {
 	if !errors.Is(d.Decode(&extra), io.EOF) {
 		return nil, errors.New("native workflow recovery file contains extra data")
 	}
-	if err = validateNVKENativeRecovery(&r); err != nil {
+	if err = validateNVKENativeRecoveryKind(&r, kind); err != nil {
 		return nil, err
 	}
 	return &r, nil
 }
 
 func validateNVKENativeReceipt(saved *nvkeNativeRequest, row *api.NVKEOperation) error {
-	if row == nil || nvkeGUID(row.ID) != nil || row.Version < 1 || row.SiteID != saved.TargetID || row.RequestID != saved.RequestID || row.OperationKey != "temporal."+saved.Ref || row.IsInventory || row.ResourceSource != nil {
+	return validateNVKENativeReceiptKey(saved, row, "temporal."+saved.Ref)
+}
+
+func validateNVKENativeReceiptKey(saved *nvkeNativeRequest, row *api.NVKEOperation, key string) error {
+	if row == nil || nvkeGUID(row.ID) != nil || row.Version < 1 || row.SiteID != saved.TargetID || row.RequestID != saved.RequestID || row.OperationKey != key || row.IsInventory || row.ResourceSource != nil {
 		return errors.New("native workflow receipt did not confirm the original identity; preserve recovery")
 	}
 	return nil

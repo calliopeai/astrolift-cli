@@ -289,7 +289,11 @@ before reviewing another change. `temporal workflow request WORKFLOW` submits th
 three pinned native maintenance workflows with an explicit cluster observation,
 authority version, private input and durable request file. `temporal workflow
 recover` only looks up that original receipt. Lost-node retirement additionally
-requires explicit teardown acknowledgement. Native history reset remains pending.
+requires explicit teardown acknowledgement. `temporal workflow history WORKFLOW`
+reads exact owner history pages. `temporal workflow reset` admits a reviewed etcd
+rotation reset from a private JSON review; `reset recover` only looks up its
+original receipt. The server sends at most one native reset RPC and never
+repeats an unconfirmed sending intent. Renewal reset is unsupported.
 
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.

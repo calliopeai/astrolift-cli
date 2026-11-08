@@ -1038,3 +1038,330 @@ async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(
             )
             assert counts["managedNodeCount"] is None
             assert "PRIVATE" not in json.dumps(page)
+
+
+async def test_compiled_cli_native_owner_history_and_reset_recovery(
+    binary, tmp_path, asgi_endpoint, controller_site, monkeypatch
+):
+    from temporalio.client import WorkflowFailureError
+    from astrolift_clusters import nvke_native_reset
+    from astrolift_clusters.models import NvkeOperation
+    from astrolift_clusters.tests.test_nvke_native_reset import (
+        FailedRotation,
+        begin_activity,
+        record_phase,
+        prepare_activity,
+        rewrite_activity,
+        REWRITE_CALLS,
+    )
+    from astrolift_workflows import client as workflow_client
+    from astrolift_workflows.activities.nvke import nvke_operation_attempt
+    from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow
+
+    state, identity = controller_site
+    issued = mint_token()
+    await sync_to_async(ApiToken.objects.create)(
+        user=state.world.user,
+        organization=state.world.org,
+        name="owned native reset CLI",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["admin"],
+    )
+
+    async def run(*arguments, ok=True):
+        result = await asyncio.to_thread(
+            invoke,
+            binary,
+            tmp_path,
+            asgi_endpoint,
+            issued.plaintext,
+            state.world.org.slug,
+            *arguments,
+        )
+        assert "PRIVATE" not in result.stdout + result.stderr
+        if ok:
+            assert result.returncode == 0, result.stderr
+            return json.loads(result.stdout)
+        assert result.returncode != 0
+        return result
+
+    async with temporal_test_env() as env:
+        native_queue, astro_queue = (
+            "native-reset-cli-" + uuid4().hex,
+            "astro-reset-cli-" + uuid4().hex,
+        )
+
+        async def get_client():
+            return env.client
+
+        monkeypatch.setattr(workflow_client, "_get_client_async", get_client)
+        monkeypatch.setattr(workflow_client, "_temporal_enabled", lambda: True)
+        monkeypatch.setattr(workflow_client, "_task_queue", lambda: astro_queue)
+        authority = await run(
+            "temporal",
+            "configure",
+            "--site",
+            state.site.guid,
+            "--site-version",
+            state.site.version,
+            "--address",
+            env.client.service_client.config.target_host,
+            "--namespace",
+            env.client.namespace,
+            "--task-queue",
+            native_queue,
+            "--plaintext",
+        )
+        owner_id = "rotation-更新-" + uuid4().hex
+        state.native_details["parent_override"]["conditions"] = {
+            "updateInProgress": {"type": "etcd_key_rotation"},
+            "etcdKeyRotation": {
+                "state": "failed",
+                "workflowID": owner_id,
+                "phase": "rewrite",
+            },
+        }
+        reset_calls = []
+        send = nvke_native_reset.send_reset
+
+        async def lose_reset_reply(*args):
+            reset_calls.append(args[3])
+            await send(*args)
+            raise RuntimeError("PRIVATE_LOST_RESET_REPLY")
+
+        monkeypatch.setattr(nvke_native_reset, "send_reset", lose_reset_reply)
+        async with (
+            Worker(
+                env.client,
+                task_queue=native_queue,
+                workflows=[FailedRotation, NativeRenewalFixture],
+                activities=[
+                    begin_activity,
+                    record_phase,
+                    prepare_activity,
+                    rewrite_activity,
+                ],
+                workflow_runner=UnsandboxedWorkflowRunner(),
+            ),
+            temporal_worker(
+                env,
+                task_queue=astro_queue,
+                workflows=[NvkeOperationWorkflow],
+                activities=[nvke_operation_attempt],
+            ),
+        ):
+            handle = await env.client.start_workflow(
+                "RotateEtcdEncryptionKey",
+                {"clusterID": identity},
+                id=owner_id,
+                task_queue=native_queue,
+            )
+            with pytest.raises(WorkflowFailureError):
+                await asyncio.wait_for(handle.result(), timeout=15)
+            read_input = tmp_path / "read-for-reset.json"
+            read_input.write_text(json.dumps({"path": {"clusterID": identity}}))
+            read_input.chmod(0o600)
+            source = await run(
+                "controller",
+                "get-cluster",
+                "--site",
+                state.site.guid,
+                "--file",
+                read_input,
+                "--request-file",
+                tmp_path / "source-reset-recovery.json",
+                "--wait",
+                "--wait-timeout",
+                "20s",
+                "--poll-interval",
+                "500ms",
+            )
+            review_flags = (
+                "--site",
+                state.site.guid,
+                "--site-version",
+                authority["siteVersion"],
+                "--authority-version",
+                authority["version"],
+                "--source-operation",
+                source["id"],
+                "--source-version",
+                source["version"],
+            )
+            page = await run(
+                "temporal",
+                "workflow",
+                "history",
+                "RotateEtcdEncryptionKey",
+                *review_flags,
+                "--limit",
+                "10",
+            )
+            assert (
+                page["workflowId"] == owner_id and page["runId"] == handle.result_run_id
+            )
+            assert page["status"] == "FAILED" and page["recordedPhase"] == "rewrite"
+            assert page["retainedMutationLock"] is True and page["sourceObservedAt"]
+            old_cursor = page["nextCursor"]
+            assert old_cursor
+            events = list(page["items"])
+            while page["nextCursor"]:
+                page = await run(
+                    "temporal",
+                    "workflow",
+                    "history",
+                    "RotateEtcdEncryptionKey",
+                    *review_flags,
+                    "--limit",
+                    "10",
+                    "--after",
+                    page["nextCursor"],
+                )
+                assert page["runId"] == handle.result_run_id
+                events.extend(page["items"])
+            selected = next(
+                e for e in events if e["activityType"] == "StartEtcdEncryptionRewrite"
+            )
+            assert all(isinstance(e["eventId"], str) for e in events)
+            reset_input = tmp_path / "reviewed-reset.json"
+            review = {
+                "workflowId": owner_id,
+                "baseRunId": handle.result_run_id,
+                "workflowTaskEventId": selected["workflowTaskCompletedEventId"],
+                "activityEventId": selected["eventId"],
+                "activityType": "StartEtcdEncryptionRewrite",
+                "phase": "rewrite",
+                "mode": "restart_rewrite",
+                "rationale": "PRIVATE_RESET_REASON",
+                "quiescenceEvidence": "PRIVATE_AGENT_EVIDENCE",
+                "acknowledgeBoundaryReviewed": True,
+                "acknowledgeConflictingWorkStopped": True,
+            }
+            reset_input.write_text(json.dumps(review, ensure_ascii=False))
+            reset_input.chmod(0o600)
+            recovery = tmp_path / "rotation-reset-recovery.json"
+            flags = (
+                *review_flags,
+                "--file",
+                reset_input,
+                "--request-file",
+                recovery,
+                "--wait",
+                "--wait-timeout",
+                "30s",
+                "--poll-interval",
+                "500ms",
+            )
+            row = await run("temporal", "workflow", "reset", *flags)
+            assert (
+                row["operationKey"] == "temporal.reset.RotateEtcdEncryptionKey"
+                and row["status"] == "SUCCEEDED"
+            )
+            assert len(reset_calls) == 1 and REWRITE_CALLS[identity] == 2
+            metadata = recovery.read_text()
+            assert "PRIVATE" not in metadata and owner_id not in metadata
+            reset_input.unlink()
+            repeated = await run("temporal", "workflow", "reset", *flags)
+            recovered = await run(
+                "temporal",
+                "workflow",
+                "reset",
+                "recover",
+                "--request-file",
+                recovery,
+                "--wait",
+            )
+            assert (
+                repeated["id"] == recovered["id"] == row["id"] and len(reset_calls) == 1
+            )
+            assert (
+                await sync_to_async(
+                    NvkeOperation.objects.filter(
+                        site=state.site,
+                        operation_key="temporal.reset.RotateEtcdEncryptionKey",
+                    ).count
+                )()
+                == 1
+            )
+            operation = await sync_to_async(NvkeOperation.objects.get)(guid=row["id"])
+            astro = env.client.get_workflow_handle(operation.workflow_id)
+            astro_history = (await astro.fetch_history()).to_json()
+            assert "PRIVATE" not in astro_history and identity not in astro_history
+            stale = await run(
+                "temporal",
+                "workflow",
+                "history",
+                "RotateEtcdEncryptionKey",
+                *review_flags,
+                "--limit",
+                "10",
+                "--after",
+                old_cursor,
+                ok=False,
+            )
+            assert "SOURCE_CHANGED" in stale.stderr and not stale.stdout
+            refreshed = await run(
+                "temporal",
+                "workflow",
+                "history",
+                "RotateEtcdEncryptionKey",
+                *review_flags,
+            )
+            assert (
+                refreshed["status"] == "COMPLETED"
+                and refreshed["recordedState"] == "failed"
+            )
+            assert refreshed["runId"] != handle.result_run_id
+
+            renewal_owner = "renewal-history-更新-" + uuid4().hex
+            renewal = await env.client.start_workflow(
+                "RenewK8sCertsV2",
+                {"clusterID": identity, "thresholdDays": 120, "force": True},
+                id=renewal_owner,
+                task_queue=native_queue,
+            )
+            await asyncio.wait_for(renewal.result(), timeout=15)
+            state.native_details["parent_override"]["conditions"] = {
+                "certificateRenewal": {
+                    "cycleID": renewal_owner,
+                    "state": "succeeded",
+                    "forced": True,
+                },
+            }
+            renewal_source = await run(
+                "controller",
+                "get-cluster",
+                "--site",
+                state.site.guid,
+                "--file",
+                read_input,
+                "--request-file",
+                tmp_path / "renewal-history-source.json",
+                "--wait",
+                "--wait-timeout",
+                "20s",
+                "--poll-interval",
+                "500ms",
+            )
+            renewal_page = await run(
+                "temporal",
+                "workflow",
+                "history",
+                "RenewK8sCertsV2",
+                "--site",
+                state.site.guid,
+                "--site-version",
+                authority["siteVersion"],
+                "--authority-version",
+                authority["version"],
+                "--source-operation",
+                renewal_source["id"],
+                "--source-version",
+                renewal_source["version"],
+            )
+            assert renewal_page["workflowId"] == renewal_owner
+            assert (
+                renewal_page["status"] == "COMPLETED"
+                and renewal_page["recordedState"] == "succeeded"
+            )
