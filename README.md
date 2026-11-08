@@ -309,6 +309,32 @@ Latest inspection failure and retained certificate expiry remain separate facts.
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.
 
+Remote native tooling is available through `astro nvke agent`. Its `catalog`
+returns every command and option declared by the connected server. Configure a
+reviewed HTTPS endpoint, persistent instance GUID and bundle manifest SHA-256 with
+`configure --site GUID --site-version N --authority-version 0 --endpoint URL
+--instance GUID --bundle-sha256 SHA --credentials-file PRIVATE.json`, then refresh
+the returned site/authority versions and run `verify`. Credentials use
+`caPem`, `clientCertificatePem` and `clientKeyPem`; omission preserves the existing
+sealed pair. `get`, `enable`, `disable` and `remove` expose the remaining lifecycle.
+
+`agent request --site GUID --site-version N --authority-version N --file PRIVATE.json
+--request-file NEW-RECOVERY.json` sends the complete native command envelope as
+text through Astro's encrypted outbox. Use `--acknowledge-infrastructure-change`
+for reviewed bootstrap/install/access changes. The recovery file retains identity,
+versions and a digest, never the private input. `agent recover --request-file FILE`
+looks up the original receipt without re-admitting work or needing the input file.
+Optional `--wait` uses a local deadline and does not cancel remote effects.
+
+Use existing `nvke operation get/wait/cancel/result` for agent jobs.
+`agent reconcile OPERATION_GUID --site GUID --site-version N --authority-version N
+--version N` reads the original uncertain job under reviewed current admin
+authority. `agent artifact OPERATION_GUID` with those same reviewed flags,
+`--name ARTIFACT --output NEW-PRIVATE-FILE` streams protected chunks, checks size
+and SHA-256, and never prints artifact bytes. Failed downloads retain a private
+partial file. Increase `--max-bytes` explicitly for diagnostics larger than 64 MiB.
+Native process completion needs separate infrastructure readiness checks.
+
 Local operator tools are available under `astro nvke tooling`. `tooling catalog`
 shows the immutable runner/source pins offline. `tooling prepare` builds the pinned
 native binary; `tooling run` invokes bootstrap, site-spec/render/inspection utilities,

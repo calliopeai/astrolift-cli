@@ -688,3 +688,39 @@ lock or restart a rewrite. A succeeded Astro reset operation means its proved
 native reset execution completed; encryption health and hardware qualification
 still require independent evidence. Local compiled-CLI qualification uses real
 PostgreSQL/HTTP/Temporal with fixture workflows, not production node mutations.
+
+
+## Hosted operator agent
+
+`astro nvke agent catalog` exposes the server's complete pinned command descriptors.
+`get/configure/verify/enable/disable/remove` manage a dedicated site-bound mTLS
+executor independently of the controller, datastore, metrics and native Temporal.
+Configuration requires an exact instance GUID, bundle SHA-256 and HTTPS base URL.
+New authorities require a private `caPem/clientCertificatePem/clientKeyPem` JSON
+bundle; subsequent omission preserves the sealed existing pair.
+
+Submit the complete native envelope from a protected UTF-8 file with `agent request`.
+Its `--request-file` is created and flushed before admission and binds caller,
+server, organization, request UUID, site/authority versions, native revision,
+private input digest, acknowledgement and observation deadline. A lost reply must
+be recovered with that original file. `agent recover` performs a receipt lookup
+only and needs no native input file. Resubmission before a receipt is visible
+requires the identical input text and original reviewed versions.
+
+All native options and artifact references stay inside the server-validated
+request envelope. Infrastructure-changing requests need explicit
+`--acknowledge-infrastructure-change`. Process completion does not establish
+infrastructure readiness. Local wait expiry does not cancel remote work.
+
+Existing operation metadata/wait/cancel/private-result commands support agent
+receipts. `agent reconcile` performs a read-only settlement of an uncertain job
+under the current reviewed administrator, site, authority and operation versions.
+It never submits a new native job. Changing the original agent identity is refused
+by the backend, including after credentials rotate.
+
+`agent artifact` downloads a retained artifact to an exclusive protected file.
+Every chunk binds the original operation/name/offset/size/SHA-256, and the assembled
+file must match the complete hash. `--max-bytes` defaults to 64 MiB and can be
+increased for larger diagnostics. Nothing writes artifact contents to stdout.
+An interrupted or rejected download retains its protected partial file; inspect it
+before using any resulting credential. See the README for command flag examples.
