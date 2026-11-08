@@ -420,4 +420,91 @@ waiting. Neither timeout cancels native work. Use existing `operation get/wait`,
 for metadata, continued observation and native execution references. Successful
 native execution is not proof of changed certificates, encryption convergence
 or site health; collect fresh controller/metrics and qualification evidence.
-Native history reset controls remain pending.
+Owner history inspection and rotation reset use the separate reviewed commands below.
+
+
+## Native owner history and phase-aware rotation reset
+
+```sh
+astro nvke temporal workflow history RotateEtcdEncryptionKey --site SITE_GUID \
+  --site-version 8 --authority-version 1 \
+  --source-operation GET_CLUSTER_OPERATION_GUID --source-version 9 --limit 50 --json
+astro nvke temporal workflow reset --site SITE_GUID \
+  --site-version 8 --authority-version 1 \
+  --source-operation GET_CLUSTER_OPERATION_GUID --source-version 9 \
+  --file private-reset-review.json --request-file rotation-reset-recovery.json
+astro nvke temporal workflow reset recover --request-file rotation-reset-recovery.json --wait
+```
+
+History supports `RenewK8sCertsV2` and `RotateEtcdEncryptionKey`. The server derives
+the native owner from the successful `get-cluster` source operation. The response
+separates native run/status and inspection time from the controller's recorded
+state/phase, source time and retained lock. It excludes activity payloads/results,
+failure messages and credentials. Event and scheduling IDs are decimal strings,
+including values above JavaScript's exact integer range. Pass `nextCursor` as
+`--after` with the same versions, source and `--limit`; cursors expire after 30
+minutes and a changed native run invalidates them. There is no automatic selection
+of a reset boundary or mixing of history pages from different runs.
+
+Reset supports only `RotateEtcdEncryptionKey`. Its private JSON review has exactly
+these fields (replace placeholders with reviewed native values):
+
+```json
+{
+  "workflowId": "retained-native-rotation-owner",
+  "baseRunId": "EXACT_NATIVE_RUN_GUID",
+  "workflowTaskEventId": "14",
+  "activityEventId": "15",
+  "activityType": "StartEtcdEncryptionRewrite",
+  "phase": "rewrite",
+  "mode": "restart_rewrite",
+  "rationale": "Incident reference and reason for this exact boundary",
+  "quiescenceEvidence": "Evidence reference proving earlier conflicting node work is terminal",
+  "acknowledgeBoundaryReviewed": true,
+  "acknowledgeConflictingWorkStopped": true,
+  "retirementWorkflowId": ""
+}
+```
+
+The review file uses private file protections or `--file -` for stdin. Duplicate,
+unknown or differently cased fields, non-string event IDs and missing acknowledgements
+are refused. Rationale/evidence are each bounded to 4,000 UTF-8 bytes, encrypted by
+the server and redacted in mutation audit variables. They never enter recovery
+metadata or the native reset reason. The CLI stores a review-format marker and
+exact original UTF-8 digest, not the private review.
+
+Choose `retry_activity`, `resume_rewrite`, `restart_rewrite` or `refresh_survivors`
+according to the pinned upstream rotation procedure and exact failed phase.
+Phase names are `prepare`, `add_secondary`, `promote_primary`, `rewrite`,
+`remove_old_keys` and `finalize`. The server validates the current native owner,
+retained lock, successful Begin, native phase history and selected scheduling
+boundary. A first-task shortcut or earlier successful mutation is refused.
+Poll recovery preserves the acknowledged rewrite node/operation within its
+original six-hour allowance. Restart requires confirming the old rewrite is
+terminal. Survivor refresh additionally requires a completed
+`retirementWorkflowId` proving this cluster and retained owner. A recorded prepare
+failure needs a fresh workflow ID after lock release; renewal reset is unsupported.
+
+Node-work evidence is an operator attestation, not an independent agent-process
+or hardware check. A closed Temporal run alone does not prove node work stopped.
+Coordinate external Temporal operators: the native reset API has no cross-client
+atomic compare-and-swap, and an older base run does not protect a newer run from
+termination. This command never unlocks the cluster or automatically terminates
+native workflows before reset.
+
+A private recovery identity is flushed before Astro admission. A repeated command
+looks up the original receipt before opening the review file. If no receipt is
+visible, only the identical original review, versions, source, actor and request
+UUID may be re-admitted to Astro. `reset recover` is always lookup-only. This is
+separate from retrying the native RPC: after persisting sending, Astro sends at
+most one reset RPC with SDK retry disabled. It recovers a lost reply from exact
+native reset history proof. Even a crash between persisting sending and the RPC
+leaves an unconfirmed intent that is never resent. Retain the original files and
+inspect operation/native history before any further recovery. Reset, native start
+and HTTP/resource recovery files cannot substitute for one another.
+
+Observation and local wait deadlines do not cancel the native owner, release its
+lock or restart a rewrite. A succeeded Astro reset operation means its proved
+native reset execution completed; encryption health and hardware qualification
+still require independent evidence. Local compiled-CLI qualification uses real
+PostgreSQL/HTTP/Temporal with fixture workflows, not production node mutations.
