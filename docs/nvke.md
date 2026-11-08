@@ -377,6 +377,31 @@ NVKE_TEST_OPSCODE=/path/to/opscode \
 This drives real bundle preparation, native spec utilities, mutation-rejecting
 management dry-run, and SIGINT/recovery behavior through the compiled executable.
 
+The opt-in `scripts/integration/test_nvke_native_site.py` instead drives the
+compiled CLI through an owned loopback Astro GraphQL server, real Postgres and a
+real Temporal worker to the isolated native NVKE site. Set
+`NVKE_TEST_NATIVE_SITE_PROFILE` to its mode-0600 qualification profile and install
+the test-only `socksio` dependency in the backend test environment. The fixture
+accepts only the explicitly bound local topology, pinned revision, namespace,
+native CA/client-certificate kubeconfig and imported simulator tenant identity.
+Its SSH SOCKS route changes HTTP transport only; production authorization, TLS,
+encrypted outbox, activities and receipt recovery execute unchanged.
+
+The case loses an admission reply and recovers the original receipt using a
+read-only token. It enrolls imported workload access from the actual controller
+read, downloads the native kubeconfig to a private file, and checks that revoking
+the grant refuses a new download before another Secret read.
+The exported kubeconfig must also reach the workload `/readyz`, `/version` and
+node inventory with native CA/client-certificate TLS verification; two Ready
+nodes and one control plane are required for the bound simulator tenant.
+One uniquely named MachineImage is created and deleted through Astro with
+UID/version guards; the
+transport rejects all other native writes. Temporal history must contain no
+native payload or credentials. `NVKE_TEST_NATIVE_SITE_REPORT` optionally selects
+a new exclusive private metadata-only report. This qualifies those local hosted
+paths, not new tenant provisioning, site-connection UI configuration, production
+network reachability or physical providers.
+
 
 ## Reviewed resources and typed observations
 
