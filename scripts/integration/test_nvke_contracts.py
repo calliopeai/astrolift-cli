@@ -19,9 +19,6 @@ from uuid import uuid4
 import pytest
 import uvicorn
 from asgiref.sync import sync_to_async
-from temporalio import workflow
-from temporalio.worker import UnsandboxedWorkflowRunner, Worker
-
 from astrolift_clusters.tests.test_nvke_operations import (
     datastore_site as _datastore_site,
 )
@@ -29,6 +26,8 @@ from astrolift_clusters.tests.test_nvke_sites import world as _world
 from astrolift_identity.api_tokens import mint_token
 from astrolift_identity.models import ApiToken
 from core.testing.temporal import temporal_test_env, temporal_worker
+from temporalio import workflow
+from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 pytestmark = pytest.mark.django_db(transaction=True)
 CLI_ROOT = Path(__file__).resolve().parents[2]
@@ -1086,20 +1085,20 @@ async def test_compiled_cli_bound_control_plane_read_and_typed_diagnostics(
 async def test_compiled_cli_native_owner_history_and_reset_recovery(
     binary, tmp_path, asgi_endpoint, controller_site, monkeypatch
 ):
-    from temporalio.client import WorkflowFailureError
     from astrolift_clusters import nvke_native_reset
     from astrolift_clusters.models import NvkeOperation
     from astrolift_clusters.tests.test_nvke_native_reset import (
+        REWRITE_CALLS,
         FailedRotation,
         begin_activity,
-        record_phase,
         prepare_activity,
+        record_phase,
         rewrite_activity,
-        REWRITE_CALLS,
     )
     from astrolift_workflows import client as workflow_client
     from astrolift_workflows.activities.nvke import nvke_operation_attempt
     from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow
+    from temporalio.client import WorkflowFailureError
 
     state, identity = controller_site
     issued = mint_token()
@@ -1155,6 +1154,8 @@ async def test_compiled_cli_native_owner_history_and_reset_recovery(
             "--task-queue",
             native_queue,
             "--plaintext",
+            "--connection-timeout",
+            "120",
         )
         owner_id = "rotation-更新-" + uuid4().hex
         state.native_details["parent_override"]["conditions"] = {
@@ -1292,11 +1293,44 @@ async def test_compiled_cli_native_owner_history_and_reset_recovery(
                 recovery,
                 "--wait",
                 "--wait-timeout",
-                "30s",
+                "1ms",
                 "--poll-interval",
                 "500ms",
             )
-            row = await run("temporal", "workflow", "reset", *flags)
+            local_wait = await run("temporal", "workflow", "reset", *flags, ok=False)
+            assert (
+                "local wait ended" in local_wait.stderr
+                and "not been cancelled" in local_wait.stderr
+            )
+            deadline = time.monotonic() + 150
+            while time.monotonic() < deadline:
+                row = await run(
+                    "temporal",
+                    "workflow",
+                    "reset",
+                    "recover",
+                    "--request-file",
+                    recovery,
+                )
+                if row["status"] == "SUCCEEDED":
+                    break
+                if row["status"] not in {
+                    "QUEUED",
+                    "RUNNING",
+                    "AWAITING_READY",
+                    "RECONCILING",
+                }:
+                    pytest.fail(
+                        "Original reset receipt did not complete: "
+                        + json.dumps(
+                            {k: row.get(k) for k in ["status", "stage", "errorCode"]}
+                        )
+                    )
+                await asyncio.sleep(0.5)
+            else:
+                pytest.fail(
+                    "Original reset receipt did not reach completion within qualification deadline"
+                )
             assert (
                 row["operationKey"] == "temporal.reset.RotateEtcdEncryptionKey"
                 and row["status"] == "SUCCEEDED"
