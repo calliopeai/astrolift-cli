@@ -271,6 +271,10 @@ func validateNVKEWait(cmd *cobra.Command) error {
 	return nil
 }
 
+func nvkeWaitReadFailure(id string, err error) error {
+	return fmt.Errorf("%w; observation stopped for original NVKE operation %s; inspect with astro nvke operation get %s; remote execution has not been cancelled", err, id, id)
+}
+
 func waitNVKEOperation(cmd *cobra.Command, ctx context.Context, c *api.Client, row *api.NVKEOperation) error {
 	if err := validateNVKEWait(cmd); err != nil {
 		return err
@@ -304,10 +308,10 @@ func waitNVKEOperation(cmd *cobra.Command, ctx context.Context, c *api.Client, r
 			if ctx.Err() != nil {
 				return fmt.Errorf("local wait ended for NVKE operation %s; the remote operation has not been cancelled", row.ID)
 			}
-			return err
+			return nvkeWaitReadFailure(row.ID, err)
 		}
 		if next.ID != row.ID || next.SiteID != row.SiteID || next.RequestID != row.RequestID || next.OperationKey != row.OperationKey || next.IsInventory != row.IsInventory || !sameNVKESource(next.ResourceSource, row.ResourceSource) || !sameNVKEProviderSource(next.ProviderSource, row.ProviderSource) {
-			return errors.New("NVKE operation observation identity changed")
+			return nvkeWaitReadFailure(row.ID, errors.New("NVKE operation observation identity changed"))
 		}
 		row = next
 	}
@@ -355,6 +359,9 @@ func runNVKEOperation(cmd *cobra.Command, ctx context.Context, c *api.Client, id
 		row, err = c.NVKEOperation(ctx, id)
 	}
 	if err != nil {
+		if selected == "wait" {
+			return nvkeWaitReadFailure(id, err)
+		}
 		return err
 	}
 	if row.ID != id {

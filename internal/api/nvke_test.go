@@ -81,3 +81,34 @@ func TestNVKEMissingOrHostileEnvelopesNeverProduceSuccessOrLeakBodies(t *testing
 		}
 	}
 }
+
+func TestNVKEOperationReadFailuresKeepSafeClasses(t *testing.T) {
+	for _, test := range []struct {
+		name, body, want string
+		status           int
+	}{
+		{"refusal", `{"errors":[{"message":"PRIVATE_RESPONSE","extensions":{"code":"PRIVATE_TOKEN"}}]}`, "GraphQL refusal; HTTP 403", 403},
+		{"http", `PRIVATE_RESPONSE`, "HTTP 502", 502},
+		{"invalid", `PRIVATE_RESPONSE`, "invalid or incomplete response", 200},
+		{"missing", `{"data":{"astroliftNvkeOperation":null}}`, "receipt not visible", 200},
+		{"mismatch", `{"data":{"astroliftNvkeOperation":{"id":"PRIVATE_RESPONSE"}}}`, "receipt identity mismatch", 200},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(test.status)
+				_, _ = w.Write([]byte(test.body))
+			}))
+			defer server.Close()
+			row, err := NewClient(server.URL, "PRIVATE_TOKEN", false).NVKEOperation(context.Background(), "original")
+			if row != nil || err == nil || !strings.Contains(err.Error(), test.want) || strings.Contains(err.Error(), "PRIVATE") {
+				t.Fatalf("unsafe failure: %v", err)
+			}
+		})
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { t.Error("closed transport contacted") }))
+	server.Close()
+	_, err := NewClient(server.URL, "PRIVATE_TOKEN", false).NVKEOperation(context.Background(), "original")
+	if err == nil || !strings.Contains(err.Error(), "transport failure") || strings.Contains(err.Error(), server.URL) {
+		t.Fatalf("transport diagnostic: %v", err)
+	}
+}
