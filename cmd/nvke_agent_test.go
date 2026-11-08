@@ -73,6 +73,59 @@ func agentTestData() map[string]any {
 	data["astroliftNvkeOperatorContract"] = map[string]any{"revision": nvkecatalog.Pinned().Revision, "commands": []map[string]any{{"key": "generate.sitespec", "positionals": []string{"string"}, "options": []any{}}}}
 	return data
 }
+
+func TestNVKEAgentStopUsesOriginalReviewedIdentityWithoutAdmission(t *testing.T) {
+	for _, kind := range []string{"cancelled", "uncertain", "settled-source", "wrong-version", "wrong-reply"} {
+		t.Run(kind, func(t *testing.T) {
+			cmd, out := agentTestCommand(t, "stop")
+			_ = cmd.Flags().Set("version", "4")
+			writes := 0
+			source := map[string]any{"id": nvkeTestOperation, "version": 4, "siteId": nvkeTestSite, "requestId": nvkeNativeTestSource, "operationKey": "tooling.generate.sitespec", "status": "UNCERTAIN"}
+			if kind == "settled-source" {
+				source["status"] = "SUCCEEDED"
+			}
+			if kind == "wrong-version" {
+				source["version"] = 5
+			}
+			server := nvkeTestServer(t, func(request gqlRequest, w http.ResponseWriter) {
+				data := agentTestData()
+				data["astroliftNvkeOperation"] = source
+				if strings.HasPrefix(request.Query, "mutation") {
+					writes++
+					if !strings.Contains(request.Query, "stopNvkeOperatorJob(") || strings.Contains(request.Query, "requestNvkeOperatorJob") {
+						t.Error("stop submitted replacement work")
+					}
+					input := request.Variables["input"].(map[string]any)
+					if len(input) != 5 || input["operationId"] != nvkeTestOperation || input["expectedActorId"] != float64(42) || input["expectedSiteVersion"] != float64(7) || input["expectedAuthorityVersion"] != float64(3) || input["expectedOperationVersion"] != float64(4) {
+						t.Error("stop changed the reviewed original source")
+					}
+					row := map[string]any{"id": nvkeTestOperation, "version": 5, "siteId": nvkeTestSite, "requestId": nvkeNativeTestSource, "operationKey": "tooling.generate.sitespec", "status": "CANCELLED", "private": "PRIVATE_BAD_ECHO"}
+					if kind == "uncertain" {
+						row["status"] = "UNCERTAIN"
+					}
+					if kind == "wrong-reply" {
+						row["id"] = nvkeNativeTestSource
+					}
+					data["stopNvkeOperatorJob"] = map[string]any{"ok": true, "data": row}
+				}
+				writePipelineTestResponse(t, w, data)
+			})
+			defer server.Close()
+			err := runNVKEAgentStop(cmd, context.Background(), nvkeTestClient(server), []string{nvkeTestOperation})
+			wantSuccess := kind == "cancelled" || kind == "uncertain"
+			if (err == nil) != wantSuccess || strings.Contains(out.String(), "PRIVATE") {
+				t.Fatalf("unsafe stop kind=%s writes=%d err=%v", kind, writes, err)
+			}
+			wantWrites := 1
+			if kind == "settled-source" || kind == "wrong-version" {
+				wantWrites = 0
+			}
+			if writes != wantWrites {
+				t.Fatalf("stop writes=%d expected=%d", writes, wantWrites)
+			}
+		})
+	}
+}
 func TestNVKEAgentAuthorityWritesKeepReviewedScopeAndSecretsPrivate(t *testing.T) {
 	for _, verb := range []string{"configure", "verify", "enable", "disable", "remove"} {
 		t.Run(verb, func(t *testing.T) {

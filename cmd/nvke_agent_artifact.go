@@ -62,6 +62,31 @@ func newNVKEAgentReconcileCommand() *cobra.Command {
 	nvkeAgentJobFlags(cmd)
 	return cmd
 }
+func newNVKEAgentStopCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "stop OPERATION_GUID", Args: cobra.ExactArgs(1), Short: "Stop or durably fence the original uncertain agent job under reviewed current admin authority", Long: `Stop only the original agent's owned process, or durably fence a provably
+never-admitted original intent. This never replays native work or rolls back
+infrastructure. Unproven effects stay uncertain. If the reply is lost, inspect
+and reconcile the original operation before further action.`, RunE: nvkeScoped(runNVKEAgentStop)}
+	nvkeAgentJobFlags(cmd)
+	return cmd
+}
+func runNVKEAgentStop(cmd *cobra.Command, ctx context.Context, c *api.Client, args []string) error {
+	review, source, err := nvkeAgentJobReview(cmd, ctx, c, args[0])
+	if err != nil {
+		return err
+	}
+	if source.Status != "UNCERTAIN" {
+		return errors.New("only an uncertain operator job needs reviewed stop or fencing")
+	}
+	row, err := c.StopNVKEAgentJob(ctx, review)
+	if err != nil {
+		return err
+	}
+	if row == nil || row.ID != source.ID || row.SiteID != source.SiteID || row.RequestID != source.RequestID || row.OperationKey != source.OperationKey || row.Version <= source.Version || row.IsInventory || row.ResourceSource != nil || row.ProviderSource != nil || (row.Status != "SUCCEEDED" && row.Status != "FAILED" && row.Status != "CANCELLED" && row.Status != "UNCERTAIN") {
+		return errors.New("operator stop did not confirm the original receipt; inspect and reconcile the original operation")
+	}
+	return nvkePrintOperation(cmd, row)
+}
 func newNVKEAgentArtifactCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "artifact OPERATION_GUID", Args: cobra.ExactArgs(1), Short: "Download a complete retained artifact privately with source, range and SHA-256 checks", Long: `Save a retained private artifact to a new protected local file. No artifact bytes
 are printed. Each chunk uses the reviewed current site, agent and operation versions.
