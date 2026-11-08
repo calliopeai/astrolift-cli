@@ -54,15 +54,58 @@ def binary():
 
 
 @pytest.fixture
-def asgi_endpoint(settings):
+def dropped_cli_replies():
+    return {}
+
+
+@pytest.fixture
+def asgi_endpoint(settings, dropped_cli_replies):
     from config.asgi import application
+
+    async def qualified_application(scope, receive, send):
+        request_body = bytearray()
+        dropping = False
+
+        async def observed_receive():
+            event = await receive()
+            request_body.extend(event.get("body", b""))
+            return event
+
+        async def observed_send(event):
+            nonlocal dropping
+            if event["type"] == "http.response.start" and event["status"] == 200:
+                for field, remaining in dropped_cli_replies.items():
+                    if remaining and field.encode() in request_body:
+                        dropped_cli_replies[field] -= 1
+                        dropping = True
+                        await send(
+                            {
+                                "type": "http.response.start",
+                                "status": 503,
+                                "headers": [],
+                            }
+                        )
+                        return
+            if dropping:
+                if event["type"] == "http.response.body" and not event.get(
+                    "more_body", False
+                ):
+                    await send(
+                        {"type": "http.response.body", "body": b"Reply unavailable"}
+                    )
+                return
+            await send(event)
+
+        await application(scope, observed_receive, observed_send)
 
     settings.DEBUG = False
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
     sock.listen()
     server = uvicorn.Server(
-        uvicorn.Config(application, lifespan="off", access_log=False, log_level="error")
+        uvicorn.Config(
+            qualified_application, lifespan="off", access_log=False, log_level="error"
+        )
     )
     thread = threading.Thread(target=lambda: server.run(sockets=[sock]), daemon=True)
     thread.start()
@@ -1365,3 +1408,379 @@ async def test_compiled_cli_native_owner_history_and_reset_recovery(
                 renewal_page["status"] == "COMPLETED"
                 and renewal_page["recordedState"] == "succeeded"
             )
+
+
+@pytest.fixture
+def metrics_listener():
+    from astrolift_clusters.tests.test_nvke_credential_observations import listener
+
+    yield from listener.__wrapped__()
+
+
+async def test_compiled_cli_metrics_authority_observations_and_read_only_recovery(
+    binary,
+    tmp_path,
+    asgi_endpoint,
+    controller_site,
+    metrics_listener,
+    monkeypatch,
+    dropped_cli_replies,
+):
+    from astrolift_clusters.models import NvkeMetricsAuthority, NvkeOperation
+    from astrolift_clusters.nvke_sites import credentials_for
+    from astrolift_clusters.tests.test_nvke_credential_observations import sample
+    from astrolift_workflows import client as workflow_client
+    from astrolift_workflows.activities.nvke import nvke_operation_attempt
+    from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow
+
+    state, identity = controller_site
+    issued, reader = mint_token(), mint_token()
+    for token, scopes in (
+        (issued, ["read:nvke", "admin:nvke"]),
+        (reader, ["read:nvke"]),
+    ):
+        await sync_to_async(ApiToken.objects.create)(
+            user=state.world.user,
+            organization=state.world.org,
+            name="owned credential metrics CLI",
+            token_hash=token.token_hash,
+            token_last_4=token.last4,
+            scopes=scopes,
+        )
+
+    async def run(*arguments, ok=True, read_only=False):
+        result = await asyncio.to_thread(
+            invoke,
+            binary,
+            tmp_path,
+            asgi_endpoint,
+            reader.plaintext if read_only else issued.plaintext,
+            state.world.org.slug,
+            *arguments,
+        )
+        assert "PRIVATE" not in result.stdout + result.stderr
+        if ok:
+            assert result.returncode == 0, result.stderr
+            return json.loads(result.stdout)
+        assert result.returncode != 0
+        return result
+
+    scope = ("--site", state.site.guid)
+    catalog = await run("metrics", "catalog", read_only=True)
+    assert len(catalog["credentialMetrics"]["metrics"]) == 18
+    assert len(catalog["credentialMetrics"]["credentials"]) == 16
+    assert await run("metrics", "get", *scope, read_only=True) is None
+    credentials = tmp_path / "metrics-credentials.json"
+    credentials.write_text(json.dumps({"token": "PRIVATE_METRICS_TOKEN"}))
+    credentials.chmod(0o600)
+    target = ("--endpoint", metrics_listener.url, "--allow-http")
+    authority = await run(
+        "metrics",
+        "configure",
+        *scope,
+        "--site-version",
+        state.site.version,
+        *target,
+        "--credentials-file",
+        credentials,
+    )
+    stored = await sync_to_async(NvkeMetricsAuthority.objects.get)(guid=authority["id"])
+    original_ciphertext = bytes(stored.credential_ciphertext)
+    assert b"PRIVATE_METRICS_TOKEN" not in original_ciphertext
+    assert await sync_to_async(credentials_for)(stored) == {
+        "token": "PRIVATE_METRICS_TOKEN"
+    }
+
+    def review(value):
+        return (
+            *scope,
+            "--site-version",
+            value["siteVersion"],
+            "--authority-version",
+            value["version"],
+        )
+
+    verified = await run("metrics", "verify", *review(authority))
+    assert verified["verificationCode"] == "METRICS_READ" and verified["verifiedAt"]
+    assert verified["version"] == authority["version"]
+    authority = await run("metrics", "configure", *review(authority), *target)
+    await sync_to_async(stored.refresh_from_db)()
+    assert bytes(stored.credential_ciphertext) == original_ciphertext
+    assert not authority["verifiedAt"] and not authority["verificationCode"]
+    node = {"tenant_cluster": "diagnostic-cluster", "node": "cp-1"}
+    metrics_listener.body += "".join(
+        [
+            sample("credential_monitoring_enabled", 0),
+            sample("certificate_inspection_available", 0, **node),
+            sample("certificate_observation_age_seconds", "7200.125", **node),
+            sample("certificate_required", 0, **node, credential="super-admin"),
+            sample(
+                "certificate_observation_available", 1, **node, credential="super-admin"
+            ),
+            sample(
+                "certificate_not_after_timestamp_seconds",
+                1,
+                **node,
+                credential="super-admin",
+            ),
+            sample(
+                "serving_csr_count",
+                "9007199254740993",
+                tenant_cluster="diagnostic-cluster",
+                state="pending",
+            ),
+            sample(
+                "certificate_inspection_available",
+                1,
+                tenant_cluster="PRIVATE_FOREIGN",
+                node="PRIVATE_NODE",
+            ),
+        ]
+    )
+    async with temporal_test_env() as env:
+        queue = "nvke-cli-metrics-" + uuid4().hex
+
+        async def get_client():
+            return env.client
+
+        monkeypatch.setattr(workflow_client, "_get_client_async", get_client)
+        monkeypatch.setattr(workflow_client, "_temporal_enabled", lambda: True)
+        monkeypatch.setattr(workflow_client, "_task_queue", lambda: queue)
+        async with temporal_worker(
+            env,
+            task_queue=queue,
+            workflows=[NvkeOperationWorkflow],
+            activities=[nvke_operation_attempt],
+        ):
+            native = tmp_path / "metric-source.json"
+            native.write_text(json.dumps({"path": {"clusterID": identity}}))
+            native.chmod(0o600)
+            wait = ("--wait", "--poll-interval", "500ms", "--wait-timeout", "15s")
+            source = await run(
+                "controller",
+                "get-cluster",
+                *scope,
+                "--file",
+                native,
+                "--request-file",
+                tmp_path / "source-recovery.json",
+                *wait,
+            )
+            before_native, before_metrics = (
+                len(state.native_calls),
+                len(metrics_listener.calls),
+            )
+            recovery = tmp_path / "credential-recovery.json"
+            dropped_cli_replies["requestNvkeCredentialObservation("] = 1
+            lost = await run(
+                "metrics",
+                "request",
+                *scope,
+                "--site-version",
+                authority["siteVersion"],
+                "--authority-version",
+                authority["version"],
+                "--source-operation",
+                source["id"],
+                "--source-version",
+                source["version"],
+                "--request-file",
+                recovery,
+                *wait,
+                ok=False,
+            )
+            assert "preserve" in lost.stderr
+            assert dropped_cli_replies["requestNvkeCredentialObservation("] == 0
+            row = await run("metrics", "recover", "--request-file", recovery, *wait)
+            assert (
+                row["status"] == "SUCCEEDED"
+                and row["operationKey"] == "metrics.credentials"
+            )
+            assert len(metrics_listener.calls) == before_metrics + 1
+            assert len(state.native_calls) == before_native + 2
+            assert metrics_listener.calls[-1] == (
+                "/private-metrics",
+                "Bearer PRIVATE_METRICS_TOKEN",
+            )
+            original_recovery = recovery.read_bytes()
+            assert recovery.stat().st_mode & 0o777 == 0o600
+            assert (
+                identity.encode() not in original_recovery
+                and b"diagnostic-cluster" not in original_recovery
+            )
+            record = json.loads(original_recovery)
+            assert (
+                record["sourceOperationId"] == source["id"]
+                and record["sourceVersion"] == source["version"]
+            )
+            operation = await sync_to_async(NvkeOperation.objects.get)(guid=row["id"])
+            history = (
+                await env.client.get_workflow_handle(
+                    operation.workflow_id
+                ).fetch_history()
+            ).to_json()
+            for private in ("PRIVATE", "diagnostic-cluster", "cp-1", "samples"):
+                assert private not in history
+            observed = await run(
+                "metrics",
+                "observation",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                read_only=True,
+            )
+            assert (
+                observed["clusterId"] == identity
+                and observed["clusterReported"] is True
+            )
+            assert (
+                observed["collectionSucceeded"] is False
+                and observed["monitoringEnabled"] is False
+            )
+            assert observed["renewalAutomationEnabled"] is None
+            certificates = await run(
+                "metrics",
+                "certificates",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                read_only=True,
+            )
+            assert certificates["totalCount"] == 1
+            cert = certificates["items"][0]
+            assert (
+                cert["required"] is False and cert["latestInspectionAvailable"] is False
+            )
+            assert (
+                cert["observationAvailable"] is True
+                and cert["reportedExpiredAtScrape"] is True
+            )
+            samples = await run(
+                "metrics",
+                "samples",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--search",
+                "serving_csr",
+                read_only=True,
+            )
+            assert samples["items"][0]["value"] == "9007199254740993"
+            first = await run(
+                "metrics",
+                "samples",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--limit",
+                2,
+                read_only=True,
+            )
+            second = await run(
+                "metrics",
+                "samples",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--limit",
+                2,
+                "--after",
+                first["nextCursor"],
+                read_only=True,
+            )
+            assert not {item["key"] for item in first["items"]} & {
+                item["key"] for item in second["items"]
+            }
+            await run(
+                "metrics",
+                "certificates",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"],
+                "--limit",
+                2,
+                "--after",
+                first["nextCursor"],
+                read_only=True,
+                ok=False,
+            )
+            await run(
+                "metrics",
+                "observation",
+                row["id"],
+                *scope,
+                "--version",
+                row["version"] - 1,
+                read_only=True,
+                ok=False,
+            )
+            await run(
+                "operation",
+                "result",
+                row["id"],
+                "--output",
+                tmp_path / "forbidden-result.json",
+                read_only=True,
+                ok=False,
+            )
+            assert not (tmp_path / "forbidden-result.json").exists()
+            authority = await run(
+                "metrics",
+                "configure",
+                *review(authority),
+                *target,
+                "--clear-credentials",
+            )
+            assert not authority["hasCredentials"]
+            await sync_to_async(stored.refresh_from_db)()
+            assert await sync_to_async(credentials_for)(stored) == {}
+            authority = await run("metrics", "disable", *review(authority))
+            assert not authority["isEnabled"]
+            await run("metrics", "verify", *review(authority), ok=False)
+            authority = await run("metrics", "enable", *review(authority))
+            assert authority["isEnabled"]
+            authority = await run("metrics", "remove", *review(authority))
+            assert authority["deletedAt"] and not authority["isEnabled"]
+            assert await run("metrics", "get", *scope, read_only=True) is None
+            repeated = await run(
+                "metrics",
+                "request",
+                *scope,
+                "--request-file",
+                recovery,
+                "--authority-version",
+                999,
+                read_only=True,
+            )
+            recovered = await run(
+                "metrics", "recover", "--request-file", recovery, read_only=True
+            )
+            assert repeated["id"] == recovered["id"] == row["id"]
+            assert recovery.read_bytes() == original_recovery
+            assert (
+                await run(
+                    "metrics",
+                    "observation",
+                    row["id"],
+                    *scope,
+                    "--version",
+                    row["version"],
+                    read_only=True,
+                )
+            )["clusterId"] == identity
+            assert (
+                await sync_to_async(
+                    NvkeOperation.objects.filter(
+                        site=state.site, operation_key="metrics.credentials"
+                    ).count
+                )()
+                == 1
+            )
+            assert len(metrics_listener.calls) == before_metrics + 1
+            assert len(state.native_calls) == before_native + 2
