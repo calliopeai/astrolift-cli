@@ -340,6 +340,16 @@ and output SHA-256. Output is a new mode-0600 file and is never replaced.
 The default management stack's three CRDs must already exist. This command renders
 manifests without applying them or installing the management-engine controller.
 Upstream API caller authentication is deferred, so private access remains required.
+
+`astro nvke tooling management-controller --bundle DIR --profile PROFILE.json --output NEW.json`
+renders the pinned native manager with tenant-scoped NVKECluster/ConfigMap permissions,
+cluster-scoped release reads, leader election, preserved pod security and denied ingress.
+Its explicit profile binds a digest image, tenant namespace, existing provider-template
+ConfigMap and private controller endpoint/authentication mode. All six CRDs must already
+exist; the template ConfigMap belongs in the tenant namespace. Python 3.12+ with PyYAML
+is required. Both the renderer and its helper module are pinned and isolated from ambient
+imports. Output is exclusive and mode 0600. See [NVKE tooling](docs/nvke.md) for profile
+fields and the distinction between rendering and qualified installation.
 The manifest source pin and image digests do not independently establish binary
 build/release provenance. Hosted API/UI installation control and declarative
 reconciliation are separate work.

@@ -14,6 +14,7 @@ DESTINATION = ROOT / "internal/nvketooling"
 SOURCE = "kubernetes/nvke/tooling.py"
 BACKEND_SOURCE = "kubernetes/nvke/nktp_backend.py"
 MANAGEMENT_API_SOURCE = "kubernetes/nvke/management_api.py"
+MANAGEMENT_CONTROLLER_SOURCE = "kubernetes/nvke/management_controller.py"
 
 
 def describe(source):
@@ -52,6 +53,7 @@ def main():
         source = (DESTINATION / "tooling.py").read_bytes()
         backend = (DESTINATION / "nktp_backend.py").read_bytes()
         management_api = (DESTINATION / "management_api.py").read_bytes()
+        management_controller = (DESTINATION / "management_controller.py").read_bytes()
         revision = metadata["sourceRevision"]
     else:
         if (
@@ -74,6 +76,15 @@ def main():
                 str(options.source),
                 "show",
                 f"{revision}:{MANAGEMENT_API_SOURCE}",
+            ]
+        )
+        management_controller = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(options.source),
+                "show",
+                f"{revision}:{MANAGEMENT_CONTROLLER_SOURCE}",
             ]
         )
     if not re.fullmatch("[0-9a-f]{40}", revision):
@@ -101,6 +112,18 @@ def main():
     )
     if api_revision != upstream:
         raise ValueError("Management API renderer and native tooling revisions differ")
+    revision_imports = [
+        node
+        for node in ast.parse(management_controller).body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "management_api"
+        and node.level == 0
+        and any(item.name == "REVISION" and item.asname is None for item in node.names)
+    ]
+    if len(revision_imports) != 1:
+        raise ValueError(
+            "Management controller must use the pinned management API revision dependency"
+        )
     expected = {
         "format": 1,
         "sourceRevision": revision,
@@ -108,8 +131,16 @@ def main():
         "runnerSha256": hashlib.sha256(source).hexdigest(),
         "backendRendererSha256": hashlib.sha256(backend).hexdigest(),
         "managementApiRendererSha256": hashlib.sha256(management_api).hexdigest(),
+        "managementControllerRendererSha256": hashlib.sha256(
+            management_controller
+        ).hexdigest(),
         "commands": sorted(
-            [*commands, "render nktp-backend", "render management-apis"]
+            [
+                *commands,
+                "render nktp-backend",
+                "render management-apis",
+                "render management-controller",
+            ]
         ),
     }
     if options.check:
@@ -149,12 +180,26 @@ def main():
                 raise ValueError(
                     "Vendored management API renderer differs from its immutable source"
                 )
+            canonical_controller = subprocess.check_output(
+                [
+                    "git",
+                    "-C",
+                    str(options.source),
+                    "show",
+                    f"{revision}:{MANAGEMENT_CONTROLLER_SOURCE}",
+                ]
+            )
+            if canonical_controller != management_controller:
+                raise ValueError(
+                    "Vendored management controller renderer differs from its immutable source"
+                )
         print("NVKE native runner provenance verified")
     else:
         DESTINATION.mkdir(parents=True, exist_ok=True)
         (DESTINATION / "tooling.py").write_bytes(source)
         (DESTINATION / "nktp_backend.py").write_bytes(backend)
         (DESTINATION / "management_api.py").write_bytes(management_api)
+        (DESTINATION / "management_controller.py").write_bytes(management_controller)
         (DESTINATION / "provenance.json").write_text(
             json.dumps(expected, indent=2) + "\n"
         )

@@ -22,10 +22,10 @@ import (
 
 func TestInfoMatchesTheManagedCatalogAndCompleteNativeFamilies(t *testing.T) {
 	info, err := Info()
-	if err != nil || info.UpstreamRevision != nvkecatalog.Pinned().Revision || len(info.Commands) != 16 {
+	if err != nil || info.UpstreamRevision != nvkecatalog.Pinned().Revision || len(info.Commands) != 17 {
 		t.Fatalf("invalid native tool provenance: %v", err)
 	}
-	wanted := map[string]bool{"bootstrap site": false, "management install": false, "management configure-access": false, "inspect nvkr-release": false, "render management-apis": false}
+	wanted := map[string]bool{"bootstrap site": false, "management install": false, "management configure-access": false, "inspect nvkr-release": false, "render management-apis": false, "render management-controller": false}
 	for _, command := range info.Commands {
 		if _, ok := wanted[command]; ok {
 			wanted[command] = true
@@ -47,6 +47,15 @@ func TestManagementAPIRendererDriftIsRefusedBeforeInvocation(t *testing.T) {
 	managementAPIRenderer = append(append([]byte(nil), original...), []byte("\n# changed\n")...)
 	if _, err := Info(); err == nil {
 		t.Fatal("management API renderer drift was accepted")
+	}
+}
+
+func TestManagementControllerRendererDriftIsRefusedBeforeInvocation(t *testing.T) {
+	original := managementControllerRenderer
+	t.Cleanup(func() { managementControllerRenderer = original })
+	managementControllerRenderer = append(append([]byte(nil), original...), []byte("\n# changed\n")...)
+	if _, err := Info(); err == nil {
+		t.Fatal("management controller renderer drift was accepted")
 	}
 }
 

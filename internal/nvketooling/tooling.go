@@ -31,17 +31,21 @@ var backendRenderer []byte
 //go:embed management_api.py
 var managementAPIRenderer []byte
 
+//go:embed management_controller.py
+var managementControllerRenderer []byte
+
 //go:embed provenance.json
 var provenance []byte
 
 type Manifest struct {
-	Format                      int      `json:"format"`
-	SourceRevision              string   `json:"sourceRevision"`
-	UpstreamRevision            string   `json:"upstreamRevision"`
-	RunnerSHA256                string   `json:"runnerSha256"`
-	BackendRendererSHA256       string   `json:"backendRendererSha256"`
-	ManagementAPIRendererSHA256 string   `json:"managementApiRendererSha256"`
-	Commands                    []string `json:"commands"`
+	Format                             int      `json:"format"`
+	SourceRevision                     string   `json:"sourceRevision"`
+	UpstreamRevision                   string   `json:"upstreamRevision"`
+	RunnerSHA256                       string   `json:"runnerSha256"`
+	BackendRendererSHA256              string   `json:"backendRendererSha256"`
+	ManagementAPIRendererSHA256        string   `json:"managementApiRendererSha256"`
+	ManagementControllerRendererSHA256 string   `json:"managementControllerRendererSha256"`
+	Commands                           []string `json:"commands"`
 }
 
 type Bundle struct {
@@ -71,6 +75,7 @@ func Info() (Manifest, error) {
 	digest := sha256.Sum256(runner)
 	backendDigest := sha256.Sum256(backendRenderer)
 	apiDigest := sha256.Sum256(managementAPIRenderer)
+	controllerDigest := sha256.Sum256(managementControllerRenderer)
 	if json.Unmarshal(provenance, &result) != nil || result.Format != 1 ||
 		result.UpstreamRevision != nvkecatalog.Pinned().Revision ||
 		result.RunnerSHA256 != hex.EncodeToString(digest[:]) ||
@@ -79,6 +84,9 @@ func Info() (Manifest, error) {
 	}
 	if result.ManagementAPIRendererSHA256 != hex.EncodeToString(apiDigest[:]) {
 		return result, errors.New("embedded NVKE management API renderer provenance is invalid")
+	}
+	if result.ManagementControllerRendererSHA256 != hex.EncodeToString(controllerDigest[:]) {
+		return result, errors.New("embedded NVKE management controller renderer provenance is invalid")
 	}
 	return result, nil
 }
@@ -100,6 +108,24 @@ func RenderManagementAPIs(ctx context.Context, python, bundle, profile, output s
 	digest, err := hex.DecodeString(result.SHA256)
 	if err != nil || len(digest) != sha256.Size {
 		return nil, errors.New("management API manifest digest was not confirmed")
+	}
+	return &result, nil
+}
+
+func RenderManagementController(ctx context.Context, python, bundle, profile, output string) (*ManagementAPIProfile, error) {
+	data, status, err := invokeProgramFiles(ctx, python, managementControllerRenderer,
+		map[string][]byte{"management_api.py": managementAPIRenderer},
+		[]string{"--source", filepath.Join(bundle, "source"), "--profile", profile, "--output", output}, nil, "yaml")
+	if err != nil {
+		return nil, err
+	}
+	var result ManagementAPIProfile
+	if status != 0 || decode(data, &result) != nil || result.ManifestSourceRevision != nvkecatalog.Pinned().Revision {
+		return nil, errors.New("management controller profile rendering failed; check the source pin, profile and new output path")
+	}
+	digest, err := hex.DecodeString(result.SHA256)
+	if err != nil || len(digest) != sha256.Size {
+		return nil, errors.New("management controller manifest digest was not confirmed")
 	}
 	return &result, nil
 }
@@ -198,7 +224,7 @@ func pythonRuntime(ctx context.Context, requested string, modules ...string) (st
 		}
 	}
 	if len(modules) > 0 {
-		return "", errors.New("native management API rendering requires Python 3.12+ with PyYAML; install it or select --python")
+		return "", errors.New("native management rendering requires Python 3.12+ with PyYAML; install it or select --python")
 	}
 	return "", errors.New("native NVKE operator tooling requires Python 3.12+; install it or select --python")
 }
@@ -217,6 +243,10 @@ func invoke(ctx context.Context, requestedPython string, args []string, input io
 }
 
 func invokeProgram(ctx context.Context, requestedPython string, program []byte, args []string, input io.Reader, modules ...string) ([]byte, int, error) {
+	return invokeProgramFiles(ctx, requestedPython, program, nil, args, input, modules...)
+}
+
+func invokeProgramFiles(ctx context.Context, requestedPython string, program []byte, files map[string][]byte, args []string, input io.Reader, modules ...string) ([]byte, int, error) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return nil, 0, errors.New("native NVKE operator tooling supports Linux and macOS")
 	}
@@ -241,7 +271,18 @@ func invokeProgram(ctx context.Context, requestedPython string, program []byte, 
 	if err := privatefile.Write(filename, program); err != nil {
 		return nil, 0, errors.New("could not prepare the private native runner")
 	}
-	command := exec.CommandContext(ctx, python, append([]string{"-I", filename}, args...)...)
+	pythonArgs := []string{"-I", filename}
+	if len(files) > 0 {
+		for name, content := range files {
+			if name != "management_api.py" || privatefile.Write(filepath.Join(directory, name), content) != nil {
+				return nil, 0, errors.New("could not prepare the private native renderer dependency")
+			}
+		}
+		// Isolated Python excludes the script directory. Only this owned temporary
+		// directory may supply the renderer's pinned sibling module.
+		pythonArgs = []string{"-I", "-c", "import runpy,sys; p=sys.argv.pop(1); sys.path.insert(0,p); runpy.run_path(p+'/tooling.py',run_name='__main__')", directory}
+	}
+	command := exec.CommandContext(ctx, python, append(pythonArgs, args...)...)
 	command.Env = nativeEnvironment()
 	command.Stdin = input
 	var output metadataBuffer

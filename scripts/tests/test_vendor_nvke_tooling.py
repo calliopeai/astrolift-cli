@@ -40,6 +40,8 @@ class NativeRunnerVendorTest(unittest.TestCase):
         self.backend.write_text('REVISION = "' + "c" * 40 + '"\n')
         self.management_api = self.source / vendor.MANAGEMENT_API_SOURCE
         self.management_api.write_text('REVISION = "' + "c" * 40 + '"\n')
+        self.management_controller = self.source / vendor.MANAGEMENT_CONTROLLER_SOURCE
+        self.management_controller.write_text("from management_api import REVISION\n")
         self.git("add", ".")
         self.git("commit", "-qm", "native runner fixture")
         self.revision = self.git("rev-parse", "HEAD").decode().strip()
@@ -75,6 +77,7 @@ class NativeRunnerVendorTest(unittest.TestCase):
         self.management_api.write_bytes(
             b"uncommitted API renderer must not enter the release"
         )
+        self.management_controller.write_bytes(b"uncommitted controller renderer")
         self.refresh()
         self.assertEqual((self.destination / "tooling.py").read_bytes(), self.original)
         self.assertEqual(
@@ -87,6 +90,10 @@ class NativeRunnerVendorTest(unittest.TestCase):
             'REVISION = "' + "c" * 40 + '"\n',
         )
         self.assertEqual(metadata["sourceRevision"], self.revision)
+        self.assertEqual(
+            (self.destination / "management_controller.py").read_text(),
+            "from management_api import REVISION\n",
+        )
         self.run_vendor("--check", "--source", str(self.source))
 
     def test_offline_check_refuses_changed_runner_bytes(self):
@@ -133,6 +140,22 @@ class NativeRunnerVendorTest(unittest.TestCase):
         self.git("commit", "-qm", "mismatched renderer fixture")
         self.revision = self.git("rev-parse", "HEAD").decode().strip()
         with self.assertRaisesRegex(ValueError, "API renderer.*revisions differ"):
+            self.refresh()
+        self.assertFalse(self.destination.exists())
+
+    def test_offline_check_refuses_changed_management_controller_renderer(self):
+        self.refresh()
+        with (self.destination / "management_controller.py").open("ab") as output:
+            output.write(b"\n# changed\n")
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            self.run_vendor("--check")
+
+    def test_controller_revision_dependency_must_be_bound_to_the_pinned_api(self):
+        self.management_controller.write_text("from other_module import REVISION\n")
+        self.git("add", ".")
+        self.git("commit", "-qm", "changed controller dependency")
+        self.revision = self.git("rev-parse", "HEAD").decode().strip()
+        with self.assertRaisesRegex(ValueError, "pinned management API revision"):
             self.refresh()
         self.assertFalse(self.destination.exists())
 
