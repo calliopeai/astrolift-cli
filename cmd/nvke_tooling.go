@@ -77,6 +77,20 @@ distinct from infrastructure readiness. Inspect retained state before recovery.`
 	for _, flag := range []string{"bundle", "profile", "output"} {
 		_ = backend.MarkFlagRequired(flag)
 	}
-	group.AddCommand(catalog, prepare, run, backend)
+	apis := &cobra.Command{Use: "management-apis", Short: "Render pinned private operator/tenant API manifests", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		result, err := nvketooling.RenderManagementAPIs(cmd.Context(), resourceStringFlag(cmd, "python"), resourceStringFlag(cmd, "bundle"), resourceStringFlag(cmd, "profile"), resourceStringFlag(cmd, "output"))
+		if err != nil {
+			return err
+		}
+		return nvkeJSON(cmd, result)
+	}}
+	apis.Flags().String("bundle", "", "Prepared pinned native bundle (required)")
+	apis.Flags().String("profile", "", "Private API JSON profile with immutable images and tenant/client scope (required)")
+	apis.Flags().String("output", "", "New private Kubernetes manifest (required; never replaced)")
+	apis.Flags().String("python", "", "Python 3.12+ with PyYAML (auto-detected by default)")
+	for _, flag := range []string{"bundle", "profile", "output"} {
+		_ = apis.MarkFlagRequired(flag)
+	}
+	group.AddCommand(catalog, prepare, run, backend, apis)
 	return group
 }

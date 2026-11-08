@@ -176,6 +176,80 @@ class CompiledNativeToolingTest(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertNotIn("PRIVATE_TOKEN", failed.stdout + failed.stderr)
 
+    def test_compiled_management_apis_keep_scope_private_and_output_exclusive(self):
+        profile = self.workspace / "management-profile.json"
+        config = {
+            "name": "native-apis",
+            "namespace": "native-api-system",
+            "tenantNamespace": "native-org",
+            "images": {
+                "operator": "registry.example/operator@sha256:" + "a" * 64,
+                "tenant": "registry.example/tenant@sha256:" + "b" * 64,
+            },
+            "clients": [],
+        }
+        profile.write_text(json.dumps(config))
+        output = self.workspace / "management-apis.json"
+        arguments = [
+            "management-apis",
+            "--bundle",
+            self.bundle,
+            "--profile",
+            str(profile),
+            "--output",
+            str(output),
+            "--json",
+        ]
+        if os.environ.get("NVKE_TEST_TOOLING_PYTHON"):
+            arguments.extend(["--python", os.environ["NVKE_TEST_TOOLING_PYTHON"]])
+        response = self.invoke(arguments)
+        self.assertEqual(
+            response.returncode, 0, "compiled management API rendering failed"
+        )
+        metadata = json.loads(response.stdout)
+        self.assertEqual(metadata["manifestSourceRevision"], REVISION)
+        self.assertEqual(
+            metadata["sha256"], hashlib.sha256(output.read_bytes()).hexdigest()
+        )
+        self.assertNotIn("registry.example", response.stdout + response.stderr)
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        rows = json.loads(output.read_text())["items"]
+        self.assertTrue(
+            all(
+                r["spec"]["type"] == "ClusterIP" for r in rows if r["kind"] == "Service"
+            )
+        )
+        self.assertEqual(
+            next(r for r in rows if r["kind"] == "NetworkPolicy")["spec"]["ingress"], []
+        )
+        self.assertTrue(
+            all(
+                r["metadata"]["namespace"] == "native-org"
+                for r in rows
+                if r["kind"] in {"Role", "RoleBinding"}
+            )
+        )
+        original = output.read_bytes()
+        self.assertNotEqual(self.invoke(arguments).returncode, 0)
+        self.assertEqual(output.read_bytes(), original)
+        config["clients"] = [{"namespace": "other-org", "podLabels": {}}]
+        profile.write_text(json.dumps(config))
+        invalid = self.workspace / "invalid-management-apis.json"
+        arguments[arguments.index(str(output))] = str(invalid)
+        failed = self.invoke(arguments)
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertFalse(invalid.exists())
+        self.assertNotIn("other-org", failed.stdout + failed.stderr)
+        config["clients"] = []
+        config["credentials"] = "PRIVATE_TOKEN"
+        profile.write_text(json.dumps(config))
+        invalid_credentials = self.workspace / "invalid-credentials-apis.json"
+        arguments[arguments.index(str(invalid))] = str(invalid_credentials)
+        failed = self.invoke(arguments)
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertFalse(invalid_credentials.exists())
+        self.assertNotIn("PRIVATE_TOKEN", failed.stdout + failed.stderr)
+
     @unittest.skipUnless(
         os.environ.get("NVKE_TEST_UPSTREAM"),
         "Select a pinned upstream checkout for native build proof",

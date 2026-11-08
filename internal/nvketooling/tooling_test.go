@@ -22,10 +22,10 @@ import (
 
 func TestInfoMatchesTheManagedCatalogAndCompleteNativeFamilies(t *testing.T) {
 	info, err := Info()
-	if err != nil || info.UpstreamRevision != nvkecatalog.Pinned().Revision || len(info.Commands) != 15 {
+	if err != nil || info.UpstreamRevision != nvkecatalog.Pinned().Revision || len(info.Commands) != 16 {
 		t.Fatalf("invalid native tool provenance: %v", err)
 	}
-	wanted := map[string]bool{"bootstrap site": false, "management install": false, "management configure-access": false, "inspect nvkr-release": false}
+	wanted := map[string]bool{"bootstrap site": false, "management install": false, "management configure-access": false, "inspect nvkr-release": false, "render management-apis": false}
 	for _, command := range info.Commands {
 		if _, ok := wanted[command]; ok {
 			wanted[command] = true
@@ -38,6 +38,15 @@ func TestInfoMatchesTheManagedCatalogAndCompleteNativeFamilies(t *testing.T) {
 		if !found {
 			t.Errorf("missing native tooling family %s", command)
 		}
+	}
+}
+
+func TestManagementAPIRendererDriftIsRefusedBeforeInvocation(t *testing.T) {
+	original := managementAPIRenderer
+	t.Cleanup(func() { managementAPIRenderer = original })
+	managementAPIRenderer = append(append([]byte(nil), original...), []byte("\n# changed\n")...)
+	if _, err := Info(); err == nil {
+		t.Fatal("management API renderer drift was accepted")
 	}
 }
 
