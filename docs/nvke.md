@@ -201,14 +201,16 @@ Temporal tests do not qualify collector behavior on live NVKE nodes.
 ## Qualification and maintenance
 
 The 88 API/resource actions are wired through the durable API. Local native tooling
-is exposed through `astro nvke tooling` as described below. Live bootstrap/install,
-node preparation, telemetry and managed workload access remain part of the broader
-integration work; these commands alone
-do not claim their completion. A controller create whose response/ID is lost
+is exposed through `astro nvke tooling` as described below. Paired local source-built
+qualification includes seed/node bootstrap, the default management stack, private
+operator/tenant APIs and one SDK-driven NICo-simulator tenant with two Ready nodes.
+Hosted API/UI/CLI flows against that site, declarative reconciliation, production
+artifact/telemetry qualification and physical providers remain broader integration
+work. These commands alone do not claim their completion. A controller create whose response/ID is lost
 requires operator investigation. OIDC enablement lacks a direct upstream read-back
 field, and declared pool readiness counters are not all populated by the pinned
 management engine; the backend waits for positive evidence rather than labelling
-acceptance as Ready. Real management-plane/live qualification remains required.
+acceptance as Ready. Live deployment qualification remains required.
 
 Normal builds use the committed offline command vocabulary. To refresh it from an
 explicitly selected paired provider, use that provider's Python environment:
@@ -294,6 +296,29 @@ TLS mounts, receivers/processors, site labels and queue/retry settings for both
 protocols. These checks do not establish runtime Collector readiness or ingestion:
 validate certificates, all three signals, site identity and backend failure recovery
 on the installed site. Management NKTP does not collect workload-cluster-local data.
+
+Render the private management-engine operator/tenant API manifests with:
+
+```bash
+astro nvke tooling management-apis --bundle /private/native-bundle \
+  --profile /private/management-api-profile.json --output /private/management-apis.json
+```
+
+This renderer additionally requires PyYAML in the selected Python 3.12+ runtime.
+The profile supplies a cluster-unique `name`, `namespace`, `tenantNamespace`, and
+`images.operator`/`images.tenant` immutable repository-at-SHA256 references. Optional
+`clients` entries require both `namespace` and nonempty `podLabels`; an empty list
+denies pod ingress. The output preserves native workload RBAC and pod security,
+binds the tenant API to its namespace and exposes ClusterIP services only. It adds
+the three management-engine CRDs; the default stack's three release/image CRDs
+must already exist. `imagePullPolicy` optionally selects `Always`, `IfNotPresent`
+or `Never` for local preloaded images.
+
+Upstream caller authentication is deferred, so API access must remain private.
+Rendering does not apply manifests, install the controller manager, establish
+declarative reconciliation or prove image build/release provenance. CLI output
+contains only `manifestSourceRevision` and the output `sha256`; the manifest is a
+new mode-0600 file. Existing output is never replaced, including after a lost reply.
 
 Native stdout/stderr remain private files. CLI stdout contains only run metadata and
 artifact paths. Astro API-token environment variables are not forwarded to native

@@ -1,9 +1,10 @@
 {
   "format": 1,
-  "sourceRevision": "2218f1cd93a9215f4445e3ed95702f1cbe848c5f",
+  "sourceRevision": "93619bca993b501c4b34b04a0460d483a53c5146",
   "upstreamRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
   "runnerSha256": "0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd",
   "backendRendererSha256": "8f9a22c5d953f7c0765cfda6cf991fd2b4d6a31685916d1bd3983c6418e30bb1",
+  "managementApiRendererSha256": "d16b7ed50a5c03d1ba6e972aa06fab04ea4dc8942109f32ae5212c7769ef7b18",
   "commands": [
     "bootstrap site",
     "generate oidc-kubeconfig",
@@ -17,6 +18,7 @@
     "management configure-access",
     "management install",
     "render deploy-path",
+    "render management-apis",
     "render nktp-backend",
     "validate sitespec",
     "version"

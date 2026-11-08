@@ -328,6 +328,22 @@ for execution). `--python` selects a runtime explicitly. The CLI returns metadat
 private output-file paths; native output is kept in the workspace. Preserve its attempt
 records after failure or interruption and inspect retained infrastructure before recovery.
 
+`astro nvke tooling management-apis --bundle DIR --profile PROFILE.json --output NEW.json`
+renders source-pinned private operator/tenant API deployments, the additional CRDs,
+tenant-scoped RBAC, ClusterIP services and an ingress policy. It requires Python 3.12+
+with PyYAML; `--python` can select a virtual environment. The profile supplies a
+cluster-unique name, runtime/tenant namespaces and immutable operator/tenant image
+references. An empty `clients` list denies pod ingress; allowed clients must bind both
+namespace and nonempty pod labels. `--json` returns only the manifest-source revision
+and output SHA-256. Output is a new mode-0600 file and is never replaced.
+
+The default management stack's three CRDs must already exist. This command renders
+manifests without applying them or installing the management-engine controller.
+Upstream API caller authentication is deferred, so private access remains required.
+The manifest source pin and image digests do not independently establish binary
+build/release provenance. Hosted API/UI installation control and declarative
+reconciliation are separate work.
+
 ### As an operator
 
 Operator commands configure the platform itself rather than tenant

@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DESTINATION = ROOT / "internal/nvketooling"
 SOURCE = "kubernetes/nvke/tooling.py"
 BACKEND_SOURCE = "kubernetes/nvke/nktp_backend.py"
+MANAGEMENT_API_SOURCE = "kubernetes/nvke/management_api.py"
 
 
 def describe(source):
@@ -50,6 +51,7 @@ def main():
         metadata = json.loads((DESTINATION / "provenance.json").read_text())
         source = (DESTINATION / "tooling.py").read_bytes()
         backend = (DESTINATION / "nktp_backend.py").read_bytes()
+        management_api = (DESTINATION / "management_api.py").read_bytes()
         revision = metadata["sourceRevision"]
     else:
         if (
@@ -65,6 +67,15 @@ def main():
         backend = subprocess.check_output(
             ["git", "-C", str(options.source), "show", f"{revision}:{BACKEND_SOURCE}"]
         )
+        management_api = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(options.source),
+                "show",
+                f"{revision}:{MANAGEMENT_API_SOURCE}",
+            ]
+        )
     if not re.fullmatch("[0-9a-f]{40}", revision):
         raise ValueError("source revision must be a full immutable commit")
     upstream, commands = describe(source)
@@ -79,13 +90,27 @@ def main():
     )
     if backend_revision != upstream:
         raise ValueError("NKTP renderer and native tooling revisions differ")
+    api_revision = next(
+        ast.literal_eval(node.value)
+        for node in ast.parse(management_api).body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "REVISION"
+            for target in node.targets
+        )
+    )
+    if api_revision != upstream:
+        raise ValueError("Management API renderer and native tooling revisions differ")
     expected = {
         "format": 1,
         "sourceRevision": revision,
         "upstreamRevision": upstream,
         "runnerSha256": hashlib.sha256(source).hexdigest(),
         "backendRendererSha256": hashlib.sha256(backend).hexdigest(),
-        "commands": sorted([*commands, "render nktp-backend"]),
+        "managementApiRendererSha256": hashlib.sha256(management_api).hexdigest(),
+        "commands": sorted(
+            [*commands, "render nktp-backend", "render management-apis"]
+        ),
     }
     if options.check:
         if metadata != expected:
@@ -111,11 +136,25 @@ def main():
                 raise ValueError(
                     "vendored NKTP renderer differs from its immutable source"
                 )
+            canonical_api = subprocess.check_output(
+                [
+                    "git",
+                    "-C",
+                    str(options.source),
+                    "show",
+                    f"{revision}:{MANAGEMENT_API_SOURCE}",
+                ]
+            )
+            if canonical_api != management_api:
+                raise ValueError(
+                    "Vendored management API renderer differs from its immutable source"
+                )
         print("NVKE native runner provenance verified")
     else:
         DESTINATION.mkdir(parents=True, exist_ok=True)
         (DESTINATION / "tooling.py").write_bytes(source)
         (DESTINATION / "nktp_backend.py").write_bytes(backend)
+        (DESTINATION / "management_api.py").write_bytes(management_api)
         (DESTINATION / "provenance.json").write_text(
             json.dumps(expected, indent=2) + "\n"
         )
