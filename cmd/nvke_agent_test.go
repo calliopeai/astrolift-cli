@@ -16,6 +16,7 @@ import (
 
 	"github.com/calliopeai/astrolift-cli/internal/api"
 	"github.com/calliopeai/astrolift-cli/internal/nvkecatalog"
+	"github.com/calliopeai/astrolift-cli/internal/privatefile"
 	"github.com/spf13/cobra"
 )
 
@@ -138,7 +139,7 @@ func agentTestInput(t *testing.T, cmd *cobra.Command) string {
 	t.Helper()
 	text := `{"format":1,"revision":"` + nvkecatalog.Pinned().Revision + `","siteId":"` + nvkeTestSite + `","command":"generate.sitespec","positionals":["private-site"],"options":{"nodes":"input:nodes.csv"},"files":{"nodes.csv":"PRIVATE_NODES_9007199254740993"}}`
 	file := filepath.Join(t.TempDir(), "native.json")
-	if err := os.WriteFile(file, []byte(text), 0600); err != nil {
+	if err := privatefile.Write(file, []byte(text)); err != nil {
 		t.Fatal(err)
 	}
 	_ = cmd.Flags().Set("file", file)
@@ -207,11 +208,11 @@ func TestNVKEAgentPendingRecoveryRefusesChangedInputAndRecoverNeverAdmits(t *tes
 	if err := runNVKEAgentRequest(recovery, context.Background(), nvkeTestClient(server), true); err == nil || writes != 1 {
 		t.Fatal("recover admitted work")
 	}
-	_ = os.WriteFile(resourceStringFlag(cmd, "file"), []byte(`{"PRIVATE":"changed"}`), 0600)
+	_ = privatefile.Write(resourceStringFlag(cmd, "file"), []byte(`{"PRIVATE":"changed"}`))
 	if err := runNVKEAgentRequest(cmd, context.Background(), nvkeTestClient(server), false); err == nil || writes != 1 {
 		t.Fatal("changed input replaced original intent")
 	}
-	if err := os.WriteFile(resourceStringFlag(cmd, "file"), []byte(originalText), 0600); err != nil {
+	if err := privatefile.Write(resourceStringFlag(cmd, "file"), []byte(originalText)); err != nil {
 		t.Fatal(err)
 	}
 	for _, changed := range []struct{ flag, value, original string }{
