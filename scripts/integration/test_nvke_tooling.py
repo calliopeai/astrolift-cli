@@ -28,7 +28,7 @@ class CompiledNativeToolingTest(unittest.TestCase):
         self.workspace = Path(self.temporary.name)
         self.bundle = BUNDLE
 
-    def invoke(self, arguments, timeout=45, input_text=None):
+    def invoke(self, arguments, timeout=45, input_text=None, cwd=None):
         return subprocess.run(
             [CLI, "nvke", "tooling", *arguments],
             capture_output=True,
@@ -36,6 +36,7 @@ class CompiledNativeToolingTest(unittest.TestCase):
             input=input_text,
             timeout=timeout,
             check=False,
+            cwd=cwd,
         )
 
     def native(self, arguments, input_text=None):
@@ -249,6 +250,109 @@ class CompiledNativeToolingTest(unittest.TestCase):
         self.assertNotEqual(failed.returncode, 0)
         self.assertFalse(invalid_credentials.exists())
         self.assertNotIn("PRIVATE_TOKEN", failed.stdout + failed.stderr)
+
+    def test_compiled_controller_profile_keeps_native_scope_and_isolates_imports(self):
+        profile = self.workspace / "controller-profile.json"
+        config = {
+            "name": "native-engine",
+            "namespace": "native-engine-system",
+            "tenantNamespace": "native-org",
+            "image": "registry.example/manager@sha256:" + "a" * 64,
+            "infraTemplateConfigMap": "nico-templates",
+            "controllerEndpoint": "http://nvke-controller.nvke-controller.svc.cluster.local:8080/api",
+            "controllerAuth": {"mode": "private-network"},
+        }
+        profile.write_text(json.dumps(config))
+        output = self.workspace / "controller.json"
+        arguments = [
+            "management-controller",
+            "--bundle",
+            self.bundle,
+            "--profile",
+            str(profile),
+            "--output",
+            str(output),
+            "--json",
+        ]
+        if os.environ.get("NVKE_TEST_TOOLING_PYTHON"):
+            arguments.extend(["--python", os.environ["NVKE_TEST_TOOLING_PYTHON"]])
+        marker = self.workspace / "ambient-module-ran"
+        (self.workspace / "management_api.py").write_text(
+            "from pathlib import Path\nPath("
+            + repr(str(marker))
+            + ").write_text('unexpected import')\nraise RuntimeError('PRIVATE_AMBIENT_MODULE')\n"
+        )
+        with patch.dict(os.environ, {"PYTHONPATH": str(self.workspace)}):
+            response = self.invoke(arguments, cwd=self.workspace)
+        self.assertEqual(response.returncode, 0, "compiled controller rendering failed")
+        self.assertFalse(marker.exists())
+        metadata = json.loads(response.stdout)
+        self.assertEqual(metadata["manifestSourceRevision"], REVISION)
+        self.assertEqual(
+            metadata["sha256"], hashlib.sha256(output.read_bytes()).hexdigest()
+        )
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        rows = json.loads(output.read_text())["items"]
+        self.assertFalse(any(row["kind"] in {"Secret", "Service"} for row in rows))
+        role = next(row for row in rows if row["kind"] == "ClusterRole")
+        self.assertEqual(len(role["rules"]), 1)
+        self.assertEqual(
+            set(role["rules"][0]["resources"]),
+            {
+                "clusterreleasechannels",
+                "clusterreleases",
+                "controlplaneclasses",
+                "machineimages",
+            },
+        )
+        scoped = next(
+            row
+            for row in rows
+            if row["kind"] == "Role" and row["metadata"]["namespace"] == "native-org"
+        )
+        self.assertIn("nvkeclusters/status", str(scoped["rules"]))
+        container = next(row for row in rows if row["kind"] == "Deployment")["spec"][
+            "template"
+        ]["spec"]["containers"][0]
+        self.assertIn("--namespace=native-org", container["args"])
+        self.assertIn("--metrics-bind-address=0", container["args"])
+        self.assertEqual(
+            next(row for row in rows if row["kind"] == "NetworkPolicy")["spec"][
+                "ingress"
+            ],
+            [],
+        )
+        retained = output.read_bytes()
+        self.assertNotEqual(self.invoke(arguments).returncode, 0)
+        self.assertEqual(output.read_bytes(), retained)
+        output.unlink()
+        config["controllerAuth"] = {
+            "mode": "projected",
+            "audience": "https://nvke.example",
+        }
+        profile.write_text(json.dumps(config))
+        self.assertEqual(self.invoke(arguments).returncode, 0)
+        rows = json.loads(output.read_text())["items"]
+        pod = next(row for row in rows if row["kind"] == "Deployment")["spec"][
+            "template"
+        ]["spec"]
+        self.assertEqual(
+            pod["volumes"][0]["projected"]["sources"][0]["serviceAccountToken"][
+                "audience"
+            ],
+            "https://nvke.example",
+        )
+        output.unlink()
+        for key, value in [
+            ("controllerEndpoint", "http://external.example/api"),
+            ("credentials", "PRIVATE_TOKEN"),
+        ]:
+            candidate = {**config, key: value}
+            profile.write_text(json.dumps(candidate))
+            failed = self.invoke(arguments)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertNotIn("PRIVATE_TOKEN", failed.stdout + failed.stderr)
+            self.assertFalse(output.exists())
 
     @unittest.skipUnless(
         os.environ.get("NVKE_TEST_UPSTREAM"),

@@ -320,6 +320,37 @@ declarative reconciliation or prove image build/release provenance. CLI output
 contains only `manifestSourceRevision` and the output `sha256`; the manifest is a
 new mode-0600 file. Existing output is never replaced, including after a lost reply.
 
+Render the tenant-scoped management controller with:
+
+```bash
+astro nvke tooling management-controller --bundle /private/native-bundle \
+  --profile /private/controller-profile.json --output /private/controller.json
+```
+
+Its profile requires `name`, runtime `namespace`, `tenantNamespace`, immutable
+`image`, `infraTemplateConfigMap`, an internal Service `controllerEndpoint` ending
+in `/api`, and explicit `controllerAuth`. Projected authentication uses
+`{"mode":"projected","audience":"https://CONFIGURED_CONTROLLER_AUDIENCE"}`;
+an isolated controller without caller authentication must explicitly select
+`{"mode":"private-network"}` and retain its private access boundary. This does
+not configure the controller's verifier or NetworkPolicy. `imagePullPolicy` has
+the same options as the API renderer.
+
+All six NVKE CRDs and the reviewed provider-template ConfigMap must already exist.
+The ConfigMap belongs in the tenant namespace. The output confines ConfigMap and
+NVKECluster permissions to that tenant, retains cluster-wide release reads and
+native pod security, enables leader election, disables metrics and denies ingress.
+Use a unique name and a separate runtime namespace per installation; the native
+leader-election Lease name is fixed. The embedded renderer and its helper module
+are both pinned and run in a private directory under isolated Python 3.12+ with
+PyYAML. Ambient module paths and the working directory cannot replace the helper.
+Output is exclusive and mode 0600; stdout contains only revision and digest.
+
+The paired ops qualification exercised native controller startup and a declarative
+local NICo-simulator tenant reaching two Ready nodes, including SDK ownership-checked
+workload access. This CLI command renders manifests; hosted installation controls,
+physical providers and production image/release qualification remain separate work.
+
 Native stdout/stderr remain private files. CLI stdout contains only run metadata and
 artifact paths. Astro API-token environment variables are not forwarded to native
 tools. Effectful bootstrap/install/access attempts are flushed before execution and
