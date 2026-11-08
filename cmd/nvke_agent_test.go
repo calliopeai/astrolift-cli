@@ -187,7 +187,7 @@ func TestNVKEAgentLostAdmissionReplyRecoversWithoutInputOrAnotherMutation(t *tes
 }
 func TestNVKEAgentPendingRecoveryRefusesChangedInputAndRecoverNeverAdmits(t *testing.T) {
 	cmd, _ := agentTestCommand(t, "request")
-	agentTestInput(t, cmd)
+	originalText := agentTestInput(t, cmd)
 	filename := resourceStringFlag(cmd, "request-file")
 	writes := 0
 	server := nvkeTestServer(t, func(request gqlRequest, w http.ResponseWriter) {
@@ -210,6 +210,23 @@ func TestNVKEAgentPendingRecoveryRefusesChangedInputAndRecoverNeverAdmits(t *tes
 	_ = os.WriteFile(resourceStringFlag(cmd, "file"), []byte(`{"PRIVATE":"changed"}`), 0600)
 	if err := runNVKEAgentRequest(cmd, context.Background(), nvkeTestClient(server), false); err == nil || writes != 1 {
 		t.Fatal("changed input replaced original intent")
+	}
+	if err := os.WriteFile(resourceStringFlag(cmd, "file"), []byte(originalText), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, changed := range []struct{ flag, value, original string }{
+		{"site-version", "8", "7"}, {"authority-version", "4", "3"},
+		{"operation-timeout", "60", "7200"}, {"acknowledge-infrastructure-change", "true", "false"},
+	} {
+		if err := cmd.Flags().Set(changed.flag, changed.value); err != nil {
+			t.Fatal(err)
+		}
+		if err := runNVKEAgentRequest(cmd, context.Background(), nvkeTestClient(server), false); err == nil || writes != 1 {
+			t.Fatalf("changed original %s admitted replacement work", changed.flag)
+		}
+		if err := cmd.Flags().Set(changed.flag, changed.original); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 func TestNVKEAgentArtifactChunksAreBoundAndOnlyCompleteHashesSucceed(t *testing.T) {
