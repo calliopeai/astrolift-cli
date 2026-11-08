@@ -10,7 +10,7 @@ import (
 
 const nvkeConnectionFields = `id version surface endpoint isEnabled allowHttp timeoutSeconds hasCredentials verifiedAt verificationCode`
 const nvkeSiteFields = `id version name slug organizationNamespace isActive upstreamRevision createdAt updatedAt connections { ` + nvkeConnectionFields + ` }`
-const nvkeOperationFields = `isInventory resourceSource { operationId version resourceKey } id version siteId requestId operationKey status stage generation errorCode errorMessage cancellationRequestedAt startedAt finishedAt deadline createdAt updatedAt`
+const nvkeOperationFields = `providerSource { connectionId connectionVersion siteVersion upstreamRevision } isInventory resourceSource { operationId version resourceKey } id version siteId requestId operationKey status stage generation errorCode errorMessage cancellationRequestedAt startedAt finishedAt deadline createdAt updatedAt`
 
 // NVKE credentials are write-only. Results may hold native scripts or kubeconfigs
 // and are fetched separately from the ordinary operation metadata.
@@ -44,6 +44,7 @@ type NVKEResourceSource struct {
 	ResourceKey *string `json:"resourceKey"`
 }
 type NVKEOperation struct {
+	ProviderSource          *NVKEProviderSource `json:"providerSource"`
 	IsInventory             bool                `json:"isInventory"`
 	ResourceSource          *NVKEResourceSource `json:"resourceSource"`
 	ID                      string              `json:"id"`
