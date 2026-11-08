@@ -301,6 +301,9 @@ func waitNVKEOperation(cmd *cobra.Command, ctx context.Context, c *api.Client, r
 		}
 		next, err := c.NVKEOperation(ctx, row.ID)
 		if err != nil {
+			if ctx.Err() != nil {
+				return fmt.Errorf("local wait ended for NVKE operation %s; the remote operation has not been cancelled", row.ID)
+			}
 			return err
 		}
 		if next.ID != row.ID || next.SiteID != row.SiteID || next.RequestID != row.RequestID || next.OperationKey != row.OperationKey || next.IsInventory != row.IsInventory || !sameNVKESource(next.ResourceSource, row.ResourceSource) || !sameNVKEProviderSource(next.ProviderSource, row.ProviderSource) {

@@ -272,6 +272,27 @@ func TestNVKEWaitTreatsReadinessAndUncertaintyTruthfully(t *testing.T) {
 		t.Fatalf("timeout: %v", err)
 	}
 }
+func TestNVKEWaitDeadlineDuringAnInflightReadRetainsTheRemoteOperation(t *testing.T) {
+	cmd, _, _, _ := nvkeTestCommand(t)
+	_ = cmd.Flags().Set("wait-timeout", "2s")
+	_ = cmd.Flags().Set("poll-interval", "500ms")
+	reads := make(chan struct{}, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
+		var body gqlRequest
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || !strings.HasPrefix(strings.TrimSpace(body.Query), "query") {
+			t.Error("waiting submitted something other than an observation")
+		}
+		reads <- struct{}{}
+		<-request.Context().Done()
+	}))
+	defer server.Close()
+	row := &api.NVKEOperation{ID: nvkeTestOperation, SiteID: nvkeTestSite, Status: "RUNNING"}
+	err := waitNVKEOperation(cmd, context.Background(), nvkeTestClient(server), row)
+	if err == nil || !strings.Contains(err.Error(), "not been cancelled") || !strings.Contains(err.Error(), row.ID) || len(reads) != 1 {
+		t.Fatalf("in-flight local deadline lost the retained operation: %v", err)
+	}
+}
+
 func TestNVKESensitiveResultRequiresExplicitOutputAndNeverOverwrites(t *testing.T) {
 	requests := 0
 	server := nvkeTestServer(t, func(_ gqlRequest, w http.ResponseWriter) {
