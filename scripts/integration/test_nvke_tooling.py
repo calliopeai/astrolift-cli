@@ -101,6 +101,81 @@ class CompiledNativeToolingTest(unittest.TestCase):
         )
         self.assertFalse((self.workspace / "bootstrap-state.json").exists())
 
+    def test_compiled_nktp_backend_profiles_are_private_and_source_pinned(self):
+        profile = self.workspace / "backend-profile.json"
+        for protocol, endpoint in (
+            ("grpc", "telemetry.example.test:4317"),
+            ("http", "https://telemetry.example.test/otlp"),
+        ):
+            profile.write_text(
+                json.dumps(
+                    {
+                        "protocol": protocol,
+                        "endpoint": endpoint,
+                        "authorization": {
+                            "secret": "astro-telemetry",
+                            "key": "authorization",
+                        },
+                        "tls": {
+                            "secret": "astro-tls",
+                            "caKey": "ca.crt",
+                            "certKey": "tls.crt",
+                            "keyKey": "tls.key",
+                        },
+                    }
+                )
+            )
+            output = self.workspace / (protocol + ".values.json")
+            arguments = [
+                "nktp-backend",
+                "--bundle",
+                self.bundle,
+                "--profile",
+                str(profile),
+                "--output",
+                str(output),
+                "--json",
+            ]
+            result = self.invoke(arguments)
+            self.assertEqual(
+                result.returncode, 0, "compiled NKTP profile rendering failed"
+            )
+            metadata = json.loads(result.stdout)
+            self.assertEqual(metadata["revision"], REVISION)
+            self.assertEqual(
+                metadata["sha256"], hashlib.sha256(output.read_bytes()).hexdigest()
+            )
+            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            self.assertNotIn(endpoint, result.stdout + result.stderr)
+            original = output.read_bytes()
+            duplicate = self.invoke(arguments)
+            self.assertNotEqual(duplicate.returncode, 0)
+            self.assertEqual(output.read_bytes(), original)
+            self.assertNotIn(endpoint, duplicate.stdout + duplicate.stderr)
+        profile.write_text(
+            json.dumps(
+                {
+                    "protocol": "grpc",
+                    "endpoint": "PRIVATE_TOKEN@telemetry.example.test:4317",
+                }
+            )
+        )
+        output = self.workspace / "invalid.values.json"
+        failed = self.invoke(
+            [
+                "nktp-backend",
+                "--bundle",
+                self.bundle,
+                "--profile",
+                str(profile),
+                "--output",
+                str(output),
+            ]
+        )
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertFalse(output.exists())
+        self.assertNotIn("PRIVATE_TOKEN", failed.stdout + failed.stderr)
+
     @unittest.skipUnless(
         os.environ.get("NVKE_TEST_UPSTREAM"),
         "Select a pinned upstream checkout for native build proof",

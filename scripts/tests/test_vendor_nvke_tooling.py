@@ -36,6 +36,8 @@ class NativeRunnerVendorTest(unittest.TestCase):
             + '"\nUTILITIES = {("generate", "sitespec")}\nMANAGEMENT_SCRIPTS = {"install": ("deploy/script.sh", ["install"])}\n'
         ).encode()
         self.runner.write_bytes(self.original)
+        self.backend = self.source / vendor.BACKEND_SOURCE
+        self.backend.write_text('REVISION = "' + "c" * 40 + '"\n')
         self.git("add", ".")
         self.git("commit", "-qm", "native runner fixture")
         self.revision = self.git("rev-parse", "HEAD").decode().strip()
@@ -67,8 +69,13 @@ class NativeRunnerVendorTest(unittest.TestCase):
 
     def test_dirty_checkout_does_not_enter_the_embedded_runner(self):
         self.runner.write_bytes(b"uncommitted code must not enter the release")
+        self.backend.write_bytes(b"uncommitted renderer must not enter the release")
         self.refresh()
         self.assertEqual((self.destination / "tooling.py").read_bytes(), self.original)
+        self.assertEqual(
+            (self.destination / "nktp_backend.py").read_text(),
+            'REVISION = "' + "c" * 40 + '"\n',
+        )
         metadata = json.loads((self.destination / "provenance.json").read_text())
         self.assertEqual(metadata["sourceRevision"], self.revision)
         self.run_vendor("--check", "--source", str(self.source))
@@ -88,6 +95,13 @@ class NativeRunnerVendorTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "revisions differ"):
             self.refresh()
         self.assertFalse(self.destination.exists())
+
+    def test_offline_check_refuses_changed_backend_renderer(self):
+        self.refresh()
+        with (self.destination / "nktp_backend.py").open("ab") as output:
+            output.write(b"\n# changed\n")
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            self.run_vendor("--check")
 
     def test_mutable_revision_name_is_not_accepted(self):
         with (

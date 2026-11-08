@@ -63,6 +63,20 @@ distinct from infrastructure readiness. Inspect retained state before recovery.`
 	run.Flags().String("python", "", "Python 3.12+ executable (auto-detected by default)")
 	_ = run.MarkFlagRequired("bundle")
 	_ = run.MarkFlagRequired("workspace")
-	group.AddCommand(catalog, prepare, run)
+	backend := &cobra.Command{Use: "nktp-backend", Short: "Render source-pinned NKTP TLS backend overrides from Secret references", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		result, err := nvketooling.RenderBackend(cmd.Context(), resourceStringFlag(cmd, "python"), resourceStringFlag(cmd, "bundle"), resourceStringFlag(cmd, "profile"), resourceStringFlag(cmd, "output"))
+		if err != nil {
+			return err
+		}
+		return nvkeJSON(cmd, result)
+	}}
+	backend.Flags().String("bundle", "", "Prepared pinned native bundle (required)")
+	backend.Flags().String("profile", "", "JSON backend profile with Secret references, never credential values (required)")
+	backend.Flags().String("output", "", "New private Helm values file (required; never replaced)")
+	backend.Flags().String("python", "", "Python 3.12+ executable (auto-detected by default)")
+	for _, flag := range []string{"bundle", "profile", "output"} {
+		_ = backend.MarkFlagRequired(flag)
+	}
+	group.AddCommand(catalog, prepare, run, backend)
 	return group
 }
