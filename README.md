@@ -295,6 +295,17 @@ rotation reset from a private JSON review; `reset recover` only looks up its
 original receipt. The server sends at most one native reset RPC and never
 repeats an unconfirmed sending intent. Renewal reset is unsupported.
 
+`metrics get/configure/verify/enable/disable/remove` manages a separate metrics
+scrape URL and write-only bearer/TLS credentials. `metrics catalog` shows the
+pinned credential gauges and vocabulary. `metrics request` requires a successful
+controller read plus reviewed site, metrics authority and source versions, and
+flushes its private recovery file before admission. `metrics recover` only looks
+up that original receipt. `metrics observation/certificates/samples` read a saved
+credential observation at its exact operation version, with server pagination and
+search for both page views. Missing evidence remains null, numeric values retain
+reported decimal precision, and expiry comparison is explicitly at scrape time.
+Latest inspection failure and retained certificate expiry remain separate facts.
+
 See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
 reconciliation, the complete command families and qualification limits.
 

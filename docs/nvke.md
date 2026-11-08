@@ -84,6 +84,9 @@ using generic requests against a reviewed newer server.
 
 ## Recovery, waiting and results
 
+Credential metrics have their own request and recovery commands described below;
+they accept a reviewed controller receipt rather than native input JSON.
+
 Every request requires `--site SITE_GUID` and `--request-file recovery.json`.
 The CLI reviews the site and connected contract, verifies the current caller, and
 exclusively creates and flushes a private recovery file before submitting anything.
@@ -123,6 +126,77 @@ Metadata commands never fetch them. `operation result` requires an explicit new
 private output path and never overwrites a file. Its JSON receipt contains only
 `{"saved":true}`. Use `--output -` only when intentionally writing the sensitive
 JSON result to stdout. `--json` is available on every command.
+
+## Credential metrics and certificate observations
+
+```bash
+astro nvke metrics catalog --json
+astro nvke metrics get --site SITE_GUID --json
+astro nvke metrics configure --site SITE_GUID --site-version SITE_VERSION \
+  --authority-version 0 --endpoint https://nvke.example:8080/metrics \
+  --credentials-file metrics-credentials.json --json
+astro nvke metrics verify --site SITE_GUID --site-version SITE_VERSION \
+  --authority-version AUTHORITY_VERSION --json
+astro nvke metrics request --site SITE_GUID --site-version SITE_VERSION \
+  --authority-version AUTHORITY_VERSION --source-operation GET_CLUSTER_OPERATION_GUID \
+  --source-version SOURCE_VERSION --request-file credential-recovery.json --wait --json
+astro nvke metrics recover --request-file credential-recovery.json --json
+astro nvke metrics observation CREDENTIAL_OPERATION_GUID --site SITE_GUID --version VERSION --json
+astro nvke metrics certificates CREDENTIAL_OPERATION_GUID --site SITE_GUID --version VERSION \
+  --limit 25 --search cp-1 --json
+astro nvke metrics samples CREDENTIAL_OPERATION_GUID --site SITE_GUID --version VERSION \
+  --limit 25 --after OPAQUE_CURSOR --json
+```
+
+Configure the full metrics listener URL explicitly; the CLI does not infer it from
+REST, reuse connection credentials or fetch the listener itself. The default is
+HTTPS. `--allow-http` explicitly permits HTTP for an evaluation listener.
+`--connection-timeout` bounds a scrape to 1–300 seconds, default 30. Private
+credential JSON contains `token`, `caPem`, `clientCertificatePem`, `clientKeyPem`;
+certificate and key must be supplied together. Use `--credentials-file -` for
+stdin. Omission preserves existing credentials; `--clear-credentials` clears
+them. Never put credentials in the URL or command arguments.
+
+`configure`, `enable`, `disable` and `remove` advance site/authority versions and
+clear verification. Always use their returned versions for the next change.
+`verify` records `METRICS_READ` without advancing either version; readable metrics
+do not prove collection success or cluster health. `remove` soft deletes the local
+authority. After a lost configuration reply, inspect `metrics get` before reviewing
+another change.
+
+Run a successful controller `get-cluster` after the last authority change. A new
+`metrics request` requires that source receipt/version, current site/metrics
+authority versions, both NVKE admin and read access, and a new private recovery
+file. It accepts no caller-supplied cluster name. The server derives the selector
+from its encrypted source, then checks the live controller UUID/name and
+provisioned/non-deleting state before and after the scrape. The request defaults
+to a 600-second observation deadline; `--operation-timeout` accepts 30–86400.
+Use ordinary `operation get/wait/cancel` for the returned durable receipt.
+
+The recovery file contains scope, reviewed versions, source receipt, pinned
+revision, deadline and request UUID, with no native inputs, metrics URL or bearer.
+Reusing `metrics request` checks the original receipt before current authority or
+source state. If no receipt is visible, it reuses the identical recorded request;
+changed explicit versions, source or deadline are refused. `metrics recover`
+never re-admits. Preserve the file after uncertain transport outcomes.
+
+Historical `observation`, `certificates` and `samples` require only NVKE read access
+and the exact successful credential operation version. They do not contact the
+native listener and remain readable after authority rotation/removal. Certificate
+and sample pages search the complete saved observation on the server. Cursors
+bind actor, organization, site, operation/version, view, search and page size.
+Use `operation result --output PRIVATE_PATH` only when intentionally retrieving
+the encrypted raw result with NVKE admin access.
+
+All views preserve scrape time, null unknowns and reported numeric values as
+decimal strings, including large CSR counts. Latest inspection availability,
+retained certificate NotAfter, observation availability/age, collection success,
+monitoring and renewal automation enablement are separate facts. Expiry comparison
+is **at scrape time**. A scheduled renewal time is not certificate expiry. A failed
+collection or absent series never establishes healthy credentials. Native metrics
+label clusters by name rather than UUID; even live controller checks cannot prove
+which incarnation produced a retained gauge after name reuse. Local CLI/API/TLS/
+Temporal tests do not qualify collector behavior on live NVKE nodes.
 
 ## Qualification and maintenance
 
