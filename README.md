@@ -1575,3 +1575,47 @@ bundle and versions. It prints typed readiness facts, decimal-string counters
 and null unknowns, with no native inputs or raw diagnostics. A successful review
 keeps the original install uncertain and authorizes no continuation or guard
 release. Refresh source metadata after a refused or unavailable review.
+
+`astro nvke agent install-plan` exposes read-only remaining-install proposals:
+
+```sh
+astro nvke agent install-plan prepare OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --file PRIVATE_PLAN.json --request-file NEW_PRIVATE_RECOVERY.json
+astro nvke agent install-plan review OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID
+astro nvke agent install-plan items OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-digest SHA256 --limit 25
+```
+
+The private preparation body has `format: 1`, the matching `planId`,
+`maximumInputBytes` as a positive decimal string, and `request: null` to inherit
+original authenticated inputs or a complete native management-install envelope.
+Optional `overrides.options` and `overrides.files` merge into that request; null
+removes a field. Full native request fields remain available. Files require
+private permissions or protected Windows ACLs; `--file -` accepts stdin.
+
+Preparation flushes a metadata-only recovery journal before the API mutation.
+Reusing that journal requires the same server, organization, actor, source
+versions, plan identity and exact private input bytes. A lost reply retains the
+plan UUID; use `review` to recover the saved result without the private input.
+`retry-preparation` explicitly asks the server to repeat only its retained
+preparation intent and requires the original preparation actor/API token.
+An incomplete agent plan remains refused; it is never silently overwritten.
+
+`items` and `workloads` first review the retained plan header, then read one
+server page. Both accept `--plan-digest`, `--limit` (1–100), `--search` (up to 200
+characters) and `--after` from the exact same source/view/search/limit. Follow
+`nextCursor` explicitly; the CLI never silently changes paging scope. Workload
+counters remain decimal strings and unknown readiness stays null. Returned
+source/agent identity, digests, phase observations and proposed actions are
+validated before output; arbitrary peer diagnostics are excluded.
+
+Plan requests use a bounded six-minute HTTP deadline to accommodate native
+rendering and source verification; cancelling a local wait does not cancel remote
+preparation. These commands require current administrator/read permissions and
+the original UNCERTAIN management installation. They do not continue installation, replay the
+original native command, mark its failure successful or release its effect fence.
+The proposal still requires dependency closure and live skipped-resource checks
+before any future reviewed execution path.

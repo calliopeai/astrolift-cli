@@ -62,8 +62,12 @@ func validateNVKEInstallReview(row *api.NVKEInstallReview, source *api.NVKEOpera
 			return invalid
 		}
 	}
+	return validateNVKEInstallWorkloads(row.Workloads, invalid)
+}
+
+func validateNVKEInstallWorkloads(items []api.NVKEInstallWorkload, invalid error) error {
 	seen := make(map[[3]string]bool)
-	for _, item := range row.Workloads {
+	for _, item := range items {
 		key := [3]string{item.Namespace, item.Kind, item.Name}
 		if seen[key] || !nvkeInstallWorkloadName.MatchString(item.Namespace) || !nvkeInstallWorkloadName.MatchString(item.Name) || (item.Kind != "Deployment" && item.Kind != "StatefulSet") || (item.Observation != "ready" && item.Observation != "requires-review") {
 			return invalid
