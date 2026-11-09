@@ -142,6 +142,9 @@ func TestNVKEMetricsCredentialsArePreservedClearedOrStrictlyRejected(t *testing.
 				if err := os.WriteFile(file, []byte(bodies[mode]), 0644); err != nil {
 					t.Fatal(err)
 				}
+				if err := os.Chmod(file, 0644); err != nil {
+					t.Fatal(err)
+				}
 				_ = cmd.Flags().Set("credentials-file", file)
 			}
 			writes := 0
