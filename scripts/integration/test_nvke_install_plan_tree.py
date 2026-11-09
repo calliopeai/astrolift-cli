@@ -74,7 +74,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
             yield endpoint
 
 
-@pytest.mark.parametrize("client", ["cli", "browser", "context"])
+@pytest.mark.parametrize("client", ["cli", "browser", "context", "context-browser"])
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     world, binary, tmp_path, asgi_endpoint, dropped_cli_replies, monkeypatch, client
 ):
@@ -83,6 +83,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         or not os.getenv("NVKE_TEST_TREE_STORYBOOK")
     ):
         pytest.skip("Select the owned tree browser frontend and Storybook endpoint")
+    if client == "context-browser" and (
+        not os.getenv("NVKE_TEST_CONTEXT_FRONTEND")
+        or not os.getenv("NVKE_TEST_CONTEXT_STORYBOOK")
+    ):
+        pytest.skip("Select the owned context frontend and Storybook endpoint")
     selected = os.getenv("NVKE_TEST_AGENT_OPSCODE")
     if (
         not selected
@@ -194,7 +199,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         case.setUp()
         try:
             context_capture = None
-            if client == "context":
+            if client in {"context", "context-browser"}:
                 from context_cli_qualification import ContextCapture
 
                 context_capture = ContextCapture(case, native)
@@ -570,6 +575,27 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                 )
+            if client == "context-browser":
+                from context_browser_qualification import run_context_browser
+
+                browser_row = run_context_browser(
+                    bearer=issued.plaintext,
+                    tmp_path=tmp_path,
+                    endpoint=asgi_endpoint,
+                    world=world,
+                    site=state.site,
+                    authority=authority,
+                    operation=original,
+                    plan=plan,
+                    charts=data,
+                    tree=tree,
+                    dropped=dropped_cli_replies,
+                )
+                browser_artifact = case.engine.install_render_contexts / str(
+                    browser_row.guid
+                )
+                assert (browser_artifact / "index.json").is_file()
+                assert len(list((browser_artifact / "work").iterdir())) == 1
             if client == "browser":
                 from tree_browser_qualification import run_tree_browser
 
