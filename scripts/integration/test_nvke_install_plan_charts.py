@@ -154,6 +154,8 @@ def test_compiled_cli_chart_prepare_lost_reply_review_and_private_retry(
                 case.bundle_digest,
                 "--credentials-file",
                 credentials,
+                "--connection-timeout",
+                300,
             )
             authority = run(
                 "agent",
