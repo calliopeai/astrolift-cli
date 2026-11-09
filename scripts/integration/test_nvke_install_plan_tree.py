@@ -73,13 +73,14 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     ):
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
-    revision = "b0f9d26dd5467d97eef92d6d728dca33e0bf5777"
+    revision = "0d17f53ec998698df88b2ab86f3d0359fbedbbfc"
     for name in (
         "operator_agent.py",
         "management_chart_materialization.py",
         "management_plan_chart_service.py",
         "management_plan_tree_service.py",
         "management_execution_tree.py",
+        "management_template_rendering.py",
         "management_execution_release.py",
         "management_execution_arguments.py",
         "management_dependencies.py",
@@ -190,7 +191,24 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             job, intent, body = case.plan_fixture()
             body["overrides"] = {
                 "options": {"config": "input:config.json"},
-                "files": {"config.json": "{}", "secret.txt": "PRIVATE_TREE_CONTENT"},
+                "files": {
+                    "config.json": json.dumps(
+                        {
+                            "Nico": {
+                                "Endpoint": "https://nico.example.test",
+                                "OrgID": "owned",
+                                "APIName": "owned",
+                                "Token": "PRIVATE_TREE_CONTENT",
+                            },
+                            "Tenant": {
+                                "User": "owned",
+                                "Password": "PRIVATE_TREE_CONTENT",
+                            },
+                            "ClusterName": "owned-browser-tree",
+                        }
+                    ),
+                    "secret.txt": "PRIVATE_TREE_CONTENT",
+                },
             }
             state = SimpleNamespace(
                 world=world,
@@ -424,6 +442,26 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             )
             assert "maximumBytes" not in tree_journal.read_text()
             assert NvkeInstallPlanTree.objects.get(guid=tree_id).status == "prepared"
+            sealed = native.agent.management_plan_tree_service.trees.ExecutionTrees(
+                case.engine.install_execution_trees, plans=case.engine.install_plans
+            ).load(tree_id)
+            assert len(sealed["templateRendering"]) == 1
+            frozen = Path(sealed["treeLocation"])
+            assert (
+                "PRIVATE_TREE_CONTENT"
+                in (
+                    frozen / "deployment/nvke-base-config/20-nico-credentials.yaml"
+                ).read_text()
+            )
+            assert (
+                "type: template"
+                not in (frozen / "deployment/nvke-deploy.yaml").read_text()
+            )
+            assert (
+                frozen
+                / "template-sources/nvke-base-config/20-nico-credentials.yaml.tmpl"
+            ).is_file()
+
             artifact = case.engine.install_execution_trees / tree_id
             tree_attempts = sorted(path.name for path in (artifact / "work").iterdir())
             endpoint, port, instance = (

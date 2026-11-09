@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "scope": "native-template-tree-integration-checkpoint",
+  "opscodeRuntimeSourceRevision": "0d17f53ec998698df88b2ab86f3d0359fbedbbfc",
+  "applicationRevision": "e90caaadd",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "9a8fa0c6a3e23fa69b99e7aa36f0b51bab31d2f4d533a247f4824ec08aecf486"
+  },
+  "checks": {
+    "cli": {
+      "exitCode": 0,
+      "topLevelPassed": 1048,
+      "topLevelSkipped": 2,
+      "format": "passed",
+      "vet": "passed",
+      "lint": "passed",
+      "logSha256": "26a3c87df205acb67fdb2f2d67fedf7a037b1eab9c9ec96dbc4258c8c9f01abc"
+    },
+    "pairedCliApiBrowser": {
+      "status": "pending",
+      "sessionId": 9044,
+      "completionMarker": "/tmp/astrolift-nvke-tree-templates-paired-qualified.exit"
+    }
+  },
+  "assertionsAdded": [
+    "Actual native NICo template output sealed in execution tree",
+    "Original template sources retained",
+    "Template item converted to manifest",
+    "Runtime source guard includes native renderer"
+  ],
+  "limitations": [
+    "Pending paired test is not qualified by this checkpoint. Previous browser qualification remains historical at its recorded source revision.",
+    "No native continuation, main merge or deployment authorized by these results."
+  ]
+}
