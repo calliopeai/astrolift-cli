@@ -40,7 +40,10 @@ def world():
 
 @pytest.fixture
 def binary():
-    return paired.binary.__wrapped__()
+    selected = paired.binary.__wrapped__()
+    digest = hashlib.sha256(Path(selected).read_bytes()).hexdigest()
+    yield selected
+    assert hashlib.sha256(Path(selected).read_bytes()).hexdigest() == digest
 
 
 @pytest.fixture
@@ -53,9 +56,15 @@ def asgi_endpoint(settings, dropped_cli_replies):
     yield from paired.asgi_endpoint.__wrapped__(settings, dropped_cli_replies)
 
 
+@pytest.mark.parametrize("client", ["cli", "browser"])
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
-    world, binary, tmp_path, asgi_endpoint, dropped_cli_replies, monkeypatch
+    world, binary, tmp_path, asgi_endpoint, dropped_cli_replies, monkeypatch, client
 ):
+    if client == "browser" and (
+        not os.getenv("NVKE_TEST_TREE_FRONTEND")
+        or not os.getenv("NVKE_TEST_TREE_STORYBOOK")
+    ):
+        pytest.skip("Select the owned tree browser frontend and Storybook endpoint")
     selected = os.getenv("NVKE_TEST_AGENT_OPSCODE")
     if (
         not selected
@@ -455,6 +464,26 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 sorted(path.name for path in (artifact / "work").iterdir())
                 == tree_attempts
             )
+            if client == "browser":
+                from tree_browser_qualification import run_tree_browser
+
+                browser_row = run_tree_browser(
+                    bearer=issued.plaintext,
+                    tmp_path=tmp_path,
+                    endpoint=asgi_endpoint,
+                    world=world,
+                    site=state.site,
+                    authority=authority,
+                    operation=original,
+                    plan=plan,
+                    charts=data,
+                    dropped=dropped_cli_replies,
+                )
+                browser_artifact = case.engine.install_execution_trees / str(
+                    browser_row.guid
+                )
+                assert (browser_artifact / "index.json").is_file()
+                assert len(list((browser_artifact / "work").iterdir())) == 1
             assert (
                 NvkeInstallPlanCharts.objects.filter(guid=artifact_id).values().get()
                 == chart_row
