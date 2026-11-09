@@ -1663,3 +1663,45 @@ false`; foreign, stale, truncated, over-budget or authorizing results are refuse
 The new routes require a matching application version. Local transport tests are
 separate from the pending combined API/CLI/agent qualification and retained Linux
 installation; full closure and reviewed native continuation remain open.
+
+`astro nvke agent install-plan tree` prepares a private execution tree bound to an
+exact prepared plan and chart publication:
+
+```sh
+astro nvke agent install-plan tree prepare OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --chart-artifact CHART_UUID \
+  --chart-artifact-version N --chart-artifact-digest SHA256 --artifact NEW_TREE_UUID \
+  --file PRIVATE_TREE_REQUEST.json --request-file NEW_PRIVATE_RECOVERY.json
+astro nvke agent install-plan tree review OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --chart-artifact CHART_UUID \
+  --chart-artifact-version N --chart-artifact-digest SHA256 --artifact TREE_UUID
+astro nvke agent install-plan tree retry-preparation OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --chart-artifact CHART_UUID \
+  --chart-artifact-version N --chart-artifact-digest SHA256 --artifact TREE_UUID
+```
+
+The private JSON request contains exactly `format: 1`, `artifactId`, `planId`,
+`planDigest`, `chartArtifactId`, `chartArtifactDigest` and a positive decimal
+int64-string `maximumBytes`. All identities must match the reviewed source; the
+original job, plan, chart publication and tree UUIDs must be distinct. Duplicate,
+unknown, case-aliased or null fields, numeric budgets and overflows are refused.
+The same private-file and stdin rules as plan preparation apply.
+
+Preparation verifies both publications and flushes a metadata-only recovery
+journal before sending the exact private text. The journal also binds the chart
+publication version/digest. Changed text or source cannot reuse that journal.
+After a lost reply, retain the tree UUID and use `tree review`; it does not rebuild
+the tree. `retry-preparation` explicitly uses the server's encrypted original
+intent and requires its original caller/token. Neither command accepts new private
+text or silently replays preparation.
+
+Results preserve decimal byte strings and validate the complete source tuple,
+chart digest, tree digest, file count and byte budget. The tree cannot report fewer
+files than published charts or fewer bytes than their archives. Its state remains
+`requires-native-rendering-images-and-live-verification` with
+`continuationAuthorized: false`. Native rendering, image closure, fresh skipped
+resource verification and reviewed continuation remain separate required stages.
+These commands require the paired application and operator-agent tree routes.
