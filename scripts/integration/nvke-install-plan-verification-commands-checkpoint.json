@@ -1,0 +1,51 @@
+{
+  "format": 1,
+  "scope": "reviewed-verification-cobra-commands-private-journal-and-metadata-validation",
+  "status": "local-go-native-optins-and-build-qualified-paired-acceptance-pending",
+  "sourceSha256": {
+    "cmd/nvke_install_plan_verification.go": "a53bacacdbf0c60fca2661368a5c349b12edf1a0e3137543f052e3f19175d74c",
+    "cmd/nvke_install_plan_verification_test.go": "1983257ecccfeb0c88a89b08f8005e72929ef4a59847d35f5dc9511c53d83286",
+    "cmd/nvke_install_plan.go": "301fe33e03f2d81a0e3362a8ff1da6441bf1cf1190c4db63b659b9058e1b4a78",
+    "internal/api/nvke_install_plan_verification.go": "74a9a41efc9611307e6baad06a05243839480ad50cb64b9a2b66bd379924113d"
+  },
+  "checks": {
+    "ordinaryGoTests": {
+      "passedTopLevel": 1062,
+      "skipped": 2,
+      "exitCode": 0,
+      "logSha256": "a400aea2a354a619c96d6130a223bef5f3a198d7bd8414b10a7653bcc859b146"
+    },
+    "selectedNativeOptIns": {
+      "passedTopLevel": 2,
+      "skipped": 0,
+      "exitCode": 0,
+      "logSha256": "a3a6250c48558ec76d978538d5a8b5620d52ed9ba9f45d31e18b183a0ce00072",
+      "scope": "Owned source-pinned native bundle: version and bootstrap-manifest, including actual Cobra run."
+    },
+    "qualifiedUnion": {
+      "passedTopLevel": 1064,
+      "remainingOptInSkips": 0,
+      "verificationTopAndSubcasesPassed": 73
+    },
+    "format": "go fmt ./... completed",
+    "vet": "passed",
+    "lint": "passed",
+    "build": {
+      "exitCode": 0,
+      "path": "/tmp/astrolift-nvke-verification-cli-built-v1/astro",
+      "sha256": "9ab936a04b50a5b5402f1d6393e25afeedae7b07972c0d014f2ac703a51c8849"
+    }
+  },
+  "implemented": [
+    "verification prepare/review/retry-preparation binds six distinct UUIDs and every original/plan/chart/tree/context version, digest, item and ordinal. Source changes refuse before verification RPC.",
+    "Preparation creates or checks an owner-only metadata journal before remote write. It binds exact input bytes, actor, server and all source versions; it contains no request text or capture payload.",
+    "Strict body decoding refuses duplicate/unknown/alias keys, malformed or excessive limits and unreviewed source IDs. Replies cannot authorize continuation and must bind capture/frozen chart/context and signed observation/index hashes.",
+    "Responses exceeding explicitly reviewed prepare call/byte limits refuse. Failed replies preserve the journal and never automatically repeat preparation. Historical review/private retry send no private text."
+  ],
+  "remaining": [
+    "Run actual compiled CLI/App/PostgreSQL/new-agent/Kubernetes paired verification acceptance including lost reply and cold historical recovery; harness is separate work in progress.",
+    "Storybook/UI journal/hook/eight locales and actual browser acceptance for this stage.",
+    "Use-time phase/resource/original credential proofs, schema policy, image closure, linked admission and full-surface final checks/PR/merge/deploy remain outstanding."
+  ],
+  "continuationAuthorized": false
+}
