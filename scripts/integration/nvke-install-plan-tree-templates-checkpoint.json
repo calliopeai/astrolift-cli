@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "scope": "native-template-tree-integration-checkpoint",
+  "scope": "native-template-tree-cli-api-browser-local-qualification",
   "opscodeRuntimeSourceRevision": "0d17f53ec998698df88b2ab86f3d0359fbedbbfc",
-  "applicationRevision": "e90caaadd",
+  "applicationRevision": "e90caaadd23ea14d3a55433ffcb8502db257926c",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "9a8fa0c6a3e23fa69b99e7aa36f0b51bab31d2f4d533a247f4824ec08aecf486"
   },
@@ -17,9 +17,14 @@
       "logSha256": "26a3c87df205acb67fdb2f2d67fedf7a037b1eab9c9ec96dbc4258c8c9f01abc"
     },
     "pairedCliApiBrowser": {
-      "status": "pending",
-      "sessionId": 9044,
-      "completionMarker": "/tmp/astrolift-nvke-tree-templates-paired-qualified.exit"
+      "status": "passed",
+      "exitCode": 0,
+      "passed": 1,
+      "deselected": 1,
+      "skipped": 0,
+      "durationSeconds": 636.4,
+      "logSha256": "13163f7708d789ed6867bd7cf6e2a2b196dbc0bcf1173021ca4ac0c1b988b7b5",
+      "variant": "browser (includes common compiled CLI cold-recovery/private-retry journey)"
     }
   },
   "assertionsAdded": [
@@ -29,7 +34,19 @@
     "Runtime source guard includes native renderer"
   ],
   "limitations": [
-    "Pending paired test is not qualified by this checkpoint. Previous browser qualification remains historical at its recorded source revision.",
-    "No native continuation, main merge or deployment authorized by these results."
-  ]
+    "Browser metadata is supplied by an owned Storybook fixture; authentication uses private driver forwarding. Actual Next.js login/routes/access discovery remains unqualified.",
+    "Native failed receipt/configuration/deployment and Kubernetes reads are controlled fixtures, not retained Linux installation proof. The supported 300-second agent timeout is selected.",
+    "Kustomize/Helm manifest freezing integration, images/private registries, fresh skipped-resource/credential proof, remaining-only selection and linked once-only dispatch remain open.",
+    "No original native replay, retained VM restart, main merge or deployment."
+  ],
+  "compiledBinarySha256": "26a7529dd572b6d7afb6fb4b96a6a3d73cd4f7748869a0fe007456031ca7f4a8",
+  "evidence": [
+    "Controlled BootstrapConfig renders actual pinned NICo templates. Sealed tree retains authenticated original template sources, rendered private credential YAML and manifest inventory types.",
+    "Compiled CLI prepare loses its successful reply, then cold agent restart at the same endpoint/instance supports review and explicit original-token private retry without a second attempt.",
+    "Actual Chromium drives the real panel/hook from production-built static Storybook through private bearer forwarding to ASGI/PostgreSQL and actual mTLS native agent. Browser prepare discards its successful reply, then review/private retry recover one published tree.",
+    "Original operation/plan/chart full rows, native receipt, guard, run membership and linked reservations remain unchanged; journal/storage and public output expose no private request or credential content.",
+    "Selected compiled binary hash is checked before and after the test."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false
 }
