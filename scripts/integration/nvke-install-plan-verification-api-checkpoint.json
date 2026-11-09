@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "scope": "typed-render-verification-private-api-client",
+  "status": "local-api-transport-and-ordinary-go-regressions-qualified-commands-pending",
+  "sourceSha256": {
+    "internal/api/nvke_install_plan_verification.go": "74a9a41efc9611307e6baad06a05243839480ad50cb64b9a2b66bd379924113d",
+    "internal/api/nvke_install_plan_test.go": "7150d1bb55692cb6b4e1c813226556abe6a653b9ea2e72103503cf5fdf913ba1"
+  },
+  "checks": {
+    "format": "go fmt ./... completed",
+    "apiTransport": {
+      "exitCode": 0,
+      "logSha256": "71a9ac0ff535bab5aaef5fda09208cc1a6f7f567ebaaa7afe56a21f933e87286"
+    },
+    "ordinaryGoTests": {
+      "exitCode": 0,
+      "logSha256": "bd48d4e63f0cc00a0178544c75ba7fb49a72cdc155d7f3a44f6526ff6cd520aa",
+      "scope": "go test ./...; optional external/live acceptance is separately qualified, not implied by this run"
+    },
+    "vet": "go vet ./... passed",
+    "lint": "golangci-lint run passed",
+    "appContract": "All 32 response fields exactly match exported NvkeOperatorInstallPlanVerificationType."
+  },
+  "implemented": [
+    "Typed prepare/review/retained-intent retry methods use the existing private bounded plan API transport. Explicit review/retry types contain no requestText.",
+    "Redirect refusal coverage includes all three new operations and preserves the shared API client timeout."
+  ],
+  "remaining": [
+    "Cobra verification prepare/review/retry commands, private exact-input journal and reply/source validation.",
+    "Actual compiled CLI/App/new-agent paired acceptance, UI controls and final full-surface integration checks."
+  ],
+  "continuationAuthorized": false
+}
