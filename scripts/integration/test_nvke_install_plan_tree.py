@@ -73,7 +73,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     ):
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
-    revision = "20f53eefaa6822673888f536ee14e93bcb3c0762"
+    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -94,6 +94,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "management_render_release.py",
         "management_render_lookup.py",
         "management_render_capture.py",
+        "management_render_context_store.py",
+        "management_render_authenticated.py",
+        "management_render_transport.py",
+        "management_render_executor.py",
+        "management_plan_context_service.py",
+        "management_frozen_chart.py",
         "management_plan_tree_service.py",
         "qualify_bootstrap.py",
         "tooling.py",
