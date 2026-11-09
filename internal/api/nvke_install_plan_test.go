@@ -11,7 +11,7 @@ import (
 )
 
 func TestNVKEInstallPlanPrivateTransportRefusesRedirectsAndPreservesClientTimeout(t *testing.T) {
-	for _, kind := range []string{"prepare", "review", "retry", "items", "workloads", "charts-prepare", "charts-review", "charts-retry", "tree-prepare", "tree-review", "tree-retry"} {
+	for _, kind := range []string{"prepare", "review", "retry", "items", "workloads", "charts-prepare", "charts-review", "charts-retry", "tree-prepare", "tree-review", "tree-retry", "context-prepare", "context-review", "context-retry"} {
 		t.Run(kind, func(t *testing.T) {
 			forwarded := 0
 			destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +43,10 @@ func TestNVKEInstallPlanPrivateTransportRefusesRedirectsAndPreservesClientTimeou
 				_, err = c.PrepareNVKEInstallPlanCharts(context.Background(), NVKEInstallPlanChartsPrepare{RequestText: "PRIVATE_REQUEST"})
 			case "charts-review", "charts-retry":
 				_, err = c.ReviewNVKEInstallPlanCharts(context.Background(), NVKEInstallPlanChartsReview{}, kind == "charts-retry")
+			case "context-prepare":
+				_, err = c.PrepareNVKEInstallPlanContext(context.Background(), NVKEInstallPlanContextPrepare{RequestText: "PRIVATE_REQUEST"})
+			case "context-review", "context-retry":
+				_, err = c.ReviewNVKEInstallPlanContext(context.Background(), NVKEInstallPlanContextReview{}, kind == "context-retry")
 			case "tree-prepare":
 				_, err = c.PrepareNVKEInstallPlanTree(context.Background(), NVKEInstallPlanTreePrepare{RequestText: "PRIVATE_REQUEST"})
 			case "tree-review", "tree-retry":

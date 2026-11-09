@@ -1705,3 +1705,44 @@ files than published charts or fewer bytes than their archives. Its state remain
 `continuationAuthorized: false`. Native rendering, image closure, fresh skipped
 resource verification and reviewed continuation remain separate required stages.
 These commands require the paired application and operator-agent tree routes.
+
+### Authenticated install render contexts
+
+`astro nvke agent install-plan context` captures one reviewed Helm item's render
+context through the original agent and frozen credential. Configure the agent's
+private render profile before preparing the parent plan. Obtain the item name
+and original ordinal from `install-plan items`, and retain the prepared plan,
+chart publication and execution-tree versions and digests.
+
+```sh
+astro nvke agent install-plan context prepare OPERATION_GUID \
+  --site SITE_GUID --site-version 7 --authority-version 3 --version 4 \
+  --plan PLAN_GUID --plan-version 2 --plan-digest PLAN_SHA256 \
+  --chart-artifact CHART_GUID --chart-artifact-version 2 --chart-artifact-digest CHART_SHA256 \
+  --tree TREE_GUID --tree-version 2 --tree-digest TREE_SHA256 \
+  --item nktp --ordinal 6 --artifact CONTEXT_GUID \
+  --file private-context.json --request-file private-context-recovery.json
+```
+
+The private JSON contains exactly `format: 1`, `artifactId`, `planId`,
+`planDigest`, `treeId`, `treeDigest`, `item`, `revision`, `upgrade`,
+`maximumBytes`, `maximumArtifactBytes`, `maximumCalls`, `maximumIterations`,
+`timeoutSeconds`. IDs, digests and item must match the reviewed flags. Revision
+and byte limits are decimal strings; for example revision `"9007199254740993"`
+retains its precision. Install mode is `upgrade: false` with revision `"1"`.
+The byte limit is 1–536870912, artifact limit 65536–134217728, call limit 1–2048,
+iteration limit 1–64 and timeout 1–300 seconds. No helper, credential or endpoint
+fields are accepted. Input files and the metadata recovery journal use owner-only
+permissions; `--file -` accepts private stdin.
+
+Use `context review` with the same source flags, item, ordinal and artifact UUID
+after an unconfirmed result; it takes no private input or journal argument.
+`context retry-preparation` explicitly retries the server's retained intent and
+requires its original caller/token. A failed or lost response never triggers an
+automatic preparation retry. Preserve the original artifact and journal.
+
+The CLI confirms the retained Helm item and ordinal before capture, binds every
+parent publication, and outputs only checked metadata and hashes. Historical
+context capture leaves the original uncertain install intact. Fresh phase,
+resource, credential and image verification and linked native admission remain
+required; these commands never authorize continuation.
