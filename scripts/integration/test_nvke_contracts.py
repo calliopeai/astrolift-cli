@@ -121,7 +121,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         assert not thread.is_alive()
 
 
-def invoke(binary, tmp_path, endpoint, bearer, org, *arguments):
+def invoke(binary, tmp_path, endpoint, bearer, org, *arguments, process_timeout=40):
     env = {
         **os.environ,
         "XDG_CONFIG_HOME": str(tmp_path / "config"),
@@ -144,7 +144,7 @@ def invoke(binary, tmp_path, endpoint, bearer, org, *arguments):
         env=env,
         capture_output=True,
         text=True,
-        timeout=40,
+        timeout=process_timeout,
         check=False,
     )
     assert bearer not in result.stdout + result.stderr
