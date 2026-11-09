@@ -23,19 +23,28 @@
       "reason": "Go/module source bytes and compiled binary remain identical to the previously qualified checkpoint; only integration source guards changed."
     },
     "pairedCliApiBrowser": {
-      "status": "running",
-      "sessionId": 89489,
-      "logPath": "/tmp/astrolift-nvke-context-capture-paired.log",
-      "exitMarker": "/tmp/astrolift-nvke-context-capture-paired.exit",
-      "variant": "browser, including common compiled CLI preparation/cold-recovery/private-retry journey"
+      "status": "passed",
+      "passed": 1,
+      "deselected": 1,
+      "skipped": 0,
+      "warnings": 6,
+      "durationSeconds": 1208.92,
+      "exitCode": 0,
+      "variant": "browser, including common compiled CLI preparation/cold-recovery/private-retry journey",
+      "logSha256": "888796e033bc6819c308de5024c682fd156c62800703c10189015feeb232cfd2"
     }
   },
   "continuationAuthorized": false,
   "executionState": "requires-native-rendering-images-and-live-verification",
   "limitations": [
-    "Paired result is pending; this checkpoint records no browser pass for the selected runtime. The exact live tool handle was revalidated before saving.",
+    "One selected browser variant passed, including common compiled CLI setup/recovery; the separate CLI-only variant was deselected. This does not qualify the private context pipeline/store.",
     "This existing public tree recovery scenario does not invoke the private context pipeline, which has no authenticated public route or signed durable artifact store yet.",
     "Actual Next.js login/routes/access discovery, phase freshness/admission, automatic frozen chart publication, images and linked continuation remain open.",
     "Prior standalone agent local-chart timeout remains unresolved. No original replay, retained VM restart, main merge or deployment."
+  ],
+  "evidence": [
+    "Compiled CLI plus actual Chromium panel/hook complete source/helper-bound preparation, deliberate lost-reply recovery, same-endpoint cold agent recovery and explicit private retry through actual Astro/Postgres/mTLS.",
+    "Original complete source operation/plan/chart rows, native receipt/files/guard, run identities and linked reservations remain unchanged according to the paired fixture assertions.",
+    "Source guards pin the selected runtime and helper; compiled CLI is hash-checked before/after. Go and frontend source bytes remain identical to the previously qualified revisions."
   ]
 }
