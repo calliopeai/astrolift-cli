@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "public-tree-paired-agent-context-runtime-pin-checkpoint",
-  "status": "paired-public-tree-rerun-pending",
+  "status": "historical-runtime-pin-before-context-cli-implementation",
   "opscodeRuntimeRevision": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
   "fixture": "scripts/integration/test_nvke_install_plan_tree.py",
   "fixtureSha256": "d95465afecb1e0adf959d0c7726ce77c6311ae1c5f3584e2feff5b093a63824a",
@@ -9,7 +9,8 @@
     "baseRevision": "9d63c2a255af40eb44269c7e7126ccc6341307d4",
     "files": 320,
     "combinedSha256": "7c537c96a443793ce8966d19ca87c3d2cb76fa47367569eca68af0e18a131f02",
-    "evidence": "All tracked Go files, go.mod and go.sum are byte-identical to the prior signed checkpoint. Prior 1048 Go test passes, two opt-in skips, vet and lint remain applicable; no Go build or binary change."
+    "evidence": "All tracked Go files, go.mod and go.sum are byte-identical to the prior signed checkpoint. Prior 1048 Go test passes, two opt-in skips, vet and lint remain applicable; no Go build or binary change.",
+    "scope": "Historical only: these byte-equality checks describe the checkpoint revision above, before the context CLI implementation. Current source/build qualification is in the superseding receipt."
   },
   "compiledCliSha256": "26a7529dd572b6d7afb6fb4b96a6a3d73cd4f7748869a0fe007456031ca7f4a8",
   "continuationAuthorized": false,
@@ -17,5 +18,7 @@
     "Run the actual browser/API/compiled-CLI public tree case against this runtime pin.",
     "Add the new context API/CLI/UI flow; this fixture currently exercises the existing tree path only.",
     "Legacy local-chart timeout, phase/image/linked admission, live-site acceptance, review/merge and deployment remain open."
-  ]
+  ],
+  "codeRevision": "10affcee0d2dbbdda01504b3ee9a65d153828be1",
+  "supersededBy": "scripts/integration/nvke-install-plan-context-cli-checkpoint.json"
 }
