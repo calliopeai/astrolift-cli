@@ -57,6 +57,7 @@ replays the original installation or releases its uncertainty fence.`, RunE: nvk
 		}
 		group.AddCommand(leaf)
 	}
+	group.AddCommand(newNVKEAgentInstallPlanChartsCommand())
 	return group
 }
 

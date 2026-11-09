@@ -11,7 +11,7 @@ import (
 )
 
 func TestNVKEInstallPlanPrivateTransportRefusesRedirectsAndPreservesClientTimeout(t *testing.T) {
-	for _, kind := range []string{"prepare", "review", "retry", "items", "workloads"} {
+	for _, kind := range []string{"prepare", "review", "retry", "items", "workloads", "charts-prepare", "charts-review", "charts-retry"} {
 		t.Run(kind, func(t *testing.T) {
 			forwarded := 0
 			destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +39,10 @@ func TestNVKEInstallPlanPrivateTransportRefusesRedirectsAndPreservesClientTimeou
 				_, err = c.NVKEInstallPlanItems(context.Background(), NVKEInstallPlanReview{}, "digest", nil, 25, "")
 			case "workloads":
 				_, err = c.NVKEInstallPlanWorkloads(context.Background(), NVKEInstallPlanReview{}, "digest", nil, 25, "")
+			case "charts-prepare":
+				_, err = c.PrepareNVKEInstallPlanCharts(context.Background(), NVKEInstallPlanChartsPrepare{RequestText: "PRIVATE_REQUEST"})
+			case "charts-review", "charts-retry":
+				_, err = c.ReviewNVKEInstallPlanCharts(context.Background(), NVKEInstallPlanChartsReview{}, kind == "charts-retry")
 			}
 			if err == nil || forwarded != 0 || strings.Contains(err.Error(), "PRIVATE") {
 				t.Fatalf("unsafe plan transport kind=%s forwarded=%d err=%v", kind, forwarded, err)

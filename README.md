@@ -1619,3 +1619,47 @@ the original UNCERTAIN management installation. They do not continue installatio
 original native command, mark its failure successful or release its effect fence.
 The proposal still requires dependency closure and live skipped-resource checks
 before any future reviewed execution path.
+
+
+`astro nvke agent install-plan charts` prepares or reviews chart artifacts for an
+exact prepared plan. This stage never executes an installation or authorizes
+continuation:
+
+```sh
+astro nvke agent install-plan charts prepare OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --artifact NEW_ARTIFACT_UUID \
+  --file PRIVATE_CHART_REQUEST.json --request-file NEW_PRIVATE_RECOVERY.json
+astro nvke agent install-plan charts review OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --artifact ARTIFACT_UUID
+astro nvke agent install-plan charts retry-preparation OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --artifact ARTIFACT_UUID
+```
+
+The private JSON body requires `format: 1`, the matching `artifactId`, `planId`
+and `planDigest`, plus positive decimal int64-string `maximumBytes` and
+`maximumExpandedBytes`. Optional `timeoutSeconds` is an integer from 1 to 3600
+(default 300); `allowPlainHttp` defaults to false and accepts only a boolean.
+Unknown or duplicate fields, null controls, numeric byte budgets, identity
+mismatches and overflows are refused. Private files and stdin follow the same
+permissions/size rules as plan preparation.
+
+Preparation first reviews the parent and validates its exact version/digest. It
+then exclusively writes and flushes a metadata-only artifact journal before the
+private preparation mutation. The journal binds server, organization, current
+actor, original source versions, plan version/digest, artifact UUID and exact-text
+SHA-256. Reusing it with changed text, authority or source is refused. Private
+request text is not stored in the journal or printed.
+
+After a lost reply, keep the artifact UUID and use `charts review` to recover the
+saved result without downloading again. `retry-preparation` explicitly requests
+the server's original encrypted intent and requires its original caller/token;
+it accepts no private input. No command silently retries preparation. An
+incomplete stage remains explicit. Results preserve exact decimal byte strings
+and must retain the remaining-verification state and `continuationAuthorized:
+false`; foreign, stale, truncated, over-budget or authorizing results are refused.
+The new routes require a matching application version. Local transport tests are
+separate from the pending combined API/CLI/agent qualification and retained Linux
+installation; full closure and reviewed native continuation remain open.
