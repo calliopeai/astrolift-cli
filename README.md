@@ -1746,3 +1746,47 @@ parent publication, and outputs only checked metadata and hashes. Historical
 context capture leaves the original uncertain install intact. Fresh phase,
 resource, credential and image verification and linked native admission remain
 required; these commands never authorize continuation.
+
+### Signed install render verification
+
+`astro nvke agent install-plan verification prepare|review|retry-preparation`
+revalidates the exact retained context using the original frozen credentials.
+It requires the paired App verification mutations and agent verification route.
+Retain the original job, plan, chart, tree and context versions and digests.
+
+```sh
+astro nvke agent install-plan verification prepare OPERATION_GUID \
+  --site SITE_GUID --site-version 7 --authority-version 3 --version 4 \
+  --plan PLAN_GUID --plan-version 2 --plan-digest PLAN_SHA256 \
+  --chart-artifact CHART_GUID --chart-artifact-version 2 --chart-artifact-digest CHART_SHA256 \
+  --tree TREE_GUID --tree-version 2 --tree-digest TREE_SHA256 \
+  --context CONTEXT_GUID --context-version 2 --context-digest CONTEXT_SHA256 \
+  --item nktp --ordinal 6 --artifact VERIFICATION_GUID \
+  --file private-verification.json --request-file private-verification-recovery.json
+```
+
+The private JSON contains exactly `format: 1`, `artifactId`, `contextId`,
+`contextDigest`, `planId`, `planDigest`, `treeId`, `treeDigest`, `item`,
+`maximumBytes`, `maximumCaptureAgeSeconds`, `maximumCalls` and `timeoutSeconds`.
+The byte limit is a canonical decimal string in 1–536870912; capture age is
+1–3600 seconds, calls 1–2048 and timeout 1–300 seconds. The six original/job and
+artifact UUIDs must be distinct. The source IDs, digests and item must match the
+reviewed flags. Private files and the metadata journal use owner-only permissions;
+`--file -` accepts stdin. The journal precedes preparation and binds the exact
+input bytes, caller, server and every reviewed source version/digest.
+
+After an unconfirmed result, use `verification review` with the same source flags
+and artifact UUID. It reads the retained historical observation without another
+collection. `verification retry-preparation` explicitly retries the server's
+retained private intent and requires its original caller/token. Neither accepts
+private request text; neither command automatically repeats a failed preparation.
+Use a new artifact UUID to request a new observation.
+
+The CLI checks context/capture/chart hashes, source versions, original item ordinal,
+verification/index digests and bounded public counts before displaying metadata.
+Historical recovery preserves `observedAt`; it does not renew freshness for phase
+use. The result retains `continuationAuthorized: false` and
+`requires-phase-use-resource-credential-schema-images-and-linked-admission`.
+Fresh phase/skipped-resource/original credential checks, schema policy, image closure
+and linked native admission remain required. The original uncertain install stays
+in place; these commands never authorize native continuation or replay.
