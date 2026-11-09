@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "status": "paired-acceptance-pending",
+  "status": "actual-cli-app-agent-capture-and-cold-recovery-qualified",
   "scope": "actual-compiled-cli-app-agent-kubernetes-context-capture-and-cold-recovery",
   "appCommit": "8f3a2a9d1",
   "agentRuntimeCommit": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
@@ -23,15 +23,20 @@
       "failure": "First site-create request exceeded the unchanged 30s CLI API timeout before any agent setup. Harness now makes a read-only anonymous readiness request to load lazy URL/schema routing before CLI acceptance."
     },
     "currentRun": {
-      "status": "pending",
-      "sessionId": 77082,
+      "status": "completed",
+      "passed": 1,
+      "deselected": 2,
+      "skipped": 0,
+      "seconds": 1586.95,
+      "exitCode": 0,
+      "logSha256": "5d9f80b3c1f4ef5a73800fa7cb4a788f1cffb740b3ceefc9124e6fb482531e72",
       "logPath": "/tmp/astrolift-nvke-context-cli-app-paired-v2.log",
       "exitMarker": "/tmp/astrolift-nvke-context-cli-app-paired-v2.exit"
     }
   },
   "continuationAuthorized": false,
   "remaining": [
-    "Inspect terminal paired acceptance and diagnose any failure; no pass is claimed at this checkpoint.",
+    "Browser actual API/agent capture/recovery has a separate running case; CLI-only acceptance here is complete for the pinned runtime and selected reviewed configuration.",
     "Actual browser App/native capture acceptance, native phase/schema/image/linked-admission proof and full management surface release qualification."
   ]
 }
