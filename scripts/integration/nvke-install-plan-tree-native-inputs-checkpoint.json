@@ -1,0 +1,38 @@
+{
+  "format": 1,
+  "scope": "native-render-input-bound-tree-cli-browser-checkpoint",
+  "cliBaseRevision": "c25b30c24c2413bafa4d1c2a2ea126baa8b42aa0",
+  "applicationRevision": "a7ae6434739dcd2bb2e0eba8dffdf3cf74459dd1",
+  "opscodeRuntimeRevision": "870d1400c0c9986e5787b7b45635baae88785c0a",
+  "compiledBinarySha256": "26a7529dd572b6d7afb6fb4b96a6a3d73cd4f7748869a0fe007456031ca7f4a8",
+  "chartHelperBinarySha256": "a51f6258c905d414e56a9b24ef66d381b7e46dde0ea564aac3cd35b6af6b4600",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "4aae4acba9d2fa4a182f99e54f4fd4533a14d82e3a6a290ec91a76f7e42f901e"
+  },
+  "checks": {
+    "ruff": "passed",
+    "format": "passed",
+    "pairedCliApiBrowser": {
+      "status": "pending",
+      "sessionId": 42533,
+      "completionMarker": "/tmp/astrolift-nvke-native-values-paired-qualified.exit"
+    },
+    "unchangedGoChecksReused": {
+      "passed": 1048,
+      "skipped": 2,
+      "exitCode": 0,
+      "vet": "passed",
+      "lint": "passed",
+      "logSha256": "26a3c87df205acb67fdb2f2d67fedf7a037b1eab9c9ec96dbc4258c8c9f01abc",
+      "reason": "Tracked Go command/internal/module/main bytes remain identical to c25b30c; only integration fixture source guards change."
+    }
+  },
+  "continuationAuthorized": false,
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "limitations": [
+    "Pending paired run is not qualified by this checkpoint. Previous CLI/browser results remain historical at their recorded revisions.",
+    "The source/helper-bound tree intent changes; the private native input capture path is not exposed through a public agent route.",
+    "Phase-specific context acquisition/freshness is tracked in https://github.com/calliopeai/astrolift-opscode/issues/100. Frozen-chart publication, Kustomize, image closure and linked admission remain open.",
+    "No original replay, retained VM restart, main merge or deployment."
+  ]
+}
