@@ -45,6 +45,22 @@
       "lintTool": "/tmp/astrolift-nvke-tools/golangci-lint",
       "lintToolVersion": "2.15.0",
       "lintBuildLogSha256": "a8231841e039b390bf45d78d7bf75332a57517adfd6ed77a3dae6c4ced163420"
+    },
+    "nativeOptIns": {
+      "exitCode": 0,
+      "passed": 2,
+      "skipped": 0,
+      "tests": [
+        "TestNVKEToolingRealRunThroughCobra",
+        "TestRealPreparedNativeBundle"
+      ],
+      "scope": "Actual pinned native version and bootstrap-manifest utilities through the runner, including Cobra output/private-artifact handling; no infrastructure operation.",
+      "logSha256": "fbdc99e9b7385c192fc3a27b68b0fd80a4237af9c88312486aad0658db3a7786"
+    },
+    "combinedGoCoverage": {
+      "topLevelPassed": 1056,
+      "remainingOptInSkips": 0,
+      "scope": "Union of the full 1054-pass suite and the two explicitly enabled native-utility cases on byte-identical sources."
     }
   },
   "builtCli": {
