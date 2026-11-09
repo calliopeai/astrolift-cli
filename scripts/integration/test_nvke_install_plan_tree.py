@@ -1,10 +1,13 @@
 """Compiled CLI, actual ASGI/Postgres and owned mTLS/Helm 4 execution-tree recovery."""
 
+from contextlib import closing
 import hashlib
 import json
 import os
 import shutil
 import subprocess
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -53,10 +56,25 @@ def dropped_cli_replies():
 
 @pytest.fixture
 def asgi_endpoint(settings, dropped_cli_replies):
-    yield from paired.asgi_endpoint.__wrapped__(settings, dropped_cli_replies)
+    with closing(
+        paired.asgi_endpoint.__wrapped__(settings, dropped_cli_replies)
+    ) as endpoints:
+        for endpoint in endpoints:
+            # ASGI startup alone does not load Django's lazy URL/schema graph.
+            request = Request(
+                endpoint + "/app/gql/config/",
+                data=b'{"query":"{__typename}"}',
+                headers={"Content-Type": "application/json"},
+            )
+            try:
+                with urlopen(request, timeout=180) as response:
+                    assert response.status == 200
+            except HTTPError as error:
+                assert error.code in {400, 401, 403}
+            yield endpoint
 
 
-@pytest.mark.parametrize("client", ["cli", "browser"])
+@pytest.mark.parametrize("client", ["cli", "browser", "context"])
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     world, binary, tmp_path, asgi_endpoint, dropped_cli_replies, monkeypatch, client
 ):
@@ -104,6 +122,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "qualify_bootstrap.py",
         "tooling.py",
         "test_operator_agent.py",
+        "test_management_render_transport.py",
+        "test_management_render_capture.py",
         "chart-helper/main.go",
         "chart-helper/render.go",
         "chart-helper/release.go",
@@ -173,6 +193,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     try:
         case.setUp()
         try:
+            context_capture = None
+            if client == "context":
+                from context_cli_qualification import ContextCapture
+
+                context_capture = ContextCapture(case, native)
             credentials = private_file(
                 "mtls.json",
                 {
@@ -209,7 +234,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "--authority-version",
                 authority["version"],
             )
-            job, intent, body = case.plan_fixture()
+            job, intent, body = (
+                context_capture.plan_fixture()
+                if context_capture
+                else case.plan_fixture()
+            )
             body["overrides"] = {
                 "options": {"config": "input:config.json"},
                 "files": {
@@ -494,7 +523,13 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             case.server.server_close()
             case.thread.join(timeout=5)
             case.engine.close()
-            case.engine = case.make_engine()
+            case.engine = case.make_engine(
+                **(
+                    {"render_profile": context_capture.profile}
+                    if context_capture
+                    else {}
+                )
+            )
             case.start_server(port=port)
             assert case.url == endpoint and case.engine.instance_id == instance
             tree = run("agent", "install-plan", "tree", "review", job, *tree_flags)
@@ -523,6 +558,18 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 sorted(path.name for path in (artifact / "work").iterdir())
                 == tree_attempts
             )
+            if context_capture:
+                context_capture.qualify(
+                    run,
+                    private_file,
+                    dropped_cli_replies,
+                    job,
+                    tree_flags,
+                    plan,
+                    tree,
+                    data,
+                    tmp_path,
+                )
             if client == "browser":
                 from tree_browser_qualification import run_tree_browser
 
@@ -567,6 +614,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             )
             assert list(case.engine.install_plans.links.iterdir()) == []
         finally:
+            if context_capture:
+                context_capture.close()
             case.tearDown()
     finally:
         native.NativeAgentTests.tearDownClass()
