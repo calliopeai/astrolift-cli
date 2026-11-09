@@ -74,7 +74,9 @@ def asgi_endpoint(settings, dropped_cli_replies):
             yield endpoint
 
 
-@pytest.mark.parametrize("client", ["cli", "browser", "context", "context-browser"])
+@pytest.mark.parametrize(
+    "client", ["cli", "browser", "context", "context-browser", "verification"]
+)
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     world, binary, tmp_path, asgi_endpoint, dropped_cli_replies, monkeypatch, client
 ):
@@ -96,7 +98,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     ):
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
-    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+    revision = (
+        "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38"
+        if client == "verification"
+        else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+    )
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -134,6 +140,14 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "chart-helper/release.go",
         "chart-helper/go.mod",
         "chart-helper/go.sum",
+    ) + (
+        (
+            "management_plan_verification_service.py",
+            "management_render_revalidation.py",
+            "management_render_verification_store.py",
+        )
+        if client == "verification"
+        else ()
     ):
         relative = "kubernetes/nvke/" + name
         assert (source / relative).read_bytes() == subprocess.check_output(
@@ -199,7 +213,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         case.setUp()
         try:
             context_capture = None
-            if client in {"context", "context-browser"}:
+            if client in {"context", "context-browser", "verification"}:
                 from context_cli_qualification import ContextCapture
 
                 context_capture = ContextCapture(case, native)
@@ -565,6 +579,21 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             )
             if context_capture:
                 context_capture.qualify(
+                    run,
+                    private_file,
+                    dropped_cli_replies,
+                    job,
+                    tree_flags,
+                    plan,
+                    tree,
+                    data,
+                    tmp_path,
+                )
+            if client == "verification":
+                from verification_cli_qualification import qualify
+
+                qualify(
+                    context_capture,
                     run,
                     private_file,
                     dropped_cli_replies,
