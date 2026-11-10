@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "reviewed-workload-registry-acquisition-cli",
-  "status": "local-command-and-actual-linked-api-native-cli-recovery-qualified-release-incomplete",
+  "status": "local-commands-and-actual-linked-cli-browser-native-recovery-qualified-release-incomplete",
   "sourceSha256": {
     "cmd/nvke_install_plan_image.go": "f847c662cc31c99fcb8f3de444609bf2a854ff496585cbb434913a816528f88c",
     "cmd/nvke_install_plan_workload_image_test.go": "9bc7ac73dedf217ef34bac593e5c74b310e699461b075e4b254650e9ac4928ea",
@@ -54,6 +54,16 @@
       "passed": 1,
       "skipped": 0,
       "seconds": 605.12
+    },
+    "actualBrowserApiNative": {
+      "sessionId": 77587,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-image-browser-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-image-browser-app-agent-v1.log",
+      "logSha256": "2da748e172b015271d8ddd944ea3124bfac09c09cd2bd7e37460dfb07d9618ce",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 989.28
     }
   },
   "coverage": [
@@ -64,7 +74,7 @@
     "Existing graph-only and local image regression checks pass"
   ],
   "limits": [
-    "Actual linked client/API/PostgreSQL/native controlled-registry proof passed; browser API/native linkage and full live NVKE acceptance remain pending",
+    "Actual linked CLI and Chromium/API/PostgreSQL/native controlled-registry proofs passed; full live NVKE acceptance remains pending",
     "Actual unlinked workload CLI/browser proof is recorded separately in nvke-workload-cli-local.json",
     "Full signed image closure, platform/credential correspondence and linked native continuation remain incomplete",
     "No main merge or deployment occurred"

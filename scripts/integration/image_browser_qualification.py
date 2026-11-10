@@ -3,6 +3,8 @@
 import json
 import os
 import subprocess
+from contextlib import nullcontext
+from unittest.mock import patch
 from pathlib import Path
 from uuid import uuid4
 
@@ -24,6 +26,8 @@ def run_image_browser(
     reference,
     root_digest,
     dropped,
+    workload=None,
+    restart=None,
 ):
     frontend = Path(os.environ["NVKE_TEST_IMAGE_FRONTEND"]).resolve()
     runner = frontend / "e2e/nvke-install-plan-image-api-runner.mjs"
@@ -68,6 +72,8 @@ def run_image_browser(
             },
         },
     }
+    if workload is not None:
+        config["fixture"]["workload"] = workload
     config["bearer"] = bearer
     config_path = tmp_path / "image-browser-private.json"
     with os.fdopen(
@@ -79,9 +85,30 @@ def run_image_browser(
         json.dump(config, output)
     dropped["prepareNvkeOperatorInstallPlanImage("] = 1
     log = tmp_path / "image-browser-private.log"
-    with os.fdopen(
-        os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), "w"
-    ) as output:
+    from astrolift_clusters import nvke_install_plan_images as images
+
+    original_publish = images._publish
+    restarted = []
+
+    def published(*args, **kwargs):
+        value = original_publish(*args, **kwargs)
+        if not restarted and str(args[0]) == artifact_id:
+            restart()
+            restarted.append(True)
+        return value
+
+    publisher = (
+        patch.object(images, "_publish", side_effect=published)
+        if restart
+        else nullcontext()
+    )
+    with (
+        publisher,
+        os.fdopen(
+            os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600),
+            "w",
+        ) as output,
+    ):
         result = subprocess.run(
             ["node", str(runner)],
             cwd=frontend,
@@ -91,6 +118,8 @@ def run_image_browser(
             timeout=900,
             check=False,
         )
+    if restart:
+        assert restarted == [True]
     assert result.returncode == 0, (
         "Owned browser/API image qualification failed; inspect its private log"
     )
@@ -102,4 +131,16 @@ def run_image_browser(
     assert row.summary["captureDigest"] == report["captureDigest"]
     assert row.summary["rootDigest"] == root_digest
     assert row.summary["continuationAuthorized"] is False
+    if workload is not None:
+        assert report["workloadId"] == row.summary["workloadId"] == workload["id"]
+        assert (
+            report["workloadVersion"]
+            == row.source_binding["workload_version"]
+            == workload["version"]
+        )
+        assert (
+            report["workloadDigest"]
+            == row.summary["workloadDigest"]
+            == workload["workloadDigest"]
+        )
     return row
