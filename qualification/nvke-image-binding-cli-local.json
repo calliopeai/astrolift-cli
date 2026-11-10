@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "signed-image-binding-cli",
-  "status": "command-gates-and-actual-app-native-qualified-browser-proof-running-release-incomplete",
+  "status": "command-gates-cli-and-browser-app-native-qualified-release-incomplete",
   "sourceBaseRevision": "19c97c4",
   "sourceSha256": {
     "cmd/nvke_install_plan.go": "b4616907d193dff5827e1394d69d1f52726b1e21d9cf78905eb4816b0b8d41d4",
@@ -64,10 +64,19 @@
     },
     "actualBrowserAppNative": {
       "sessionId": 80748,
-      "status": "running-after-qualified-cli-predecessor",
+      "status": "complete",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 1377.63,
       "logPath": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.log",
+      "logSha256": "2e9fcaffecd99fce825b2cd216fa7ab771854b2cb4749e1601d9555913c6e737",
       "exitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.exit",
-      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-queue-v3.exit"
+      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-queue-v3.exit",
+      "appSourceRevision": "8790e0811",
+      "commandSourceRevision": "d241426",
+      "agentSourceRevision": "c67a6fe",
+      "interpretation": "Actual compiled CLI plus Chromium/Storybook hook through App/Postgres/native mutual TLS: browser binding publication loses its reply after durable App publication and cold agent restart; reload makes no automatic RPC; explicit original read and retained retry preserve artifact/capture/binding digests and observation time. Browser binding has one native attempt, unchanged registry request counts, unchanged original/native/guard/parent evidence, no private request/reference/selected-image/bearer leakage to recovery storage, and continuation stays false."
     }
   },
   "coverage": [
@@ -78,7 +87,7 @@
     "Public output validates reviewed workload, counts, bytes and preserved observation metadata and forbids continuation"
   ],
   "limits": [
-    "Browser image-binding pairing and combined native browser proof remain separate",
+    "Browser image-binding pairing and combined native browser proof are qualified on the pinned agent snapshot; final coordinated runtime repinning remains required",
     "Operator/platform/credential/rewrite/import/fresh-use/linked-admission closure and release remain open",
     "No main merge or deployment"
   ]
