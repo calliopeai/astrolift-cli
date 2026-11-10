@@ -1857,3 +1857,27 @@ the existing integration environment variables. The pinned agent revision and
 exact local run evidence are in `scripts/integration/nvke-install-plan-image-app-agent-local.json`.
 This fixture does not prove workload/platform closure, live cluster admission or
 production installation.
+
+
+### Reviewed workload inventory
+
+`astro nvke agent install-plan workload prepare|review|retry-preparation` collects
+and recovers the all-item inventory for one reviewed execution tree. Use the
+same original-operation, plan, chart-artifact and tree UUID/version/digest flags
+as image preparation, with a distinct `--artifact` UUID. Preparation requires a
+private `--file` JSON request and a private `--request-file` metadata journal.
+
+The JSON contains `format: 1`, `artifactId`, `planId`, `planDigest`, `treeId`,
+`treeDigest`, `contextBindings`, `maximumBytes`, `maximumResources` and
+`timeoutSeconds`. Each Helm item has an exact
+`"item-name": {"contextId": "UUID", "contextDigest": "SHA256"}` binding; native
+items use the server's frozen inputs. Byte limits are canonical decimal strings
+up to 67,108,864; resource limits are 1–10,000 and timeout is 1–300 seconds.
+No helper, kubeconfig, private path or native command enters the request.
+
+The journal is written before acquisition and retains source metadata and the
+complete input hash. After a lost reply, preserve its UUID and source versions
+and use `workload review`. `retry-preparation` explicitly reuses the server's
+retained private intent under the original caller/token. Output contains counts,
+digests and observation time. Inventory collection keeps native continuation
+unauthorized; signed image closure and linked admission remain separate work.
