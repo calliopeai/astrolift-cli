@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "scope": "registry-image-cli-private-intent-and-metadata-recovery",
+  "status": "local-cli-gates-qualified-real-app-agent-integration-pending",
+  "sourceSha256": {
+    "cmd/nvke_install_plan.go": "2dab6207bc623c8f0d49bcdd227eb6344b8768d5dfc41e0820513195b137ca6b",
+    "cmd/nvke_install_plan_image.go": "9c3ea4d48b63e5f54074361cddb155ca3125ba76e8be2fe7ba00c73a276c1374",
+    "cmd/nvke_install_plan_image_test.go": "3e73fd4a04244eabb264bb6b1dfdd0e38a5290fc6f1f1b4d7fb5e310116bfd58",
+    "internal/api/nvke_install_plan_image.go": "287e13427f7dc757b9fdda853aa21287df8836042ae237fb6e253560721c1a2d",
+    "README.md": "028099705a785e6a43590e2ccd425414c5754c191b20b8e97f3899c7aba30744"
+  },
+  "checks": {
+    "sessionId": 8249,
+    "logPath": "/tmp/astrolift-nvke-cli-image-full.log",
+    "exitMarker": "/tmp/astrolift-nvke-cli-image-full.exit",
+    "logSha256": "f5137f020d17f4dc52fef604c43c65cb8114bc8d5bc574513228b5fc94f7ab09",
+    "exitCode": 0,
+    "goFmt": "passed",
+    "goVet": "passed",
+    "lint": "0 issues",
+    "makeTest": "passed",
+    "topLevelPassingTests": 1068,
+    "makeBuild": "passed"
+  },
+  "limits": [
+    "Image command contract tests use controlled GraphQL transport responses. Actual CLI -> App/Postgres -> final pinned native agent/registry qualification remains required.",
+    "Historical evidence never authorizes continuation or renews freshness.",
+    "No main merge or deployment."
+  ],
+  "retainedInitialFailure": {
+    "logPath": "/tmp/astrolift-nvke-cli-image-focused.log",
+    "exitCode": 1,
+    "reason": "Generated test used SetImage instead of Cobra SetContext; corrected before passing focused and full gates."
+  }
+}

@@ -1790,3 +1790,47 @@ use. The result retains `continuationAuthorized: false` and
 Fresh phase/skipped-resource/original credential checks, schema policy, image closure
 and linked native admission remain required. The original uncertain install stays
 in place; these commands never authorize native continuation or replay.
+
+
+### Source-bound registry images
+
+`astro nvke agent install-plan image prepare|review|retry-preparation` captures
+an OCI registry image through the original agent. Configure the agent's private
+image-policy profile before preparing the parent plan; the request selects a
+reviewed policy alias. Retain the original operation, plan, chart publication and
+execution-tree versions and digests.
+
+```sh
+astro nvke agent install-plan image prepare OPERATION_GUID \
+  --site SITE_GUID --site-version 7 --authority-version 3 --version 4 \
+  --plan PLAN_GUID --plan-version 2 --plan-digest PLAN_SHA256 \
+  --chart-artifact CHART_GUID --chart-artifact-version 2 --chart-artifact-digest CHART_SHA256 \
+  --tree TREE_GUID --tree-version 2 --tree-digest TREE_SHA256 \
+  --artifact IMAGE_GUID --file private-image.json --request-file private-image-recovery.json
+```
+
+The private JSON contains exactly `format: 1`, `artifactId`, `planId`,
+`planDigest`, `treeId`, `treeDigest`, `reference`, `policy`, `maximumBytes`,
+`maximumCalls` and `timeoutSeconds`. IDs and digests must match the reviewed
+flags. `maximumBytes` is a canonical decimal string in 1–9223372036854775807;
+calls are 1–4096 and timeout is 1–300 seconds. Reference is a registry image
+reference without a URL scheme; policy is a reviewed logical alias. Credentials,
+output paths and arbitrary transport settings are not accepted. Private files
+use owner-only permissions; `--file -` accepts private stdin.
+
+Preparation flushes a metadata-only journal binding the exact private input hash,
+caller, server and every source version/digest before sending the request. The
+journal contains no image reference, policy or credentials. After an unconfirmed
+result, retain the artifact UUID and use `image review` with the same source flags.
+It reads historical metadata without a new collection. `image retry-preparation`
+explicitly uses the server's retained private intent and requires its original
+caller/token. Neither command accepts replacement private text or automatically
+repeats preparation.
+
+The CLI checks source bindings, signed artifact/source/capture digests, the OCI
+root digest, positive byte/blob counts and observation timestamp before output.
+Preparation also checks the reviewed byte limit. Historical recovery does not
+renew freshness. The result retains `continuationAuthorized: false` and
+`requires-workload-platform-credential-phase-use-and-linked-admission`.
+Local-image handling, rendered workload/platform closure, credential equivalence,
+fresh use-time verification and linked native admission remain required.
