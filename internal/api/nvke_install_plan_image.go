@@ -3,6 +3,9 @@ package api
 import "context"
 
 type NVKEInstallPlanImageSource struct {
+	WorkloadID              string `json:"workloadId,omitempty"`
+	ExpectedWorkloadVersion int    `json:"expectedWorkloadVersion,omitempty"`
+	WorkloadDigest          string `json:"workloadDigest,omitempty"`
 	NVKEInstallPlanTreeSource
 	TreeID              string `json:"treeId"`
 	ExpectedTreeVersion int    `json:"expectedTreeVersion"`
@@ -20,6 +23,9 @@ type NVKEInstallPlanImageReview struct {
 }
 
 type NVKEInstallPlanImage struct {
+	WorkloadID             string `json:"workloadId"`
+	WorkloadVersion        *int   `json:"workloadVersion"`
+	WorkloadDigest         string `json:"workloadDigest"`
 	ID                     string `json:"id"`
 	Version                int    `json:"version"`
 	Status                 string `json:"status"`
@@ -50,7 +56,7 @@ type NVKEInstallPlanImage struct {
 	ContinuationAuthorized *bool  `json:"continuationAuthorized"`
 }
 
-const nvkeInstallPlanImageFields = `id version status sourceKind planId planVersion chartArtifactId chartArtifactVersion chartArtifactDigest treeId treeVersion treeDigest operationId operationVersion siteId siteVersion authorityId authorityVersion planDigest artifactDigest sourceDigest captureDigest rootDigest blobCount bytes observedAt executionState continuationAuthorized`
+const nvkeInstallPlanImageFields = `id version status sourceKind workloadId workloadVersion workloadDigest planId planVersion chartArtifactId chartArtifactVersion chartArtifactDigest treeId treeVersion treeDigest operationId operationVersion siteId siteVersion authorityId authorityVersion planDigest artifactDigest sourceDigest captureDigest rootDigest blobCount bytes observedAt executionState continuationAuthorized`
 
 func (c *Client) PrepareNVKEInstallPlanImage(ctx context.Context, input NVKEInstallPlanImagePrepare) (*NVKEInstallPlanImage, error) {
 	return nvkeMutation[NVKEInstallPlanImage](ctx, c.nvkeInstallPlanClient(), "prepareNvkeOperatorInstallPlanImage", "PrepareNvkeOperatorInstallPlanImageInput", nvkeInstallPlanImageFields, input)

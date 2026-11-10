@@ -1881,3 +1881,14 @@ and use `workload review`. `retry-preparation` explicitly reuses the server's
 retained private intent under the original caller/token. Output contains counts,
 digests and observation time. Inventory collection keeps native continuation
 unauthorized; signed image closure and linked admission remain separate work.
+
+Registry image acquisition may bind a reviewed workload inventory with
+`astro nvke agent install-plan image prepare|review|retry-preparation` and the
+complete `--workload <uuid> --workload-version <version> --workload-digest <sha256>`
+triple. The private preparation JSON must include the matching `workloadId` and
+`workloadDigest`. The CLI reviews that inventory before acquisition and retains
+the tuple in its private metadata journal. Historical review and retry must keep
+it; omitting it cannot downgrade to graph-only evidence. This mode supports
+registry references found in rendered workloads even when absent from
+`images.txt`. Local image mode does not accept workload bindings. Image evidence
+continues to require platform/credential proof and linked admission.
