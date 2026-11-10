@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "scope": "actual-compiled-local-image-cli-app-postgres-agent-recovery",
+  "status": "one-real-cli-api-native-case-qualified",
+  "nativeRevision": "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "e21cc4f90113dd8ad40c1864b9a3f5b216b6f6460cac9a5ea561bbc25a06955b",
+    "scripts/integration/image_cli_qualification.py": "2b0be64f387c5dcd108979afcbf7590b4b3e271fbafb0c5f18b73337b9b04e13"
+  },
+  "binarySha256": "fa49094a39606e300483bfb09bcd690e4b97eb8d0533c45dd254498bb5ed1080",
+  "checks": {
+    "sessionId": 88799,
+    "logPath": "/tmp/astrolift-nvke-local-image-cli-app-agent.log",
+    "logSha256": "3930f03d7f55115dc6fe94a125fc3e759366e1571eae56a039dfaa6e97af0485",
+    "exitMarker": "/tmp/astrolift-nvke-local-image-cli-app-agent.exit",
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "seconds": 1172.85,
+    "ruffLintAndFormat": true
+  },
+  "coverage": [
+    "Compiled CLI through actual ASGI/GraphQL, real Postgres, current SDK and exact pinned native source over mTLS.",
+    "Digest-pinned local OCI layout retained by the authenticated execution tree; no registry profile or transport.",
+    "Metadata-only journal saved before prepare; lost App reply is not automatically replayed.",
+    "Cold agent restart, explicit historical review and retained retry recover the same evidence with one work attempt.",
+    "Original operation/receipt/guard, runs, parent records and admission links remain unchanged."
+  ],
+  "fixtureBoundary": "Controlled failed-receipt and small owned deployment/layout setup precedes captured rows. This does not establish a successful production installation or physical node qualification.",
+  "diagnosis": "Long host-contended run retained its active CLI request; read-only Postgres inspection showed idle client connections rather than a database lock wait. No timeout or source-integrity gate was weakened.",
+  "limits": [
+    "Actual local browser/API/native case pending.",
+    "Registry CLI/browser proofs require final repinning to the current common runtime.",
+    "Workload/platform/credential closure, import/rewrite, phase-use evidence and linked admission pending.",
+    "No main merge or deployment."
+  ]
+}
