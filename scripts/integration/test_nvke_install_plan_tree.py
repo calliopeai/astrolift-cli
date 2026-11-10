@@ -84,6 +84,8 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "verification",
         "verification-browser",
         "image",
+        "local-image",
+        "local-image-browser",
         "image-browser",
     ],
 )
@@ -110,6 +112,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         or not os.getenv("NVKE_TEST_IMAGE_STORYBOOK")
     ):
         pytest.skip("Select the owned image frontend and Storybook endpoint")
+    if client == "local-image-browser" and (
+        not os.getenv("NVKE_TEST_LOCAL_IMAGE_FRONTEND")
+        or not os.getenv("NVKE_TEST_LOCAL_IMAGE_STORYBOOK")
+    ):
+        pytest.skip("Select the owned local image frontend and Storybook endpoint")
     selected = os.getenv("NVKE_TEST_AGENT_OPSCODE")
     if (
         not selected
@@ -119,8 +126,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
     revision = (
-        "572b87b4efec2252597efc05cee4189facd35571"
-        if client in {"image", "image-browser"}
+        "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22"
+        if client in {"image", "image-browser", "local-image", "local-image-browser"}
         else (
             "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
             if client in {"verification", "verification-browser"}
@@ -177,7 +184,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         assert (source / relative).read_bytes() == subprocess.check_output(
             ["git", "show", revision + ":" + relative], cwd=source
         )
-    if client in {"image", "image-browser"}:
+    if client in {"image", "image-browser", "local-image", "local-image-browser"}:
         paths = (
             subprocess.check_output(
                 ["git", "ls-tree", "-r", "--name-only", revision, "kubernetes/nvke"],
@@ -263,10 +270,19 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         try:
             image_capture = None
             context_capture = None
-            if client in {"image", "image-browser"}:
-                from image_cli_qualification import ImageCapture
+            if client in {
+                "image",
+                "image-browser",
+                "local-image",
+                "local-image-browser",
+            }:
+                from image_cli_qualification import ImageCapture, LocalImageCapture
 
-                image_capture = ImageCapture(case, native)
+                image_capture = (
+                    LocalImageCapture
+                    if client in {"local-image", "local-image-browser"}
+                    else ImageCapture
+                )(case, native)
             if client in {
                 "context",
                 "context-browser",
@@ -338,7 +354,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "secret.txt": "PRIVATE_TREE_CONTENT",
                 },
             }
-            if image_capture:
+            if image_capture and image_capture.source_kind == "registry":
                 body["overrides"]["files"]["registry-policy.json"] = (
                     image_capture.policy
                 )
@@ -378,9 +394,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "  - {name: nktp, type: helm}\n"
                 )
                 if image_capture:
-                    (destination / "images.txt").write_text(
-                        image_capture.registry.reference + "\n"
-                    )
+                    image_capture.materialize(destination)
                 else:
                     (destination / "images.txt").unlink(missing_ok=True)
                 chart = destination / "owned-local-chart"
@@ -616,7 +630,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     if context_capture
                     else {}
                 ),
-                **({"image_profile": image_capture.profile} if image_capture else {}),
+                **(
+                    {"image_profile": image_capture.profile}
+                    if image_capture and image_capture.profile
+                    else {}
+                ),
             )
             case.start_server(port=port)
             assert case.url == endpoint and case.engine.instance_id == instance
@@ -670,8 +688,25 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                 )
-            if client == "image-browser":
-                from image_browser_qualification import run_image_browser
+            if client in {"image-browser", "local-image-browser"}:
+                browser_tree_row = (
+                    NvkeInstallPlanTree.objects.filter(guid=tree_id).values().get()
+                )
+                browser_parent_roots = (
+                    case.engine.install_plans.root,
+                    case.engine.install_chart_artifacts,
+                    case.engine.install_execution_trees,
+                )
+                browser_parents = [
+                    preparation.storage._scan(root, 1073741824)
+                    for root in browser_parent_roots
+                ]
+                if client == "local-image-browser":
+                    from local_image_browser_qualification import (
+                        run_local_image_browser as run_image_browser,
+                    )
+                else:
+                    from image_browser_qualification import run_image_browser
 
                 browser_row = run_image_browser(
                     bearer=issued.plaintext,
@@ -693,6 +728,14 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 )
                 assert (browser_artifact / "index.json").is_file()
                 assert len(list((browser_artifact / "work").iterdir())) == 1
+                assert (
+                    NvkeInstallPlanTree.objects.filter(guid=tree_id).values().get()
+                    == browser_tree_row
+                )
+                assert [
+                    preparation.storage._scan(root, 1073741824)
+                    for root in browser_parent_roots
+                ] == browser_parents
             if client == "verification":
                 from verification_cli_qualification import qualify
 
