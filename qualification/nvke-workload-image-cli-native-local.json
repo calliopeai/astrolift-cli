@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "combined-render-and-registry-actual-cli-api-native-fixture",
-  "status": "combined-fixture-exclusive-write-error-fixed-native-rerun-pending",
+  "status": "actual-linked-cli-api-postgres-native-cold-recovery-passed-release-incomplete",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "3de81df5cfd2485a2f9eb19c6ecc1ca2f60c3f674cd827eb3544b65779ee0afa",
     "scripts/integration/image_cli_qualification.py": "ac4bda867bc6d66210762129b1109fd02c9b8c548cc7bd67d033af58f821e78f"
@@ -20,7 +20,7 @@
     "Exercise compiled CLI/App/PostgreSQL/authenticated native image acquisition, lost reply and cold historical recovery without recollection"
   ],
   "limits": [
-    "Not yet a passing actual linked client qualification; fixed fixture v4 is running",
+    "One owned combined-profile fixture passed with no skips, using a rendered Pod image absent from images.txt, actual authenticated registry/agent, App API and PostgreSQL; full live installation remains pending",
     "Existing workload and independent image proofs remain separate",
     "No original live operation, guard, VM or admission was changed"
   ],
@@ -43,8 +43,19 @@
   "cause": "FileExistsError in the controlled owned_deployment fixture: it wrote ConfigMap bytes then attempted a second exclusive private_write of Pod bytes at the same path. The private-file guard correctly refused. The fixture now selects document bytes before exactly one private_write.",
   "rerun": {
     "sessionId": 42016,
-    "status": "pending",
+    "status": "complete",
+    "exitCode": 0,
     "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.exit",
-    "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.log"
+    "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.log",
+    "logSha256": "12b74444c0dfb57f93e90e8d8e7aab2de519d8bd4aafe49476186eac4be27ed7",
+    "passed": 1,
+    "skipped": 0,
+    "seconds": 605.12
+  },
+  "runtimePins": {
+    "app": "66983d1d7",
+    "cliCommands": "201ed23",
+    "cliFixture": "f8a2394",
+    "opscode": "58b643a0a50f71d822deade7fb633b98acded4f9"
   }
 }
