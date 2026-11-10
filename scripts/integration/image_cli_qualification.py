@@ -9,6 +9,8 @@ from astrolift_clusters.models import NvkeInstallPlanImage
 
 
 class ImageCapture:
+    source_kind = "registry"
+
     def __init__(self, case, native):
         import test_management_registry_capture as registry_fixture
 
@@ -66,9 +68,14 @@ class ImageCapture:
         case.server.server_close()
         case.thread.join(timeout=5)
         case.engine.close()
-        case.engine = case.make_engine(image_profile=self.profile)
+        case.engine = case.make_engine(
+            **({"image_profile": self.profile} if self.profile else {})
+        )
         case.start_server(port=port)
         assert (case.url, case.engine.instance_id) == (endpoint, instance)
+
+    def materialize(self, destination):
+        (destination / "images.txt").write_text(self.registry.reference + "\n")
 
     def qualify(
         self, run, private_file, dropped, job, tree_flags, plan, tree, charts, tmp_path
@@ -90,7 +97,13 @@ class ImageCapture:
             "maximumCalls": 512,
             "timeoutSeconds": 300,
         }
+        if self.source_kind == "local":
+            body.pop("policy")
+            body.pop("maximumCalls")
+            body["sourceKind"] = "local"
         flags = (
+            "--source-kind",
+            self.source_kind,
             *tree_flags[:-2],
             "--tree",
             tree["id"],
@@ -140,7 +153,7 @@ class ImageCapture:
         attempts = sorted(path.name for path in (artifact / "work").iterdir())
         assert len(attempts) == 1
         reads = len(self.registry.requests)
-        assert reads > 0
+        assert reads > 0 if self.source_kind == "registry" else reads == 0
         self.restart()
         with patch.object(
             service.images.registry,
@@ -152,6 +165,7 @@ class ImageCapture:
                 run("agent", "install-plan", "image", "retry-preparation", job, *flags)
                 == public
             )
+        assert public["sourceKind"] == self.source_kind
         assert public["id"] == artifact_id and public["treeId"] == tree["id"]
         assert public["chartArtifactDigest"] == charts["artifactDigest"]
         assert public["rootDigest"] == self.registry.descriptor["digest"]
@@ -170,3 +184,67 @@ class ImageCapture:
         ):
             assert service.preparation.storage._scan(root, 1073741824) == parents[name]
         return public
+
+
+class LocalImageCapture(ImageCapture):
+    source_kind = "local"
+
+    def __init__(self, case, native):
+        from types import SimpleNamespace
+        import test_management_oci_content as content
+
+        self.case, self.native = case, native
+        self.profile = None
+        self.closed = self.class_ready = False
+        self.fixture = None
+        blobs = content.OCIContentTests()
+        blobs.blobs = {}
+        config = blobs.document(
+            {"os": "linux", "architecture": "arm64"},
+            "application/vnd.oci.image.config.v1+json",
+        )
+        layer = blobs.blob(
+            b"PRIVATE_LOCAL_LAYER", "application/vnd.oci.image.layer.v1.tar"
+        )
+        descriptor = blobs.document(
+            {"schemaVersion": 2, "config": config, "layers": [layer]},
+            "application/vnd.oci.image.manifest.v1+json",
+        )
+        self.registry = SimpleNamespace(
+            reference="example.test/local@" + descriptor["digest"],
+            descriptor=descriptor,
+            requests=[],
+        )
+        self.files = {
+            "oci-layout": b'{"imageLayoutVersion":"1.0.0"}',
+            "index.json": json.dumps(
+                {"schemaVersion": 2, "manifests": [descriptor]}
+            ).encode(),
+            **{
+                "blobs/" + digest.replace(":", "/"): raw
+                for digest, raw in blobs.blobs.items()
+            },
+        }
+
+    def close(self):
+        self.closed = True
+
+    def materialize(self, destination):
+        self.native.agent.private_write(
+            destination / "images.txt",
+            (self.registry.reference + "\towned-layout\n").encode(),
+        )
+        for relative, raw in self.files.items():
+            path = destination / "owned-layout" / relative
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            self.native.agent.private_write(path, raw)
+
+    def qualify(self, *args, **kwargs):
+        import management_plan_image_service as service
+
+        with patch.object(
+            service.images.registry,
+            "capture",
+            side_effect=AssertionError("Local proof contacted registry"),
+        ):
+            return super().qualify(*args, **kwargs)
