@@ -64,6 +64,8 @@ def asgi_endpoint(settings, dropped_cli_replies):
     async def qualified_application(scope, receive, send):
         request_body = bytearray()
         dropping = False
+        status = None
+        started = time.monotonic()
 
         async def observed_receive():
             event = await receive()
@@ -71,7 +73,9 @@ def asgi_endpoint(settings, dropped_cli_replies):
             return event
 
         async def observed_send(event):
-            nonlocal dropping
+            nonlocal dropping, status
+            if event["type"] == "http.response.start":
+                status = event["status"]
             if event["type"] == "http.response.start" and event["status"] == 200:
                 for field, remaining in dropped_cli_replies.items():
                     if remaining and field.encode() in request_body:
@@ -95,7 +99,14 @@ def asgi_endpoint(settings, dropped_cli_replies):
                 return
             await send(event)
 
-        await application(scope, observed_receive, observed_send)
+        completed = False
+        try:
+            await application(scope, observed_receive, observed_send)
+            completed = True
+        finally:
+            from request_timing_qualification import record_request_timing
+
+            record_request_timing(request_body, time.monotonic() - started, status, completed, dropping)
 
     settings.DEBUG = False
     sock = socket.socket()

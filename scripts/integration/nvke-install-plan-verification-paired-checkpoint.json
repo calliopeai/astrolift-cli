@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "actual-compiled-cli-app-agent-verification-acceptance-harness",
-  "status": "actual-compiled-cli-app-agent-acceptance-running",
+  "status": "actual-acceptance-failed-context-preparation-timeout",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "2f8b03588600c35643ba581d24ec0dfaf25177473ab94354db71fb9131e7315b",
     "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
@@ -22,12 +22,20 @@
       "logSha256": "739ba0a08f274e3adf9ab344b26231f01f6974d58612974d73f1e11441305cfe"
     },
     "actualAcceptance": {
-      "status": "running",
+      "status": "failed",
       "sessionId": 62575,
       "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v1.log",
       "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v1.exit",
       "database": "test_astro_nvke_verification_20261109",
-      "scope": "Configured App model/service gates passed; selected exact verification node only. Compiled binary and runtime/helper pins remain frozen for the actual run."
+      "scope": "No verification acceptance claimed. Diagnose repeated SDK source traversal, qualify bounded complete source snapshots, then rerun unchanged timeout with metadata-only request timings.",
+      "exitCode": 1,
+      "failureStage": "context prepare before verification",
+      "reason": "compiled CLI harness subprocess exceeded existing 380-second budget"
+    },
+    "requestTimingPrivacy": {
+      "exitCode": 0,
+      "testsPassed": 2,
+      "logPath": "/tmp/astrolift-nvke-verification-request-timing-privacy.log"
     }
   },
   "implemented": [
@@ -36,7 +44,7 @@
     "Acceptance checks signed index digest, capture/context/chart/source metadata, unchanged original full App/native records/guard and parent/context snapshots."
   ],
   "remaining": [
-    "Run the explicit selected scenario with the owned compiled binary, frozen runtime/bundle/helper and actual App/PostgreSQL after configured API gates finish; diagnose failures before recording acceptance.",
+    "Qualify SDK source-graph request reduction against pinned native runtimes, then rerun exact verification scenario with unchanged process and authority budgets.",
     "No paired acceptance or live production proof is claimed by static checks or collection."
   ],
   "continuationAuthorized": false
