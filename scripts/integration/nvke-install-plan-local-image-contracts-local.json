@@ -1,0 +1,42 @@
+{
+  "format": 1,
+  "scope": "compiled-cli-local-image-request-review-recovery-protocol",
+  "status": "local-contracts-vet-lint-full-suite-and-build-qualified-paired-api-agent-pending",
+  "sourceSha256": {
+    "cmd/nvke_install_plan_image.go": "e236ee0614f620644575bccb1b89ff7c3963c14eecbaeb3cdf5a59406ba2bbdb",
+    "cmd/nvke_install_plan_local_image_test.go": "de337a8403909dca7ff845632ed7fda8927cd4b576dd2f3e13b9c775126ac16a",
+    "internal/api/nvke_install_plan_image.go": "b372026401959b67d9506573914049c22e78aad52d88de59c8029a9aecd2cf04",
+    "README.md": "207e711dcecbcabd0e42db79d5c7fb9aa556b2d0044c9185d76cb49aad8d1588"
+  },
+  "checks": {
+    "sessionId": 68189,
+    "logPath": "/tmp/astrolift-nvke-local-image-cli-check-v2.log",
+    "logSha256": "29118360031b71cb4cc8a40defb7cf8bf0cdfb8bc0af21c13bf44af051be4182",
+    "exitMarker": "/tmp/astrolift-nvke-local-image-cli-check-v2.exit",
+    "exitCode": 0,
+    "fullSuitePassingTopLevelTests": 1071,
+    "skippedTests": [
+      "TestRealPreparedNativeBundle",
+      "TestNVKEToolingRealRunThroughCobra"
+    ],
+    "checks": [
+      "Focused registry/local image command cases",
+      "go vet ./...",
+      "make lint",
+      "go test ./... -count=1 -json",
+      "make build"
+    ]
+  },
+  "binarySha256": "fa49094a39606e300483bfb09bcd690e4b97eb8d0533c45dd254498bb5ed1080",
+  "behavior": [
+    "Explicit --source-kind local on prepare, review and retained retry; default registry remains compatible.",
+    "Local closed JSON requires sourceKind local, digest-pinned reference and byte/time budgets; registry policy/call fields are refused.",
+    "Private journal binds local kind and exact input hash before mutation; no private reference in journal.",
+    "GraphQL requests sourceKind; mismatched evidence kinds and wrong requested local root digest are refused."
+  ],
+  "limits": [
+    "Real local compiled CLI/App/Postgres/agent recovery proof pending.",
+    "Skipped general tooling cases require separate native-bundle selection; prior native tooling proofs remain separate.",
+    "No local image import, continuation authorization, main merge or deployment."
+  ]
+}

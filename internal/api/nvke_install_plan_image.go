@@ -23,6 +23,7 @@ type NVKEInstallPlanImage struct {
 	ID                     string `json:"id"`
 	Version                int    `json:"version"`
 	Status                 string `json:"status"`
+	SourceKind             string `json:"sourceKind"`
 	PlanID                 string `json:"planId"`
 	PlanVersion            int    `json:"planVersion"`
 	ChartArtifactID        string `json:"chartArtifactId"`
@@ -49,7 +50,7 @@ type NVKEInstallPlanImage struct {
 	ContinuationAuthorized *bool  `json:"continuationAuthorized"`
 }
 
-const nvkeInstallPlanImageFields = `id version status planId planVersion chartArtifactId chartArtifactVersion chartArtifactDigest treeId treeVersion treeDigest operationId operationVersion siteId siteVersion authorityId authorityVersion planDigest artifactDigest sourceDigest captureDigest rootDigest blobCount bytes observedAt executionState continuationAuthorized`
+const nvkeInstallPlanImageFields = `id version status sourceKind planId planVersion chartArtifactId chartArtifactVersion chartArtifactDigest treeId treeVersion treeDigest operationId operationVersion siteId siteVersion authorityId authorityVersion planDigest artifactDigest sourceDigest captureDigest rootDigest blobCount bytes observedAt executionState continuationAuthorized`
 
 func (c *Client) PrepareNVKEInstallPlanImage(ctx context.Context, input NVKEInstallPlanImagePrepare) (*NVKEInstallPlanImage, error) {
 	return nvkeMutation[NVKEInstallPlanImage](ctx, c.nvkeInstallPlanClient(), "prepareNvkeOperatorInstallPlanImage", "PrepareNvkeOperatorInstallPlanImageInput", nvkeInstallPlanImageFields, input)
