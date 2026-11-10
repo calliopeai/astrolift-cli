@@ -87,6 +87,8 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "local-image",
         "local-image-browser",
         "image-browser",
+        "workload",
+        "workload-browser",
     ],
 )
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
@@ -117,6 +119,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         or not os.getenv("NVKE_TEST_LOCAL_IMAGE_STORYBOOK")
     ):
         pytest.skip("Select the owned local image frontend and Storybook endpoint")
+    if client == "workload-browser" and (
+        not os.getenv("NVKE_TEST_WORKLOAD_FRONTEND")
+        or not os.getenv("NVKE_TEST_WORKLOAD_STORYBOOK")
+    ):
+        pytest.skip("Select the owned workload frontend and Storybook endpoint")
     selected = os.getenv("NVKE_TEST_AGENT_OPSCODE")
     if (
         not selected
@@ -126,7 +133,9 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
     revision = (
-        "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22"
+        "58b643a0a50f71d822deade7fb633b98acded4f9"
+        if client in {"workload", "workload-browser"}
+        else "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22"
         if client in {"image", "image-browser", "local-image", "local-image-browser"}
         else (
             "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
@@ -184,7 +193,14 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         assert (source / relative).read_bytes() == subprocess.check_output(
             ["git", "show", revision + ":" + relative], cwd=source
         )
-    if client in {"image", "image-browser", "local-image", "local-image-browser"}:
+    if client in {
+        "image",
+        "image-browser",
+        "local-image",
+        "local-image-browser",
+        "workload",
+        "workload-browser",
+    }:
         paths = (
             subprocess.check_output(
                 ["git", "ls-tree", "-r", "--name-only", revision, "kubernetes/nvke"],
@@ -288,6 +304,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "context-browser",
                 "verification",
                 "verification-browser",
+                "workload",
+                "workload-browser",
             }:
                 from context_cli_qualification import ContextCapture
 
@@ -676,6 +694,46 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                 )
+            if client in {"workload", "workload-browser"}:
+                from workload_cli_qualification import qualify_workload
+
+                qualify_workload(
+                    case,
+                    context_capture,
+                    context_summary,
+                    run,
+                    private_file,
+                    dropped_cli_replies,
+                    job,
+                    tree_flags,
+                    plan,
+                    tree,
+                    data,
+                    tmp_path,
+                )
+            if client == "workload-browser":
+                from workload_browser_qualification import run_workload_browser
+
+                browser_row = run_workload_browser(
+                    bearer=issued.plaintext,
+                    tmp_path=tmp_path,
+                    endpoint=asgi_endpoint,
+                    world=world,
+                    site=state.site,
+                    authority=authority,
+                    operation=original,
+                    plan=plan,
+                    charts=data,
+                    tree=tree,
+                    context_summary=context_summary,
+                    restart=context_capture.restart,
+                    dropped=dropped_cli_replies,
+                )
+                browser_artifact = case.engine.install_workload_inventories / str(
+                    browser_row.guid
+                )
+                assert (browser_artifact / "index.json").is_file()
+                assert len(list((browser_artifact / "work").iterdir())) == 1
             if image_capture:
                 image_capture.qualify(
                     run,

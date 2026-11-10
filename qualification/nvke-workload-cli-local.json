@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "source-bound-workload-inventory-cli-controls",
-  "status": "local-client-command-gates-passed-live-api-and-native-cli-qualification-pending",
+  "status": "local-client-and-actual-api-native-cli-browser-workload-recovery-qualified-release-incomplete",
   "sourceSha256": {
     "README.md": "794bcc38747e7eaff656455a66e574111b4b0bb26a9599e94cd683be9d042d60",
     "cmd/nvke_install_plan.go": "7940a3a3cbd537f171d35a508084ef536bffa66e271f3734fcc1d446cb5e8207",
@@ -44,6 +44,26 @@
       "exitMarker": "/tmp/astrolift-nvke-workload-cli-build-v2.exit",
       "logPath": "/tmp/astrolift-nvke-workload-cli-build-v2.log",
       "logSha256": "6a1cb113362c36685f6d1ddd090acd91ea6c9fe855ac249ebc274e0939def00c"
+    },
+    "actualCliApiNative": {
+      "sessionId": 4799,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-app-agent-v1.log",
+      "logSha256": "01eeaca65450c72d4f982c140cb5dd81435f031746830986cd5a4557d14b4d5b",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 278.95
+    },
+    "actualBrowserApiNative": {
+      "sessionId": 79886,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-browser-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-browser-app-agent-v1.log",
+      "logSha256": "889d91b1bc6af7674b307f48cc641f67ab450da09743477b91bd054cda61665b",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 431.9
     }
   },
   "retainedFailures": [
@@ -79,11 +99,24 @@
     "changed private input cannot reuse the journal identity",
     "closed binding keys and nested duplicate keys are refused before journal or mutation",
     "stale truncated authorizing or inconsistent summaries are refused",
-    "bounded count/digest observations keep continuation unauthorized"
+    "bounded count/digest observations keep continuation unauthorized",
+    "Actual compiled CLI and Chromium use the App API, real PostgreSQL and pinned authenticated native agent with the owned Kubernetes context fixture",
+    "Lost preparation replies after durable publication, native agent cold restart, reload without RPC, explicit historical review and retained-intent retry preserve digests and observation time",
+    "One native collection attempt per artifact; parent artifacts, original uncertain operation and native guards remain unchanged; continuation stays unauthorized"
   ],
   "limits": [
-    "Command/RPC qualification uses owned HTTP fixtures; actual API/native CLI and browser acceptance remain pending",
+    "Actual client/API/PostgreSQL/native proof uses owned Kubernetes and Helm fixtures; full live NVKE acceptance remains pending",
     "Published CLI runtime source repinning and coordinated release remain separate gates",
     "Full signed image closure, platform/credential correspondence and linked continuation remain incomplete"
-  ]
+  ],
+  "integrationSourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "bbeb6a1cf0a942e796db14df49f65f28dc5f8b7059ae74cf67a8bb3268e82940",
+    "scripts/integration/workload_browser_qualification.py": "21a49758cdcd9fb4cfec493f447235b5830a8a78ea8851d1423b8fdc1c7ab54d",
+    "scripts/integration/workload_cli_qualification.py": "02f6aedbbab38721a4d8a803881d8d89fb526ad59bcb2a80f6d9474f905dc52e"
+  },
+  "runtimePins": {
+    "appBase": "3dff73116",
+    "cli": "a55746c",
+    "opscode": "58b643a0a50f71d822deade7fb633b98acded4f9"
+  }
 }
