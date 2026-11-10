@@ -31,6 +31,9 @@ fresh use-time evidence remain required for native admission.`,
 				return runNVKEAgentInstallPlanImage(cmd, ctx, c, args[0], action)
 			})}
 		nvkeAgentJobFlags(leaf)
+		leaf.Flags().String("workload", "", "Exact reviewed workload inventory UUID (optional registry source)")
+		leaf.Flags().Int("workload-version", 0, "Exact reviewed workload inventory version")
+		leaf.Flags().String("workload-digest", "", "Exact reviewed workload inventory SHA-256")
 		leaf.Flags().String("source-kind", "registry", "Image source: registry or local; must match retained intent")
 		leaf.Flags().String("plan", "", "Exact prepared plan UUID (required)")
 		leaf.Flags().Int("plan-version", 0, "Exact prepared plan version (required)")
@@ -57,7 +60,10 @@ fresh use-time evidence remain required for native admission.`,
 }
 
 type nvkeImageJournal struct {
-	SourceKind string `json:"sourceKind,omitempty"`
+	WorkloadID      string `json:"workloadId,omitempty"`
+	WorkloadVersion int    `json:"workloadVersion,omitempty"`
+	WorkloadDigest  string `json:"workloadDigest,omitempty"`
+	SourceKind      string `json:"sourceKind,omitempty"`
 	nvkeChartJournal
 	ChartArtifactID      string `json:"chartArtifactId"`
 	ChartArtifactVersion int    `json:"chartArtifactVersion"`
@@ -69,6 +75,7 @@ type nvkeImageJournal struct {
 
 func decodeNVKEImageStrict(data []byte, target any) error {
 	allowed := map[string]bool{
+		"workloadId": true, "workloadVersion": true, "workloadDigest": true,
 		"format": true, "artifactId": true, "planId": true, "planDigest": true, "maximumBytes": true,
 		"sourceKind": true, "reference": true, "policy": true, "maximumCalls": true, "timeoutSeconds": true,
 		"chartArtifactId": true, "chartArtifactVersion": true, "chartArtifactDigest": true,
@@ -110,6 +117,8 @@ func nvkeInstallPlanImageIntent(cmd *cobra.Command, c *api.Client, review api.NV
 		return "", err
 	}
 	var body struct {
+		WorkloadID     string `json:"workloadId"`
+		WorkloadDigest string `json:"workloadDigest"`
 		SourceKind     string `json:"sourceKind"`
 		Format         int    `json:"format"`
 		ArtifactID     string `json:"artifactId"`
@@ -141,6 +150,13 @@ func nvkeInstallPlanImageIntent(cmd *cobra.Command, c *api.Client, review api.NV
 		}
 	} else {
 		expected = append(expected, "policy", "maximumCalls")
+		workloadID, workloadDigest := resourceStringFlag(cmd, "workload"), resourceStringFlag(cmd, "workload-digest")
+		if workloadID != "" {
+			expected = append(expected, "workloadId", "workloadDigest")
+			if body.WorkloadID != workloadID || body.WorkloadDigest != workloadDigest {
+				return "", errors.New("image request must match the exact reviewed workload inventory")
+			}
+		}
 		if kind != "registry" || !nvkePlanItemName.MatchString(body.Policy) || body.MaximumCalls < 1 || body.MaximumCalls > 4096 {
 			return "", errors.New("registry image requires a reviewed policy and bounded call count")
 		}
@@ -167,6 +183,10 @@ func nvkeInstallPlanImageIntent(cmd *cobra.Command, c *api.Client, review api.NV
 		ChartArtifactID: publication.ID, ChartArtifactVersion: publication.Version, ChartArtifactDigest: publication.ArtifactDigest, TreeID: tree.ID, TreeVersion: tree.Version, TreeDigest: tree.TreeDigest}
 	if local {
 		saved.SourceKind = "local"
+	} else {
+		saved.WorkloadID = resourceStringFlag(cmd, "workload")
+		saved.WorkloadVersion, _ = cmd.Flags().GetInt("workload-version")
+		saved.WorkloadDigest = resourceStringFlag(cmd, "workload-digest")
 	}
 	_, err = privatefile.ReadFile(journal, 16384)
 	if errors.Is(err, os.ErrNotExist) {
@@ -249,6 +269,12 @@ func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *ap
 	if version < 1 || chartVersion < 1 || treeVersion < 1 || !nvkeDigestPattern.MatchString(treeDigest) || !nvkeDigestPattern.MatchString(digest) || !nvkeDigestPattern.MatchString(chartDigest) {
 		return errors.New("review exact plan and chart publication versions and SHA-256 digests")
 	}
+	workloadID, workloadDigest := resourceStringFlag(cmd, "workload"), resourceStringFlag(cmd, "workload-digest")
+	workloadVersion, _ := cmd.Flags().GetInt("workload-version")
+	linked := workloadID != "" || workloadDigest != "" || cmd.Flags().Changed("workload-version")
+	if linked && (kind != "registry" || nvkeGUID(workloadID) != nil || identities[workloadID] || workloadVersion < 1 || !nvkeDigestPattern.MatchString(workloadDigest)) {
+		return errors.New("review a distinct workload UUID, exact version and SHA-256 for registry acquisition")
+	}
 	review, source, err := nvkeAgentJobReview(cmd, ctx, c, id)
 	if err != nil {
 		return err
@@ -297,6 +323,23 @@ func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *ap
 	}
 
 	imageSource := api.NVKEInstallPlanImageSource{NVKEInstallPlanTreeSource: input, TreeID: treeID, ExpectedTreeVersion: treeVersion, TreeDigest: treeDigest}
+	if linked {
+		workload, e := c.ReviewNVKEInstallPlanWorkload(ctx, api.NVKEInstallPlanWorkloadReview{
+			NVKEInstallPlanWorkloadSource: api.NVKEInstallPlanWorkloadSource{
+				NVKEInstallPlanTreeSource: input, TreeID: treeID, ExpectedTreeVersion: treeVersion, TreeDigest: treeDigest,
+			}, ArtifactID: workloadID,
+		}, false)
+		if e != nil {
+			return e
+		}
+		if e = validateNVKEInstallPlanWorkload(workload, plan, publication, tree, workloadID); e != nil {
+			return e
+		}
+		if workload.Version != workloadVersion || workload.WorkloadDigest != workloadDigest {
+			return errors.New("the workload inventory changed; review before image acquisition")
+		}
+		imageSource.WorkloadID, imageSource.ExpectedWorkloadVersion, imageSource.WorkloadDigest = workloadID, workloadVersion, workloadDigest
+	}
 	var row *api.NVKEInstallPlanImage
 	var maximumBytes int64
 	var requestedRoot string
@@ -329,6 +372,11 @@ func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *ap
 	}
 	if err = validateNVKEInstallPlanImage(row, plan, publication, tree, artifactID, kind); err != nil {
 		return err
+	}
+	if row.WorkloadID != workloadID || row.WorkloadDigest != workloadDigest ||
+		(linked && (row.WorkloadVersion == nil || *row.WorkloadVersion != workloadVersion)) ||
+		(!linked && row.WorkloadVersion != nil) {
+		return errors.New("image evidence did not confirm the exact reviewed workload source")
 	}
 	if verb == "prepare" {
 		size, _ := agentDecimal(row.Bytes)
