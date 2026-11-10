@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "actual-compiled-cli-app-agent-verification-acceptance-harness",
-  "status": "actual-acceptance-failed-context-preparation-timeout",
+  "status": "actual-acceptance-v2-running-after-client-source-graph-reduction",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "2f8b03588600c35643ba581d24ec0dfaf25177473ab94354db71fb9131e7315b",
     "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
@@ -36,6 +36,25 @@
       "exitCode": 0,
       "testsPassed": 2,
       "logPath": "/tmp/astrolift-nvke-verification-request-timing-privacy.log"
+    },
+    "actualAcceptanceV2": {
+      "status": "running",
+      "sessionId": 74407,
+      "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v2.exit",
+      "timingPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v2-timings.jsonl",
+      "database": "test_astro_nvke_verification_20261109",
+      "appSourceRevision": "471e10d05",
+      "agentRevision": "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38",
+      "processTimeoutSeconds": 380,
+      "sourceSha256": {
+        "scripts/integration/test_nvke_install_plan_tree.py": "b5a42f5a40c2356bc06c2f18bf154b8dfb18cd2047cda1a41b8ec260f91e6da6",
+        "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
+        "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
+        "scripts/integration/test_nvke_contracts.py": "0e484ecab149ba46825ab9161179255ce42a67206c1d748b7fbfc5690fd79198",
+        "scripts/integration/request_timing_qualification.py": "f0a82fe07340d391fe18390f008ce87a8e7e00261c2ff09ee4ae1875a9aff7f4"
+      },
+      "scope": "Real unchanged-timeout acceptance with 123-to-39 SDK graph traversal reduction. Native setup diagnosis succeeded but 292 seconds versus 300-second context budget leaves a remaining hot path; no acceptance claim until terminal success."
     }
   },
   "implemented": [
