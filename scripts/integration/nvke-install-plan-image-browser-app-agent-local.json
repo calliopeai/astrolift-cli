@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "scope": "owned-browser-real-api-peer-after-compiled-cli-image-qualification",
+  "status": "source-and-lint-saved-actual-browser-run-pending",
+  "agentRevision": "572b87b4efec2252597efc05cee4189facd35571",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "8a0434a06acfda24e65d63e97238b62c456ed98f378025a077f2c1be7ab16812",
+    "scripts/integration/image_browser_qualification.py": "95e26c3293f7ec6c2ed9c6a4678aee034ab67c38b7e6516562b342b552adc520",
+    "scripts/integration/image_cli_qualification.py": "3cc48995befbb1fc8f6dd1cb2f26f63f0d7a812bd9ac0c42d0feb06617f6f695"
+  },
+  "checks": {
+    "lint": {
+      "logPath": "/tmp/astrolift-nvke-image-browser-pair-lint.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-browser-pair-lint.exit",
+      "exitCode": 0
+    },
+    "actualBrowser": {
+      "sessionId": 74598,
+      "status": "pending",
+      "logPath": "/tmp/astrolift-nvke-image-browser-app-agent.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-browser-app-agent.exit"
+    }
+  },
+  "limits": [
+    "Actual image-browser case is pending; no passing browser/API/native integration is claimed.",
+    "Earlier image-only case passed in 380.74 seconds at CLI c68b9e8 with zero skips.",
+    "No actual Next route/login, live cluster installation, full closure or linked admission is claimed."
+  ]
+}
