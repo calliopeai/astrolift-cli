@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "scope": "combined-render-and-registry-actual-cli-api-native-fixture",
+  "status": "plan-preparation-refused-diagnostic-run-pending",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "e208563a87833234834805669adbfa319884764fead0f8148461d9005d202746",
+    "scripts/integration/image_cli_qualification.py": "ac4bda867bc6d66210762129b1109fd02c9b8c548cc7bd67d033af58f821e78f"
+  },
+  "failedRun": {
+    "sessionId": 46110,
+    "exitCode": 1,
+    "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v1.exit",
+    "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v1.log",
+    "logSha256": "ac55b1c1f9976d17790359c5628cd399516ebcb488a9e0953ba31da25f68a682",
+    "failure": "OPERATOR_REQUEST_REFUSED during original plan preparation, before workload/image acquisition"
+  },
+  "diagnosticRun": {
+    "sessionId": 28520,
+    "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.exit",
+    "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.log",
+    "status": "pending"
+  },
+  "intent": [
+    "Combine the task-owned authenticated Kubernetes render fixture with the controlled authenticated registry profile across cold restarts",
+    "Render the registry reference in a Pod while omitting images.txt to require signed workload authority",
+    "Exercise compiled CLI/App/PostgreSQL/authenticated native image acquisition, lost reply and cold historical recovery without recollection"
+  ],
+  "limits": [
+    "Not a passing actual linked client qualification; native refusal cause is still being diagnosed",
+    "Existing workload and independent image proofs remain separate",
+    "No original live operation, guard, VM or admission was changed"
+  ]
+}

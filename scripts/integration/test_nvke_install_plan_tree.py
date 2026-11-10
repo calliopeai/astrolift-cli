@@ -4,6 +4,7 @@ from contextlib import closing
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 from urllib.error import HTTPError
@@ -89,6 +90,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "image-browser",
         "workload",
         "workload-browser",
+        "workload-image",
     ],
 )
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
@@ -134,7 +136,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     source = Path(selected)
     revision = (
         "58b643a0a50f71d822deade7fb633b98acded4f9"
-        if client in {"workload", "workload-browser"}
+        if client in {"workload", "workload-browser", "workload-image"}
         else "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22"
         if client in {"image", "image-browser", "local-image", "local-image-browser"}
         else (
@@ -200,6 +202,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "local-image-browser",
         "workload",
         "workload-browser",
+        "workload-image",
     }:
         paths = (
             subprocess.check_output(
@@ -286,11 +289,36 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         try:
             image_capture = None
             context_capture = None
+            if client == "workload-image":
+                install_plan = native.agent.OperatorAgent.install_plan
+
+                def observed_install_plan(engine, *args, **kwargs):
+                    try:
+                        return install_plan(engine, *args, **kwargs)
+                    except native.agent.AgentError as error:
+                        if re.fullmatch(r"[A-Z_]{1,128}", error.code):
+                            print("Owned native plan refusal:", error.code)
+                        raise
+
+                monkeypatch.setattr(
+                    native.agent.OperatorAgent, "install_plan", observed_install_plan
+                )
+                make_engine = case.make_engine
+                profiles = {}
+
+                def combined_engine(**options):
+                    for key in ("render_profile", "image_profile"):
+                        if key in options:
+                            profiles[key] = options[key]
+                    return make_engine(**{**profiles, **options})
+
+                monkeypatch.setattr(case, "make_engine", combined_engine)
             if client in {
                 "image",
                 "image-browser",
                 "local-image",
                 "local-image-browser",
+                "workload-image",
             }:
                 from image_cli_qualification import ImageCapture, LocalImageCapture
 
@@ -306,6 +334,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "verification-browser",
                 "workload",
                 "workload-browser",
+                "workload-image",
             }:
                 from context_cli_qualification import ContextCapture
 
@@ -411,7 +440,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "  - {name: spire-tpm-pubhashes, type: manifest}\n"
                     "  - {name: nktp, type: helm}\n"
                 )
-                if image_capture:
+                if image_capture and client != "workload-image":
                     image_capture.materialize(destination)
                 else:
                     (destination / "images.txt").unlink(missing_ok=True)
@@ -426,6 +455,15 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     chart / "templates/config.yaml",
                     b"apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: owned\n",
                 )
+                if client == "workload-image":
+                    native.agent.private_write(
+                        chart / "templates/config.yaml",
+                        (
+                            "apiVersion: v1\nkind: Pod\nmetadata:\n  name: owned\nspec:\n  containers:\n    - name: owned\n      image: "
+                            + image_capture.registry.reference
+                            + "\n"
+                        ).encode(),
+                    )
                 (destination / "nktp/release.yaml").write_text(
                     "chart:\n  name: nktp\n  path: owned-local-chart\n  setFile:\n    - password="
                     + str(inputs / "secret.txt")
@@ -694,10 +732,10 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                 )
-            if client in {"workload", "workload-browser"}:
+            if client in {"workload", "workload-browser", "workload-image"}:
                 from workload_cli_qualification import qualify_workload
 
-                qualify_workload(
+                workload_summary = qualify_workload(
                     case,
                     context_capture,
                     context_summary,
@@ -745,6 +783,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     tree,
                     data,
                     tmp_path,
+                    workload=workload_summary if client == "workload-image" else None,
                 )
             if client in {"image-browser", "local-image-browser"}:
                 browser_tree_row = (
