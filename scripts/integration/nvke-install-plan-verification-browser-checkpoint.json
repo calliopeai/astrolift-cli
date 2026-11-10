@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "owned-app-postgres-native-verification-browser-acceptance-harness",
-  "status": "static-qualified-collection-and-actual-acceptance-pending",
+  "status": "static-and-exact-scenario-collection-qualified-actual-acceptance-pending",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "b5a42f5a40c2356bc06c2f18bf154b8dfb18cd2047cda1a41b8ec260f91e6da6",
     "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
@@ -13,9 +13,13 @@
       "exitCode": 0
     },
     "collection": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 58070,
-      "exitMarker": "/tmp/astrolift-nvke-verification-browser-collect.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-browser-collect.exit",
+      "exitCode": 0,
+      "selectedCases": 2,
+      "seconds": 14.46,
+      "logSha256": "83d92336464343814dee2b2e3bebb2d344afc95061d7dc34c0455dbe4fc61919"
     }
   },
   "implemented": [
@@ -24,7 +28,7 @@
     "Dropped preparation reply followed by browser reload, historical read and private retry must produce a prepared immutable verification record with matching native summary hashes and one attempt. Original operation, guard, native runs, parent plan and chart retention checks remain in the shared scenario."
   ],
   "remaining": [
-    "Complete scenario collection and diagnose native context unavailable before actual runtime qualification.",
+    "Diagnose native context unavailable before actual runtime qualification.",
     "Run real CLI and browser scenarios without increasing authority or process timeouts."
   ],
   "continuationAuthorized": false
