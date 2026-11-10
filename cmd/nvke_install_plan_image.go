@@ -18,11 +18,11 @@ import (
 )
 
 func newNVKEAgentInstallPlanImageCommand() *cobra.Command {
-	group := &cobra.Command{Use: "image", Short: "Prepare and recover a source-bound private registry image artifact"}
+	group := &cobra.Command{Use: "image", Short: "Prepare and recover a source-bound private registry or local image artifact"}
 	for _, verb := range []string{"prepare", "review", "retry-preparation"} {
 		action := verb
 		leaf := &cobra.Command{Use: verb + " OPERATION_GUID", Args: cobra.ExactArgs(1),
-			Short: verb + " a registry image artifact for the exact plan and chart publication",
+			Short: verb + " an image artifact for the exact plan and chart publication",
 			Long: `Image preparation seals a private recovery journal before the API request.
 Review reads retained image evidence. Explicit retry uses the server's retained
 private intent and its original caller/token. Workload, platform, credential and
@@ -31,13 +31,14 @@ fresh use-time evidence remain required for native admission.`,
 				return runNVKEAgentInstallPlanImage(cmd, ctx, c, args[0], action)
 			})}
 		nvkeAgentJobFlags(leaf)
+		leaf.Flags().String("source-kind", "registry", "Image source: registry or local; must match retained intent")
 		leaf.Flags().String("plan", "", "Exact prepared plan UUID (required)")
 		leaf.Flags().Int("plan-version", 0, "Exact prepared plan version (required)")
 		leaf.Flags().String("plan-digest", "", "Exact prepared plan SHA-256 (required)")
 		leaf.Flags().String("chart-artifact", "", "Exact chart publication UUID (required)")
 		leaf.Flags().Int("chart-artifact-version", 0, "Exact chart publication version (required)")
 		leaf.Flags().String("chart-artifact-digest", "", "Exact chart publication SHA-256 (required)")
-		leaf.Flags().String("artifact", "", "Exact new or retained registry-image UUID (required)")
+		leaf.Flags().String("artifact", "", "Exact new or retained image UUID (required)")
 		leaf.Flags().String("tree", "", "Exact execution-tree UUID (required)")
 		leaf.Flags().Int("tree-version", 0, "Exact reviewed execution-tree version (required)")
 		leaf.Flags().String("tree-digest", "", "Exact execution-tree SHA-256 (required)")
@@ -56,6 +57,7 @@ fresh use-time evidence remain required for native admission.`,
 }
 
 type nvkeImageJournal struct {
+	SourceKind string `json:"sourceKind,omitempty"`
 	nvkeChartJournal
 	ChartArtifactID      string `json:"chartArtifactId"`
 	ChartArtifactVersion int    `json:"chartArtifactVersion"`
@@ -68,7 +70,7 @@ type nvkeImageJournal struct {
 func decodeNVKEImageStrict(data []byte, target any) error {
 	allowed := map[string]bool{
 		"format": true, "artifactId": true, "planId": true, "planDigest": true, "maximumBytes": true,
-		"reference": true, "policy": true, "maximumCalls": true, "timeoutSeconds": true,
+		"sourceKind": true, "reference": true, "policy": true, "maximumCalls": true, "timeoutSeconds": true,
 		"chartArtifactId": true, "chartArtifactVersion": true, "chartArtifactDigest": true,
 		"kind": true, "server": true, "organizationId": true, "actorId": true, "siteId": true,
 		"siteVersion": true, "authorityVersion": true, "operationId": true, "operationVersion": true,
@@ -108,6 +110,7 @@ func nvkeInstallPlanImageIntent(cmd *cobra.Command, c *api.Client, review api.NV
 		return "", err
 	}
 	var body struct {
+		SourceKind     string `json:"sourceKind"`
 		Format         int    `json:"format"`
 		ArtifactID     string `json:"artifactId"`
 		PlanID         string `json:"planId"`
@@ -120,11 +123,38 @@ func nvkeInstallPlanImageIntent(cmd *cobra.Command, c *api.Client, review api.NV
 		MaximumCalls   int    `json:"maximumCalls"`
 		TimeoutSeconds int    `json:"timeoutSeconds"`
 	}
-	if len(text) > 1024*1024 || decodeNVKEImageStrict(text, &body) != nil || body.Format != 1 || body.ArtifactID != artifactID || body.PlanID != plan.ID || body.PlanDigest != plan.Plan.PlanDigest || body.TreeID != tree.ID || body.TreeDigest != tree.TreeDigest || !validNVKEImageReference(body.Reference) || !nvkePlanItemName.MatchString(body.Policy) {
+	if len(text) > 1024*1024 || decodeNVKEImageStrict(text, &body) != nil || body.Format != 1 || body.ArtifactID != artifactID || body.PlanID != plan.ID || body.PlanDigest != plan.Plan.PlanDigest || body.TreeID != tree.ID || body.TreeDigest != tree.TreeDigest || !validNVKEImageReference(body.Reference) {
 		return "", errors.New("review a closed image request matching the exact artifact, plan and tree")
 	}
+	kind := resourceStringFlag(cmd, "source-kind")
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(text, &fields) != nil {
+		return "", errors.New("invalid closed image request")
+	}
+	local := kind == "local"
+	expected := []string{"format", "artifactId", "planId", "planDigest", "treeId", "treeDigest", "reference", "maximumBytes", "timeoutSeconds"}
+	if local {
+		expected = append(expected, "sourceKind")
+		parts := strings.Split(body.Reference, "@")
+		if body.SourceKind != "local" || len(parts) != 2 || !nvkeImageContentDigest.MatchString(parts[1]) {
+			return "", errors.New("local image requires a digest-pinned reference and local source kind")
+		}
+	} else {
+		expected = append(expected, "policy", "maximumCalls")
+		if kind != "registry" || !nvkePlanItemName.MatchString(body.Policy) || body.MaximumCalls < 1 || body.MaximumCalls > 4096 {
+			return "", errors.New("registry image requires a reviewed policy and bounded call count")
+		}
+	}
+	if len(fields) != len(expected) {
+		return "", errors.New("image request fields do not match the selected source kind")
+	}
+	for _, key := range expected {
+		if _, ok := fields[key]; !ok || bytes.Equal(bytes.TrimSpace(fields[key]), []byte("null")) {
+			return "", errors.New("missing image request field")
+		}
+	}
 	limit, err := agentDecimal(body.MaximumBytes)
-	if err != nil || limit < 1 || body.MaximumCalls < 1 || body.MaximumCalls > 4096 || body.TimeoutSeconds < 1 || body.TimeoutSeconds > 300 {
+	if err != nil || limit < 1 || body.TimeoutSeconds < 1 || body.TimeoutSeconds > 300 {
 		return "", errors.New("use canonical bounded image bytes, calls and timeout")
 	}
 
@@ -135,6 +165,9 @@ func nvkeInstallPlanImageIntent(cmd *cobra.Command, c *api.Client, review api.NV
 		OperationVersion: review.ExpectedOperationVersion, PlanID: plan.ID, InputSHA256: nvkeParameterDigest(text),
 	}, PlanVersion: plan.Version, PlanDigest: plan.Plan.PlanDigest, ArtifactID: artifactID},
 		ChartArtifactID: publication.ID, ChartArtifactVersion: publication.Version, ChartArtifactDigest: publication.ArtifactDigest, TreeID: tree.ID, TreeVersion: tree.Version, TreeDigest: tree.TreeDigest}
+	if local {
+		saved.SourceKind = "local"
+	}
 	_, err = privatefile.ReadFile(journal, 16384)
 	if errors.Is(err, os.ErrNotExist) {
 		data, e := json.MarshalIndent(saved, "", "  ")
@@ -169,9 +202,13 @@ func validNVKEImageReference(value string) bool {
 
 var nvkeImageContentDigest = regexp.MustCompile(`^(sha256:[0-9a-f]{64}|sha512:[0-9a-f]{128})$`)
 
-func validateNVKEInstallPlanImage(row *api.NVKEInstallPlanImage, plan *api.NVKEInstallPlan, publication *api.NVKEInstallPlanCharts, tree *api.NVKEInstallPlanTree, artifactID string) error {
+func validateNVKEInstallPlanImage(row *api.NVKEInstallPlanImage, plan *api.NVKEInstallPlan, publication *api.NVKEInstallPlanCharts, tree *api.NVKEInstallPlanTree, artifactID string, kinds ...string) error {
+	kind := "registry"
+	if len(kinds) > 0 {
+		kind = kinds[0]
+	}
 	invalid := errors.New("image evidence did not confirm the exact reviewed source; preserve its identity and refresh")
-	if row == nil || row.ID != artifactID || row.Version < 1 || row.Status != "prepared" || row.PlanID != plan.ID || row.PlanVersion != plan.Version || row.PlanDigest != plan.Plan.PlanDigest || row.ChartArtifactID != publication.ID || row.ChartArtifactVersion != publication.Version || row.ChartArtifactDigest != publication.ArtifactDigest || row.TreeID != tree.ID || row.TreeVersion != tree.Version || row.TreeDigest != tree.TreeDigest || row.OperationID != plan.OperationID || row.OperationVersion != plan.OperationVersion || row.SiteID != plan.SiteID || row.SiteVersion != plan.SiteVersion || row.AuthorityID != plan.AuthorityID || row.AuthorityVersion != plan.AuthorityVersion || row.BlobCount == nil || *row.BlobCount < 1 || *row.BlobCount > 100000 || row.ContinuationAuthorized == nil || *row.ContinuationAuthorized || row.ExecutionState != "requires-workload-platform-credential-phase-use-and-linked-admission" {
+	if row == nil || (kind != "registry" && kind != "local") || (row.SourceKind != kind && (kind != "registry" || row.SourceKind != "")) || row.ID != artifactID || row.Version < 1 || row.Status != "prepared" || row.PlanID != plan.ID || row.PlanVersion != plan.Version || row.PlanDigest != plan.Plan.PlanDigest || row.ChartArtifactID != publication.ID || row.ChartArtifactVersion != publication.Version || row.ChartArtifactDigest != publication.ArtifactDigest || row.TreeID != tree.ID || row.TreeVersion != tree.Version || row.TreeDigest != tree.TreeDigest || row.OperationID != plan.OperationID || row.OperationVersion != plan.OperationVersion || row.SiteID != plan.SiteID || row.SiteVersion != plan.SiteVersion || row.AuthorityID != plan.AuthorityID || row.AuthorityVersion != plan.AuthorityVersion || row.BlobCount == nil || *row.BlobCount < 1 || *row.BlobCount > 100000 || row.ContinuationAuthorized == nil || *row.ContinuationAuthorized || row.ExecutionState != "requires-workload-platform-credential-phase-use-and-linked-admission" {
 		return invalid
 	}
 	for _, digest := range []string{row.ArtifactDigest, row.SourceDigest, row.CaptureDigest} {
@@ -192,6 +229,10 @@ func validateNVKEInstallPlanImage(row *api.NVKEInstallPlanImage, plan *api.NVKEI
 }
 
 func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *api.Client, id, verb string) error {
+	kind := resourceStringFlag(cmd, "source-kind")
+	if kind != "registry" && kind != "local" {
+		return errors.New("source-kind must be registry or local")
+	}
 	planID, artifactID, digest := resourceStringFlag(cmd, "plan"), resourceStringFlag(cmd, "artifact"), resourceStringFlag(cmd, "plan-digest")
 	treeID, treeDigest := resourceStringFlag(cmd, "tree"), resourceStringFlag(cmd, "tree-digest")
 	treeVersion, _ := cmd.Flags().GetInt("tree-version")
@@ -230,7 +271,7 @@ func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *ap
 		return err
 	}
 	if plan.Version != version || plan.Plan.PlanDigest != digest {
-		return errors.New("the prepared plan changed; review before registry-image preparation")
+		return errors.New("the prepared plan changed; review before image preparation")
 	}
 	parent := api.NVKEInstallPlanChartsSource{NVKEInstallPlanReview: api.NVKEInstallPlanReview{NVKEAgentJobReview: review, PlanID: planID}, ExpectedPlanVersion: version, PlanDigest: digest}
 	publication, err := c.ReviewNVKEInstallPlanCharts(ctx, api.NVKEInstallPlanChartsReview{NVKEInstallPlanChartsSource: parent, ArtifactID: chartID}, false)
@@ -258,6 +299,7 @@ func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *ap
 	imageSource := api.NVKEInstallPlanImageSource{NVKEInstallPlanTreeSource: input, TreeID: treeID, ExpectedTreeVersion: treeVersion, TreeDigest: treeDigest}
 	var row *api.NVKEInstallPlanImage
 	var maximumBytes int64
+	var requestedRoot string
 	if verb == "prepare" {
 		var text string
 		text, err = nvkeInstallPlanImageIntent(cmd, c, review, source, plan, publication, tree, artifactID)
@@ -266,9 +308,13 @@ func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *ap
 		}
 		var limits struct {
 			MaximumBytes string `json:"maximumBytes"`
+			Reference    string `json:"reference"`
 		}
 		if json.Unmarshal([]byte(text), &limits) != nil {
 			return errors.New("image limits unavailable")
+		}
+		if kind == "local" {
+			requestedRoot = strings.Split(limits.Reference, "@")[1]
 		}
 		maximumBytes, err = agentDecimal(limits.MaximumBytes)
 		if err != nil {
@@ -281,13 +327,13 @@ func runNVKEAgentInstallPlanImage(cmd *cobra.Command, ctx context.Context, c *ap
 	if err != nil {
 		return fmt.Errorf("%w; retain --artifact %s and exact source/publication versions; use install-plan image review before another preparation", err, artifactID)
 	}
-	if err = validateNVKEInstallPlanImage(row, plan, publication, tree, artifactID); err != nil {
+	if err = validateNVKEInstallPlanImage(row, plan, publication, tree, artifactID, kind); err != nil {
 		return err
 	}
 	if verb == "prepare" {
 		size, _ := agentDecimal(row.Bytes)
-		if size > maximumBytes {
-			return errors.New("image response exceeded reviewed byte limit")
+		if size > maximumBytes || (kind == "local" && row.RootDigest != requestedRoot) {
+			return errors.New("image response did not confirm the reviewed byte limit and digest")
 		}
 	}
 	return nvkeJSON(cmd, row)

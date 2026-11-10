@@ -1792,7 +1792,7 @@ and linked native admission remain required. The original uncertain install stay
 in place; these commands never authorize native continuation or replay.
 
 
-### Source-bound registry images
+### Source-bound registry and local images
 
 `astro nvke agent install-plan image prepare|review|retry-preparation` captures
 an OCI registry image through the original agent. Configure the agent's private
@@ -1818,6 +1818,15 @@ reference without a URL scheme; policy is a reviewed logical alias. Credentials,
 output paths and arbitrary transport settings are not accepted. Private files
 use owner-only permissions; `--file -` accepts private stdin.
 
+For a digest-pinned OCI layout already retained by the signed execution tree,
+use `--source-kind local` on prepare, review and retry. The local JSON replaces
+`policy` and `maximumCalls` with exactly `sourceKind: "local"`; it retains
+`maximumBytes` and `timeoutSeconds`. The reference must end in `@sha256:` plus
+64 lowercase hex digits or `@sha512:` plus 128. Local verification uses no
+registry profile or transport and imports no image. The response kind must match
+`--source-kind` (default `registry`); local preparation also checks the requested
+root digest. Kind changes require a new artifact and journal.
+
 Preparation flushes a metadata-only journal binding the exact private input hash,
 caller, server and every source version/digest before sending the request. The
 journal contains no image reference, policy or credentials. After an unconfirmed
@@ -1832,7 +1841,7 @@ root digest, positive byte/blob counts and observation timestamp before output.
 Preparation also checks the reviewed byte limit. Historical recovery does not
 renew freshness. The result retains `continuationAuthorized: false` and
 `requires-workload-platform-credential-phase-use-and-linked-admission`.
-Local-image handling, rendered workload/platform closure, credential equivalence,
+Rendered workload/platform closure, credential equivalence,
 fresh use-time verification and linked native admission remain required.
 
 
