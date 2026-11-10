@@ -1,0 +1,78 @@
+{
+  "format": 1,
+  "scope": "signed-image-binding-cli",
+  "status": "command-gates-qualified-native-app-proof-in-progress-release-incomplete",
+  "sourceBaseRevision": "19c97c4",
+  "sourceSha256": {
+    "cmd/nvke_install_plan.go": "b4616907d193dff5827e1394d69d1f52726b1e21d9cf78905eb4816b0b8d41d4",
+    "cmd/nvke_install_plan_image_binding.go": "41837cfc8bf457a81015c2fc5b14cafafd6466f9edaaf33549dbe7f4d34d6e12",
+    "cmd/nvke_install_plan_image_binding_test.go": "7612178b9896fe61c53673902dc704002cc29aae9b33d5cf95652ea94bacf67f",
+    "internal/api/nvke_install_plan_image_binding.go": "cdb86580096f5c5ae985174c067b72da14023cbd2a9d0b1d58a17d5c936d69e7",
+    "scripts/integration/test_nvke_install_plan_tree.py": "67a513137c8d0688ac9bfb29e7f10c5e67c356e47c0f3d77178ee680575edc9d",
+    "scripts/integration/image_binding_cli_qualification.py": "13bae782411ffc22b310f6398fa741b8d1269dc030cd44638bf0d5d6809723e3",
+    "scripts/integration/image_binding_browser_qualification.py": "4c4043f367e338623bdcbd203c87b83e9f9ce9150b6ac4d88d56b38b4f88cf25"
+  },
+  "checks": {
+    "focused": {
+      "sessionId": 13973,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-focused-v1.log",
+      "logSha256": "4d05d30d169ade5b55115fb1efbbb31191e2d20081d5f04f7f87f7f72c6939a1",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-focused-v1.exit"
+    },
+    "test": {
+      "sessionId": 8658,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-test-v1.log",
+      "logSha256": "002e0594d7fe1795faa4d14f806a189236546cb18e8f3f610d27824b4e0f7ea8",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-test-v1.exit"
+    },
+    "vet": {
+      "sessionId": 8658,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-vet-v1.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-vet-v1.exit"
+    },
+    "lint": {
+      "sessionId": 8658,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-lint-v1.log",
+      "logSha256": "32c0f2dc5b6bbdd4444d5a65a5c7e8224ee3fb55866900d418f546419aace63a",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-lint-v1.exit"
+    },
+    "build": {
+      "sessionId": 8658,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-build-v1.log",
+      "logSha256": "e42eb3e4cb9cd635446134c847db53fd2d2eca7db6ddd281c451fa7d12bf6441",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-build-v1.exit"
+    },
+    "actualAppNative": {
+      "sessionId": 29441,
+      "status": "running",
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-app-agent-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-app-agent-v1.exit"
+    },
+    "actualBrowserAppNative": {
+      "sessionId": 80748,
+      "status": "queued-after-actual-cli-proof",
+      "logPath": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.exit",
+      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-queue-v3.exit"
+    }
+  },
+  "coverage": [
+    "Exact original/plan/chart/tree and workload UUID/version/digest reviews precede binding RPCs",
+    "Private complete request and durable metadata journal are checked before preparation; journal stores no references or image proof selections",
+    "Closed JSON, nested duplicate keys and aliases, parent ID collisions and canonical budgets are enforced",
+    "Lost replies never replay automatically; read and explicit server-side retained retry do not resend private request text",
+    "Public output validates reviewed workload, counts, bytes and preserved observation metadata and forbids continuation"
+  ],
+  "limits": [
+    "Actual compiled CLI/App/Postgres/native mTLS qualification is still running",
+    "Browser image-binding pairing and combined native browser proof remain separate",
+    "Operator/platform/credential/rewrite/import/fresh-use/linked-admission closure and release remain open",
+    "No main merge or deployment"
+  ]
+}

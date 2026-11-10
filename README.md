@@ -1892,3 +1892,31 @@ it; omitting it cannot downgrade to graph-only evidence. This mode supports
 registry references found in rendered workloads even when absent from
 `images.txt`. Local image mode does not accept workload bindings. Image evidence
 continues to require platform/credential proof and linked admission.
+
+### Signed image bindings
+
+`astro nvke agent install-plan image-binding prepare|review|retry-preparation`
+binds retained image proofs to the reviewed workload inventory. Keep the exact
+original-operation, plan, chart and tree flags, add the required
+`--workload`, `--workload-version` and `--workload-digest` tuple, and choose a
+distinct `--artifact` UUID. The CLI reviews every parent and the workload before
+the binding request.
+
+Preparation takes a private `--file` and a private `--request-file` metadata
+journal. JSON fields are `format: 1`, `artifactId`, `planId`, `planDigest`,
+`treeId`, `treeDigest`, `workloadId`, `workloadDigest`, `imageBindings`,
+`maximumBytes`, `maximumImageBytes` and `timeoutSeconds`. Each image reference
+selects exactly `{ "sourceKind": "local|registry", "artifactId": "UUID",
+"artifactDigest": "PUBLIC_ARTIFACT_SHA256" }`. The source kind is either
+`local` or `registry`; use the retained image's public artifact digest. Duplicate
+keys, aliases, unknown/private fields and parent UUID collisions are refused.
+Output bytes are limited to 67,108,864, image bytes to 9,223,372,036,854,775,807
+and timeout to 300 seconds; byte budgets are canonical positive decimal strings.
+
+The journal is durable before the request and contains source metadata and an
+input hash. It does not retain image references or proof selections. A lost
+reply preserves the original UUID: use `image-binding review`, then an explicit
+`retry-preparation` when needed. Recovery uses the server's retained private
+intent under its original caller/token. Results contain only digests, counts,
+verified bytes and observation time. Binding evidence does not authorize native
+continuation or replace operator/platform/credential/import/fresh-use checks.
