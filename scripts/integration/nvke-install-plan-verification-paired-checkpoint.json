@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "actual-compiled-cli-app-agent-verification-acceptance-harness",
-  "status": "collect-and-static-passed-actual-run-not-started",
+  "status": "actual-compiled-cli-app-agent-acceptance-running",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "2f8b03588600c35643ba581d24ec0dfaf25177473ab94354db71fb9131e7315b",
     "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
@@ -22,8 +22,12 @@
       "logSha256": "739ba0a08f274e3adf9ab344b26231f01f6974d58612974d73f1e11441305cfe"
     },
     "actualAcceptance": {
-      "status": "not-started",
-      "reason": "Configured App service/GraphQL acceptance is still running in its owned PostgreSQL database; paired acceptance uses transaction=True and must not overlap that database suite."
+      "status": "running",
+      "sessionId": 62575,
+      "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v1.exit",
+      "database": "test_astro_nvke_verification_20261109",
+      "scope": "Configured App model/service gates passed; selected exact verification node only. Compiled binary and runtime/helper pins remain frozen for the actual run."
     }
   },
   "implemented": [
