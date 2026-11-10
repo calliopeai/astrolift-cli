@@ -84,6 +84,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "verification",
         "verification-browser",
         "image",
+        "image-browser",
     ],
 )
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
@@ -104,6 +105,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         or not os.getenv("NVKE_TEST_VERIFICATION_STORYBOOK")
     ):
         pytest.skip("Select the owned verification frontend and Storybook endpoint")
+    if client == "image-browser" and (
+        not os.getenv("NVKE_TEST_IMAGE_FRONTEND")
+        or not os.getenv("NVKE_TEST_IMAGE_STORYBOOK")
+    ):
+        pytest.skip("Select the owned image frontend and Storybook endpoint")
     selected = os.getenv("NVKE_TEST_AGENT_OPSCODE")
     if (
         not selected
@@ -114,7 +120,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     source = Path(selected)
     revision = (
         "572b87b4efec2252597efc05cee4189facd35571"
-        if client == "image"
+        if client in {"image", "image-browser"}
         else (
             "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
             if client in {"verification", "verification-browser"}
@@ -171,7 +177,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         assert (source / relative).read_bytes() == subprocess.check_output(
             ["git", "show", revision + ":" + relative], cwd=source
         )
-    if client == "image":
+    if client in {"image", "image-browser"}:
         paths = (
             subprocess.check_output(
                 ["git", "ls-tree", "-r", "--name-only", revision, "kubernetes/nvke"],
@@ -257,7 +263,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         try:
             image_capture = None
             context_capture = None
-            if client == "image":
+            if client in {"image", "image-browser"}:
                 from image_cli_qualification import ImageCapture
 
                 image_capture = ImageCapture(case, native)
@@ -664,6 +670,29 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                 )
+            if client == "image-browser":
+                from image_browser_qualification import run_image_browser
+
+                browser_row = run_image_browser(
+                    bearer=issued.plaintext,
+                    tmp_path=tmp_path,
+                    endpoint=asgi_endpoint,
+                    world=world,
+                    site=state.site,
+                    authority=authority,
+                    operation=original,
+                    plan=plan,
+                    charts=data,
+                    tree=tree,
+                    reference=image_capture.registry.reference,
+                    root_digest=image_capture.registry.descriptor["digest"],
+                    dropped=dropped_cli_replies,
+                )
+                browser_artifact = case.engine.install_registry_images / str(
+                    browser_row.guid
+                )
+                assert (browser_artifact / "index.json").is_file()
+                assert len(list((browser_artifact / "work").iterdir())) == 1
             if client == "verification":
                 from verification_cli_qualification import qualify
 
