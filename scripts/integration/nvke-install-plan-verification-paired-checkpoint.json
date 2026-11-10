@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "actual-compiled-cli-app-agent-verification-acceptance-harness",
-  "status": "actual-acceptance-v3-running-on-qualified-bounded-native-runtime",
+  "status": "actual-compiled-cli-app-native-verification-acceptance-passed",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "2f8b03588600c35643ba581d24ec0dfaf25177473ab94354db71fb9131e7315b",
     "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
@@ -84,7 +84,7 @@
       ]
     },
     "actualAcceptanceV3": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 24419,
       "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v3.log",
       "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v3.exit",
@@ -98,7 +98,12 @@
         "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
         "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7"
       },
-      "scope": "Actual compiled CLI/App/PostgreSQL/native mTLS after all 64 agent tests and both current-runtime SDK mTLS cases passed. Native context fixture now observed at 21.535 seconds; all original timeout/authority/source/budget checks remain unchanged."
+      "scope": "Actual compiled CLI/App/PostgreSQL/native mTLS after all 64 agent tests and both current-runtime SDK mTLS cases passed. Native context fixture now observed at 21.535 seconds; all original timeout/authority/source/budget checks remain unchanged.",
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 518.89,
+      "logSha256": "3b583937364ab21cf5d1301336d932b5248251e460e6bd4b19c050438eca5051"
     }
   },
   "implemented": [
@@ -107,7 +112,7 @@
     "Acceptance checks signed index digest, capture/context/chart/source metadata, unchanged original full App/native records/guard and parent/context snapshots."
   ],
   "remaining": [
-    "Reduce recursive retained tree/page SDK reviews and native checkpoint metadata enumeration; keep reviewed source, capability, membership and authority checks and original timeout budgets. Then rerun exact actual CLI/browser scenarios.",
+    "Actual browser/App/native verification acceptance is running separately. Full surface/live/resource/credential/schema/image/admission and release work remain open.",
     "No paired acceptance or live production proof is claimed by static checks or collection."
   ],
   "continuationAuthorized": false

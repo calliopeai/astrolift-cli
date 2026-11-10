@@ -1,13 +1,13 @@
 {
   "format": 1,
   "scope": "owned-app-postgres-native-verification-browser-acceptance-harness",
-  "status": "static-and-exact-scenario-collection-qualified-actual-acceptance-pending",
+  "status": "actual-browser-app-native-verification-acceptance-running",
   "sourceSha256": {
-    "scripts/integration/test_nvke_install_plan_tree.py": "b5a42f5a40c2356bc06c2f18bf154b8dfb18cd2047cda1a41b8ec260f91e6da6",
+    "scripts/integration/test_nvke_install_plan_tree.py": "9a0b150e7c176751bcfd7b48341518e16ac4c77fade48d30782a99426cb9c531",
     "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
     "scripts/integration/verification_browser_qualification.py": "48d16b37be7a2fbafaa1e40e4e2e96b4b0d39e302ac1337d6f59ca209acfc22c"
   },
-  "agentRevision": "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38",
+  "agentRevision": "c93fe5f5dcafd870dd6d34211a4a034b600b1b70",
   "checks": {
     "ruff": {
       "exitCode": 0
@@ -20,6 +20,16 @@
       "selectedCases": 2,
       "seconds": 14.46,
       "logSha256": "83d92336464343814dee2b2e3bebb2d344afc95061d7dc34c0455dbe4fc61919"
+    },
+    "actualAcceptance": {
+      "status": "running",
+      "sessionId": 39376,
+      "logPath": "/tmp/astrolift-nvke-verification-browser-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-browser-v1.exit",
+      "database": "test_astro_nvke_verification_20261109",
+      "storybook": "http://127.0.0.1:16425",
+      "serverSessionId": 46100,
+      "frontendSource": "production API Storybook build ece934e33; runtime hook/component source identical to combined integration frontend; test-only changes do not enter this Storybook bundle."
     }
   },
   "implemented": [
@@ -28,7 +38,7 @@
     "Dropped preparation reply followed by browser reload, historical read and private retry must produce a prepared immutable verification record with matching native summary hashes and one attempt. Original operation, guard, native runs, parent plan and chart retention checks remain in the shared scenario."
   ],
   "remaining": [
-    "Diagnose native context unavailable before actual runtime qualification.",
+    "Complete actual browser/App/native run; compiled CLI acceptance passed with unchanged timeout.",
     "Run real CLI and browser scenarios without increasing authority or process timeouts."
   ],
   "continuationAuthorized": false
