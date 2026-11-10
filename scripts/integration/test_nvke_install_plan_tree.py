@@ -84,6 +84,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "verification",
         "verification-browser",
         "image",
+        "local-image",
         "image-browser",
     ],
 )
@@ -119,8 +120,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
     revision = (
-        "572b87b4efec2252597efc05cee4189facd35571"
-        if client in {"image", "image-browser"}
+        "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22"
+        if client in {"image", "image-browser", "local-image"}
         else (
             "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
             if client in {"verification", "verification-browser"}
@@ -177,7 +178,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         assert (source / relative).read_bytes() == subprocess.check_output(
             ["git", "show", revision + ":" + relative], cwd=source
         )
-    if client in {"image", "image-browser"}:
+    if client in {"image", "image-browser", "local-image"}:
         paths = (
             subprocess.check_output(
                 ["git", "ls-tree", "-r", "--name-only", revision, "kubernetes/nvke"],
@@ -263,10 +264,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         try:
             image_capture = None
             context_capture = None
-            if client in {"image", "image-browser"}:
-                from image_cli_qualification import ImageCapture
+            if client in {"image", "image-browser", "local-image"}:
+                from image_cli_qualification import ImageCapture, LocalImageCapture
 
-                image_capture = ImageCapture(case, native)
+                image_capture = (
+                    LocalImageCapture if client == "local-image" else ImageCapture
+                )(case, native)
             if client in {
                 "context",
                 "context-browser",
@@ -338,7 +341,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "secret.txt": "PRIVATE_TREE_CONTENT",
                 },
             }
-            if image_capture:
+            if image_capture and image_capture.source_kind == "registry":
                 body["overrides"]["files"]["registry-policy.json"] = (
                     image_capture.policy
                 )
@@ -378,9 +381,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "  - {name: nktp, type: helm}\n"
                 )
                 if image_capture:
-                    (destination / "images.txt").write_text(
-                        image_capture.registry.reference + "\n"
-                    )
+                    image_capture.materialize(destination)
                 else:
                     (destination / "images.txt").unlink(missing_ok=True)
                 chart = destination / "owned-local-chart"
@@ -616,7 +617,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     if context_capture
                     else {}
                 ),
-                **({"image_profile": image_capture.profile} if image_capture else {}),
+                **(
+                    {"image_profile": image_capture.profile}
+                    if image_capture and image_capture.profile
+                    else {}
+                ),
             )
             case.start_server(port=port)
             assert case.url == endpoint and case.engine.instance_id == instance
