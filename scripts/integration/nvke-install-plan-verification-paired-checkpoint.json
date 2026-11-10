@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "actual-compiled-cli-app-agent-verification-acceptance-harness",
-  "status": "actual-acceptance-v2-running-after-client-source-graph-reduction",
+  "status": "actual-acceptance-v2-failed-during-context-preflight",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "2f8b03588600c35643ba581d24ec0dfaf25177473ab94354db71fb9131e7315b",
     "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
@@ -38,7 +38,7 @@
       "logPath": "/tmp/astrolift-nvke-verification-request-timing-privacy.log"
     },
     "actualAcceptanceV2": {
-      "status": "running",
+      "status": "failed",
       "sessionId": 74407,
       "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v2.log",
       "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v2.exit",
@@ -54,7 +54,34 @@
         "scripts/integration/test_nvke_contracts.py": "0e484ecab149ba46825ab9161179255ce42a67206c1d748b7fbfc5690fd79198",
         "scripts/integration/request_timing_qualification.py": "f0a82fe07340d391fe18390f008ce87a8e7e00261c2ff09ee4ae1875a9aff7f4"
       },
-      "scope": "Real unchanged-timeout acceptance with 123-to-39 SDK graph traversal reduction. Native setup diagnosis succeeded but 292 seconds versus 300-second context budget leaves a remaining hot path; no acceptance claim until terminal success."
+      "scope": "Real unchanged-timeout acceptance with 123-to-39 SDK graph traversal reduction. Native setup diagnosis succeeded but 292 seconds versus 300-second context budget leaves a remaining hot path; no acceptance claim until terminal success.",
+      "exitCode": 1,
+      "failureStage": "compiled CLI context preparation preflight, before verification acceptance",
+      "reason": "Retained source review calls consume the unchanged process budget before context collection; exact ASGI timing evidence retained.",
+      "logSha256": "f6ade9a469c77ba258cda1f32290c262e799bee5bd482f7ac69b989f1f886c76",
+      "sourceReviewTimings": [
+        {
+          "field": "reviewNvkeOperatorInstallPlanTree",
+          "seconds": 167.383,
+          "status": 200,
+          "completed": true,
+          "dropped": false
+        },
+        {
+          "field": "reviewNvkeOperatorInstallPlanTree",
+          "seconds": 238.736,
+          "status": 200,
+          "completed": true,
+          "dropped": false
+        },
+        {
+          "field": "astroliftNvkeOperatorInstallPlanItemPage",
+          "seconds": 60.108,
+          "status": null,
+          "completed": true,
+          "dropped": false
+        }
+      ]
     }
   },
   "implemented": [
@@ -63,7 +90,7 @@
     "Acceptance checks signed index digest, capture/context/chart/source metadata, unchanged original full App/native records/guard and parent/context snapshots."
   ],
   "remaining": [
-    "Qualify SDK source-graph request reduction against pinned native runtimes, then rerun exact verification scenario with unchanged process and authority budgets.",
+    "Reduce recursive retained tree/page SDK reviews and native checkpoint metadata enumeration; keep reviewed source, capability, membership and authority checks and original timeout budgets. Then rerun exact actual CLI/browser scenarios.",
     "No paired acceptance or live production proof is claimed by static checks or collection."
   ],
   "continuationAuthorized": false
