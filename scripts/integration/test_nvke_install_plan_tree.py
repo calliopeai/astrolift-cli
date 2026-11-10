@@ -112,7 +112,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
     revision = (
-        "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38"
+        "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
         if client in {"verification", "verification-browser"}
         else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
     )
