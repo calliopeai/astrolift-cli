@@ -1834,3 +1834,17 @@ renew freshness. The result retains `continuationAuthorized: false` and
 `requires-workload-platform-credential-phase-use-and-linked-admission`.
 Local-image handling, rendered workload/platform closure, credential equivalence,
 fresh use-time verification and linked native admission remain required.
+
+
+The owned image integration case runs the compiled CLI through the real App API
+and Postgres to a source-pinned agent and a private TLS registry fixture. It covers
+lost replies, cold-agent historical read and explicit retry with one native image
+work attempt, unchanged registry read counts during recovery and unchanged
+original operation/parent artifacts. Select the exact pytest case
+`test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry[image]`
+in `scripts/integration/test_nvke_install_plan_tree.py`; select the compiled binary,
+private backend test environment, native bundle, Helm/helper and Opscode source via
+the existing integration environment variables. The pinned agent revision and
+exact local run evidence are in `scripts/integration/nvke-install-plan-image-app-agent-local.json`.
+This fixture does not prove workload/platform closure, live cluster admission or
+production installation.

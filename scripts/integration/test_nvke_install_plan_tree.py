@@ -83,6 +83,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "context-browser",
         "verification",
         "verification-browser",
+        "image",
     ],
 )
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
@@ -112,9 +113,13 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         pytest.skip("Select the owned pinned runtime, Helm 4 and snapshot-built helper")
     source = Path(selected)
     revision = (
-        "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
-        if client in {"verification", "verification-browser"}
-        else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+        "572b87b4efec2252597efc05cee4189facd35571"
+        if client == "image"
+        else (
+            "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
+            if client in {"verification", "verification-browser"}
+            else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+        )
     )
     for name in (
         "operator_agent.py",
@@ -166,6 +171,31 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         assert (source / relative).read_bytes() == subprocess.check_output(
             ["git", "show", revision + ":" + relative], cwd=source
         )
+    if client == "image":
+        paths = (
+            subprocess.check_output(
+                ["git", "ls-tree", "-r", "--name-only", revision, "kubernetes/nvke"],
+                cwd=source,
+            )
+            .decode()
+            .splitlines()
+        )
+        expected = {
+            name
+            for name in paths
+            if name.endswith((".py", ".go")) or Path(name).name in {"go.mod", "go.sum"}
+        }
+        actual = {
+            str(path.relative_to(source))
+            for path in (source / "kubernetes/nvke").rglob("*")
+            if path.is_file()
+            and (path.suffix in {".py", ".go"} or path.name in {"go.mod", "go.sum"})
+        }
+        assert actual == expected
+        for name in sorted(expected):
+            assert (source / name).read_bytes() == subprocess.check_output(
+                ["git", "show", revision + ":" + name], cwd=source
+            )
     monkeypatch.syspath_prepend(str(source / "kubernetes/nvke"))
     import test_operator_agent as native
 
@@ -225,7 +255,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     try:
         case.setUp()
         try:
+            image_capture = None
             context_capture = None
+            if client == "image":
+                from image_cli_qualification import ImageCapture
+
+                image_capture = ImageCapture(case, native)
             if client in {
                 "context",
                 "context-browser",
@@ -297,6 +332,10 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "secret.txt": "PRIVATE_TREE_CONTENT",
                 },
             }
+            if image_capture:
+                body["overrides"]["files"]["registry-policy.json"] = (
+                    image_capture.policy
+                )
             state = SimpleNamespace(
                 world=world,
                 site=NvkeSite.objects.get(guid=site["id"]),
@@ -332,7 +371,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "  - {name: spire-tpm-pubhashes, type: manifest}\n"
                     "  - {name: nktp, type: helm}\n"
                 )
-                (destination / "images.txt").unlink(missing_ok=True)
+                if image_capture:
+                    (destination / "images.txt").write_text(
+                        image_capture.registry.reference + "\n"
+                    )
+                else:
+                    (destination / "images.txt").unlink(missing_ok=True)
                 chart = destination / "owned-local-chart"
                 chart.mkdir(mode=0o700)
                 (chart / "templates").mkdir(mode=0o700)
@@ -565,7 +609,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     {"render_profile": context_capture.profile}
                     if context_capture
                     else {}
-                )
+                ),
+                **({"image_profile": image_capture.profile} if image_capture else {}),
             )
             case.start_server(port=port)
             assert case.url == endpoint and case.engine.instance_id == instance
@@ -597,6 +642,18 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             )
             if context_capture:
                 context_summary = context_capture.qualify(
+                    run,
+                    private_file,
+                    dropped_cli_replies,
+                    job,
+                    tree_flags,
+                    plan,
+                    tree,
+                    data,
+                    tmp_path,
+                )
+            if image_capture:
+                image_capture.qualify(
                     run,
                     private_file,
                     dropped_cli_replies,
@@ -709,6 +766,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             )
             assert list(case.engine.install_plans.links.iterdir()) == []
         finally:
+            if image_capture:
+                image_capture.close()
             if context_capture:
                 context_capture.close()
             case.tearDown()

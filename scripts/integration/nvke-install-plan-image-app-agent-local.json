@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "scope": "compiled-cli-real-app-postgres-native-agent-tls-registry-image-recovery",
+  "status": "one-actual-integration-case-qualified-browser-integration-pending",
+  "agentRevision": "572b87b4efec2252597efc05cee4189facd35571",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "012fe3ee29925c30d1306252f365b38aaf372ca3aabf344f33f9a1e7c21d035b",
+    "scripts/integration/image_cli_qualification.py": "3cc48995befbb1fc8f6dd1cb2f26f63f0d7a812bd9ac0c42d0feb06617f6f695",
+    "README.md": "84df1180dddc0d40129845617fb4d220b2f362c0473908303099d55b7f8b8045"
+  },
+  "binarySha256": "1a057c1ba370b9979ac05735ba0301aba6a25985c1a98ad974d7f4df52ee4f81",
+  "checks": {
+    "actualIntegration": {
+      "sessionId": 78193,
+      "logPath": "/tmp/astrolift-nvke-image-cli-app-agent.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-cli-app-agent.exit",
+      "logSha256": "6baba865fe1fe0b1b73580b5d74b04bfb8bcfbc8062355bf7036e0c029770c1b",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 380.74
+    },
+    "integrationLint": {
+      "logPath": "/tmp/astrolift-nvke-image-cli-integration-lint.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-cli-integration-lint.exit",
+      "exitCode": 0
+    },
+    "goGates": "Go source unchanged from signed 9c96cd0; full formatting/vet/lint/1068-test/build gate evidence retained in nvke-install-plan-image-local.json."
+  },
+  "invariants": [
+    "Full committed Python/Go agent source file set and bytes verified before execution.",
+    "Real API/database durable records, private immutable CLI journal and actual TLS registry capture.",
+    "Lost App reply retains one native image attempt; cold read and explicit retry create no registry reads or new work.",
+    "Original App/native operation, install guard, native runs, plan/chart/tree parents and admission links remain unchanged."
+  ],
+  "limits": [
+    "Original failure and deployment/Kubernetes readiness setup use owned controlled fixtures; no production cluster or live admission is claimed.",
+    "Real browser/API recovery qualification remains pending.",
+    "Full image/workload/platform/credential closure, phase use and linked native admission remain open; no main merge or deployment."
+  ]
+}
