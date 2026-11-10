@@ -298,6 +298,23 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     except native.agent.AgentError as error:
                         if re.fullmatch(r"[A-Z_]{1,128}", error.code):
                             print("Owned native plan refusal:", error.code)
+                        cause = error.__context__
+                        if cause is not None:
+                            frames = []
+                            trace = cause.__traceback__
+                            while trace:
+                                frames.append(
+                                    (
+                                        Path(trace.tb_frame.f_code.co_filename).name,
+                                        trace.tb_lineno,
+                                    )
+                                )
+                                trace = trace.tb_next
+                            print(
+                                "Owned native exception location:",
+                                type(cause).__name__,
+                                frames,
+                            )
                         raise
 
                 monkeypatch.setattr(
@@ -451,19 +468,16 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     chart / "Chart.yaml",
                     b"apiVersion: v2\nname: nktp\nversion: 1.0.0\n",
                 )
-                native.agent.private_write(
-                    chart / "templates/config.yaml",
-                    b"apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: owned\n",
+                document = (
+                    b"apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: owned\n"
                 )
                 if client == "workload-image":
-                    native.agent.private_write(
-                        chart / "templates/config.yaml",
-                        (
-                            "apiVersion: v1\nkind: Pod\nmetadata:\n  name: owned\nspec:\n  containers:\n    - name: owned\n      image: "
-                            + image_capture.registry.reference
-                            + "\n"
-                        ).encode(),
-                    )
+                    document = (
+                        "apiVersion: v1\nkind: Pod\nmetadata:\n  name: owned\nspec:\n  containers:\n    - name: owned\n      image: "
+                        + image_capture.registry.reference
+                        + "\n"
+                    ).encode()
+                native.agent.private_write(chart / "templates/config.yaml", document)
                 (destination / "nktp/release.yaml").write_text(
                     "chart:\n  name: nktp\n  path: owned-local-chart\n  setFile:\n    - password="
                     + str(inputs / "secret.txt")

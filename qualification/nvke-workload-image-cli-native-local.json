@@ -1,9 +1,9 @@
 {
   "format": 1,
   "scope": "combined-render-and-registry-actual-cli-api-native-fixture",
-  "status": "plan-preparation-refused-diagnostic-run-pending",
+  "status": "combined-fixture-exclusive-write-error-fixed-native-rerun-pending",
   "sourceSha256": {
-    "scripts/integration/test_nvke_install_plan_tree.py": "e208563a87833234834805669adbfa319884764fead0f8148461d9005d202746",
+    "scripts/integration/test_nvke_install_plan_tree.py": "3de81df5cfd2485a2f9eb19c6ecc1ca2f60c3f674cd827eb3544b65779ee0afa",
     "scripts/integration/image_cli_qualification.py": "ac4bda867bc6d66210762129b1109fd02c9b8c548cc7bd67d033af58f821e78f"
   },
   "failedRun": {
@@ -14,20 +14,37 @@
     "logSha256": "ac55b1c1f9976d17790359c5628cd399516ebcb488a9e0953ba31da25f68a682",
     "failure": "OPERATOR_REQUEST_REFUSED during original plan preparation, before workload/image acquisition"
   },
-  "diagnosticRun": {
-    "sessionId": 28520,
-    "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.exit",
-    "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.log",
-    "status": "pending"
-  },
   "intent": [
     "Combine the task-owned authenticated Kubernetes render fixture with the controlled authenticated registry profile across cold restarts",
     "Render the registry reference in a Pod while omitting images.txt to require signed workload authority",
     "Exercise compiled CLI/App/PostgreSQL/authenticated native image acquisition, lost reply and cold historical recovery without recollection"
   ],
   "limits": [
-    "Not a passing actual linked client qualification; native refusal cause is still being diagnosed",
+    "Not yet a passing actual linked client qualification; fixed fixture v4 is running",
     "Existing workload and independent image proofs remain separate",
     "No original live operation, guard, VM or admission was changed"
-  ]
+  ],
+  "diagnosticRuns": [
+    {
+      "sessionId": 28520,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.log",
+      "logSha256": "453b034ed25df6974df83aaf185859246db20ccdc38c23b9f5ee1a11a71923b5"
+    },
+    {
+      "sessionId": 13564,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v3.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v3.log",
+      "logSha256": "587398e3e3433fd036b95182b9ac7e47ca5450b6640a6e4cea9c56c50775e1bb"
+    }
+  ],
+  "cause": "FileExistsError in the controlled owned_deployment fixture: it wrote ConfigMap bytes then attempted a second exclusive private_write of Pod bytes at the same path. The private-file guard correctly refused. The fixture now selects document bytes before exactly one private_write.",
+  "rerun": {
+    "sessionId": 42016,
+    "status": "pending",
+    "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.exit",
+    "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.log"
+  }
 }
