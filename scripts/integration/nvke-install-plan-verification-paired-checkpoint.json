@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "actual-compiled-cli-app-agent-verification-acceptance-harness",
-  "status": "actual-acceptance-v2-failed-during-context-preflight",
+  "status": "actual-acceptance-v3-running-on-qualified-bounded-native-runtime",
   "sourceSha256": {
     "scripts/integration/test_nvke_install_plan_tree.py": "2f8b03588600c35643ba581d24ec0dfaf25177473ab94354db71fb9131e7315b",
     "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
@@ -82,6 +82,23 @@
           "dropped": false
         }
       ]
+    },
+    "actualAcceptanceV3": {
+      "status": "running",
+      "sessionId": 24419,
+      "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v3.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v3.exit",
+      "timingPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v3-timings.jsonl",
+      "database": "test_astro_nvke_verification_20261109",
+      "appSourceRevision": "06d9cad1f",
+      "agentSourceRevision": "c93fe5f5dcafd870dd6d34211a4a034b600b1b70",
+      "processTimeoutSeconds": 380,
+      "sourceSha256": {
+        "scripts/integration/test_nvke_install_plan_tree.py": "9a0b150e7c176751bcfd7b48341518e16ac4c77fade48d30782a99426cb9c531",
+        "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
+        "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7"
+      },
+      "scope": "Actual compiled CLI/App/PostgreSQL/native mTLS after all 64 agent tests and both current-runtime SDK mTLS cases passed. Native context fixture now observed at 21.535 seconds; all original timeout/authority/source/budget checks remain unchanged."
     }
   },
   "implemented": [
