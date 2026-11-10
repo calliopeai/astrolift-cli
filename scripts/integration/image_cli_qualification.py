@@ -78,7 +78,18 @@ class ImageCapture:
         (destination / "images.txt").write_text(self.registry.reference + "\n")
 
     def qualify(
-        self, run, private_file, dropped, job, tree_flags, plan, tree, charts, tmp_path
+        self,
+        run,
+        private_file,
+        dropped,
+        job,
+        tree_flags,
+        plan,
+        tree,
+        charts,
+        tmp_path,
+        *,
+        workload=None,
     ):
         import management_plan_image_service as service
 
@@ -97,6 +108,11 @@ class ImageCapture:
             "maximumCalls": 512,
             "timeoutSeconds": 300,
         }
+        if workload is not None:
+            assert self.source_kind == "registry"
+            body.update(
+                workloadId=workload["id"], workloadDigest=workload["workloadDigest"]
+            )
         if self.source_kind == "local":
             body.pop("policy")
             body.pop("maximumCalls")
@@ -114,6 +130,16 @@ class ImageCapture:
             "--artifact",
             artifact_id,
         )
+        if workload is not None:
+            flags = (
+                *flags,
+                "--workload",
+                workload["id"],
+                "--workload-version",
+                workload["version"],
+                "--workload-digest",
+                workload["workloadDigest"],
+            )
         parents = {
             name: service.preparation.storage._scan(root, 1073741824)
             for name, root in (
@@ -165,6 +191,13 @@ class ImageCapture:
                 run("agent", "install-plan", "image", "retry-preparation", job, *flags)
                 == public
             )
+        if workload is not None:
+            assert public["workloadId"] == workload["id"]
+            assert public["workloadVersion"] == workload["version"]
+            assert public["workloadDigest"] == workload["workloadDigest"]
+            assert saved["workloadId"] == workload["id"]
+            assert saved["workloadVersion"] == workload["version"]
+            assert saved["workloadDigest"] == workload["workloadDigest"]
         assert public["sourceKind"] == self.source_kind
         assert public["id"] == artifact_id and public["treeId"] == tree["id"]
         assert public["chartArtifactDigest"] == charts["artifactDigest"]
