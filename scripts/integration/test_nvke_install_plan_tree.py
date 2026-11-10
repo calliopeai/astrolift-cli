@@ -91,6 +91,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "workload",
         "workload-browser",
         "workload-image",
+        "workload-image-browser",
     ],
 )
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
@@ -111,7 +112,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         or not os.getenv("NVKE_TEST_VERIFICATION_STORYBOOK")
     ):
         pytest.skip("Select the owned verification frontend and Storybook endpoint")
-    if client == "image-browser" and (
+    if client in {"image-browser", "workload-image-browser"} and (
         not os.getenv("NVKE_TEST_IMAGE_FRONTEND")
         or not os.getenv("NVKE_TEST_IMAGE_STORYBOOK")
     ):
@@ -136,7 +137,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     source = Path(selected)
     revision = (
         "58b643a0a50f71d822deade7fb633b98acded4f9"
-        if client in {"workload", "workload-browser", "workload-image"}
+        if client
+        in {"workload", "workload-browser", "workload-image", "workload-image-browser"}
         else "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22"
         if client in {"image", "image-browser", "local-image", "local-image-browser"}
         else (
@@ -203,6 +205,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "workload",
         "workload-browser",
         "workload-image",
+        "workload-image-browser",
     }:
         paths = (
             subprocess.check_output(
@@ -289,7 +292,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         try:
             image_capture = None
             context_capture = None
-            if client == "workload-image":
+            if client in {"workload-image", "workload-image-browser"}:
                 install_plan = native.agent.OperatorAgent.install_plan
 
                 def observed_install_plan(engine, *args, **kwargs):
@@ -336,6 +339,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "local-image",
                 "local-image-browser",
                 "workload-image",
+                "workload-image-browser",
             }:
                 from image_cli_qualification import ImageCapture, LocalImageCapture
 
@@ -352,6 +356,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "workload",
                 "workload-browser",
                 "workload-image",
+                "workload-image-browser",
             }:
                 from context_cli_qualification import ContextCapture
 
@@ -457,7 +462,10 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "  - {name: spire-tpm-pubhashes, type: manifest}\n"
                     "  - {name: nktp, type: helm}\n"
                 )
-                if image_capture and client != "workload-image":
+                if image_capture and client not in {
+                    "workload-image",
+                    "workload-image-browser",
+                }:
                     image_capture.materialize(destination)
                 else:
                     (destination / "images.txt").unlink(missing_ok=True)
@@ -471,7 +479,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 document = (
                     b"apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: owned\n"
                 )
-                if client == "workload-image":
+                if client in {"workload-image", "workload-image-browser"}:
                     document = (
                         "apiVersion: v1\nkind: Pod\nmetadata:\n  name: owned\nspec:\n  containers:\n    - name: owned\n      image: "
                         + image_capture.registry.reference
@@ -746,7 +754,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                 )
-            if client in {"workload", "workload-browser", "workload-image"}:
+            if client in {
+                "workload",
+                "workload-browser",
+                "workload-image",
+                "workload-image-browser",
+            }:
                 from workload_cli_qualification import qualify_workload
 
                 workload_summary = qualify_workload(
@@ -797,9 +810,15 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     tree,
                     data,
                     tmp_path,
-                    workload=workload_summary if client == "workload-image" else None,
+                    workload=workload_summary
+                    if client in {"workload-image", "workload-image-browser"}
+                    else None,
                 )
-            if client in {"image-browser", "local-image-browser"}:
+            if client in {
+                "image-browser",
+                "local-image-browser",
+                "workload-image-browser",
+            }:
                 browser_tree_row = (
                     NvkeInstallPlanTree.objects.filter(guid=tree_id).values().get()
                 )
@@ -833,6 +852,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     reference=image_capture.registry.reference,
                     root_digest=image_capture.registry.descriptor["digest"],
                     dropped=dropped_cli_replies,
+                    **(
+                        {"workload": workload_summary, "restart": image_capture.restart}
+                        if client == "workload-image-browser"
+                        else {}
+                    ),
                 )
                 browser_artifact = case.engine.install_registry_images / str(
                     browser_row.guid
