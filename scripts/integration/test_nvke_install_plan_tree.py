@@ -90,6 +90,8 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "image-browser",
         "workload",
         "workload-browser",
+        "image-binding",
+        "image-binding-browser",
         "workload-image",
         "workload-image-browser",
     ],
@@ -138,7 +140,14 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     revision = (
         "58b643a0a50f71d822deade7fb633b98acded4f9"
         if client
-        in {"workload", "workload-browser", "workload-image", "workload-image-browser"}
+        in {
+            "workload",
+            "workload-browser",
+            "image-binding",
+            "image-binding-browser",
+            "workload-image",
+            "workload-image-browser",
+        }
         else "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22"
         if client in {"image", "image-browser", "local-image", "local-image-browser"}
         else (
@@ -147,6 +156,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
         )
     )
+    if client in {"image-binding", "image-binding-browser"}:
+        revision = "c67a6fe84b4653624de1862d5dc27fe3eb35f285"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -204,6 +215,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "local-image-browser",
         "workload",
         "workload-browser",
+        "image-binding",
+        "image-binding-browser",
         "workload-image",
         "workload-image-browser",
     }:
@@ -292,7 +305,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         try:
             image_capture = None
             context_capture = None
-            if client in {"workload-image", "workload-image-browser"}:
+            if client in {
+                "image-binding",
+                "image-binding-browser",
+                "workload-image",
+                "workload-image-browser",
+            }:
                 install_plan = native.agent.OperatorAgent.install_plan
 
                 def observed_install_plan(engine, *args, **kwargs):
@@ -338,6 +356,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-browser",
                 "local-image",
                 "local-image-browser",
+                "image-binding",
+                "image-binding-browser",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -355,6 +375,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "verification-browser",
                 "workload",
                 "workload-browser",
+                "image-binding",
+                "image-binding-browser",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -463,6 +485,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "  - {name: nktp, type: helm}\n"
                 )
                 if image_capture and client not in {
+                    "image-binding",
+                    "image-binding-browser",
                     "workload-image",
                     "workload-image-browser",
                 }:
@@ -479,7 +503,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 document = (
                     b"apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: owned\n"
                 )
-                if client in {"workload-image", "workload-image-browser"}:
+                if client in {
+                    "image-binding",
+                    "image-binding-browser",
+                    "workload-image",
+                    "workload-image-browser",
+                }:
                     document = (
                         "apiVersion: v1\nkind: Pod\nmetadata:\n  name: owned\nspec:\n  containers:\n    - name: owned\n      image: "
                         + image_capture.registry.reference
@@ -757,6 +786,8 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             if client in {
                 "workload",
                 "workload-browser",
+                "image-binding",
+                "image-binding-browser",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -800,7 +831,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 assert (browser_artifact / "index.json").is_file()
                 assert len(list((browser_artifact / "work").iterdir())) == 1
             if image_capture:
-                image_capture.qualify(
+                image_summary = image_capture.qualify(
                     run,
                     private_file,
                     dropped_cli_replies,
@@ -811,8 +842,63 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                     workload=workload_summary
-                    if client in {"workload-image", "workload-image-browser"}
+                    if client
+                    in {
+                        "image-binding",
+                        "image-binding-browser",
+                        "workload-image",
+                        "workload-image-browser",
+                    }
                     else None,
+                )
+            if client in {"image-binding", "image-binding-browser"}:
+                from image_binding_cli_qualification import qualify_image_binding
+
+                qualify_image_binding(
+                    case,
+                    image_capture,
+                    run,
+                    private_file,
+                    dropped_cli_replies,
+                    job,
+                    tree_flags,
+                    plan,
+                    tree,
+                    data,
+                    workload_summary,
+                    image_summary,
+                    tmp_path,
+                )
+            if client == "image-binding-browser":
+                from image_binding_browser_qualification import (
+                    run_image_binding_browser,
+                )
+
+                reads_before_binding_browser = len(image_capture.registry.requests)
+                browser_binding = run_image_binding_browser(
+                    bearer=issued.plaintext,
+                    tmp_path=tmp_path,
+                    endpoint=asgi_endpoint,
+                    world=world,
+                    site=state.site,
+                    authority=authority,
+                    operation=original,
+                    plan=plan,
+                    charts=data,
+                    tree=tree,
+                    reference=image_capture.registry.reference,
+                    image=image_summary,
+                    dropped=dropped_cli_replies,
+                    workload=workload_summary,
+                    restart=image_capture.restart,
+                )
+                browser_artifact = case.engine.install_image_bindings / str(
+                    browser_binding.guid
+                )
+                assert (browser_artifact / "index.json").is_file()
+                assert len(list((browser_artifact / "work").iterdir())) == 1
+                assert (
+                    len(image_capture.registry.requests) == reads_before_binding_browser
                 )
             if client in {
                 "image-browser",
