@@ -75,7 +75,15 @@ def asgi_endpoint(settings, dropped_cli_replies):
 
 
 @pytest.mark.parametrize(
-    "client", ["cli", "browser", "context", "context-browser", "verification"]
+    "client",
+    [
+        "cli",
+        "browser",
+        "context",
+        "context-browser",
+        "verification",
+        "verification-browser",
+    ],
 )
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     world, binary, tmp_path, asgi_endpoint, dropped_cli_replies, monkeypatch, client
@@ -90,6 +98,11 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         or not os.getenv("NVKE_TEST_CONTEXT_STORYBOOK")
     ):
         pytest.skip("Select the owned context frontend and Storybook endpoint")
+    if client == "verification-browser" and (
+        not os.getenv("NVKE_TEST_VERIFICATION_FRONTEND")
+        or not os.getenv("NVKE_TEST_VERIFICATION_STORYBOOK")
+    ):
+        pytest.skip("Select the owned verification frontend and Storybook endpoint")
     selected = os.getenv("NVKE_TEST_AGENT_OPSCODE")
     if (
         not selected
@@ -100,7 +113,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
     source = Path(selected)
     revision = (
         "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38"
-        if client == "verification"
+        if client in {"verification", "verification-browser"}
         else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
     )
     for name in (
@@ -146,7 +159,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             "management_render_revalidation.py",
             "management_render_verification_store.py",
         )
-        if client == "verification"
+        if client in {"verification", "verification-browser"}
         else ()
     ):
         relative = "kubernetes/nvke/" + name
@@ -213,7 +226,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         case.setUp()
         try:
             context_capture = None
-            if client in {"context", "context-browser", "verification"}:
+            if client in {
+                "context",
+                "context-browser",
+                "verification",
+                "verification-browser",
+            }:
                 from context_cli_qualification import ContextCapture
 
                 context_capture = ContextCapture(case, native)
@@ -578,7 +596,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 == tree_attempts
             )
             if context_capture:
-                context_capture.qualify(
+                context_summary = context_capture.qualify(
                     run,
                     private_file,
                     dropped_cli_replies,
@@ -604,6 +622,28 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     tmp_path,
                 )
+            if client == "verification-browser":
+                from verification_browser_qualification import run_verification_browser
+
+                browser_row = run_verification_browser(
+                    bearer=issued.plaintext,
+                    tmp_path=tmp_path,
+                    endpoint=asgi_endpoint,
+                    world=world,
+                    site=state.site,
+                    authority=authority,
+                    operation=original,
+                    plan=plan,
+                    charts=data,
+                    tree=tree,
+                    captured=context_summary,
+                    dropped=dropped_cli_replies,
+                )
+                browser_artifact = case.engine.install_render_verifications / str(
+                    browser_row.guid
+                )
+                assert (browser_artifact / "index.json").is_file()
+                assert len(list((browser_artifact / "work").iterdir())) == 1
             if client == "context-browser":
                 from context_browser_qualification import run_context_browser
 

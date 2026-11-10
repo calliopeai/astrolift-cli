@@ -200,3 +200,4 @@ class ContextCapture:
             ("trees", case.engine.install_execution_trees),
         ):
             assert service.preparation.storage._scan(root, 1073741824) == parents[name]
+        return public

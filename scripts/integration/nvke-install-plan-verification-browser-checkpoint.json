@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "scope": "owned-app-postgres-native-verification-browser-acceptance-harness",
+  "status": "static-qualified-collection-and-actual-acceptance-pending",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "b5a42f5a40c2356bc06c2f18bf154b8dfb18cd2047cda1a41b8ec260f91e6da6",
+    "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
+    "scripts/integration/verification_browser_qualification.py": "48d16b37be7a2fbafaa1e40e4e2e96b4b0d39e302ac1337d6f59ca209acfc22c"
+  },
+  "agentRevision": "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38",
+  "checks": {
+    "ruff": {
+      "exitCode": 0
+    },
+    "collection": {
+      "status": "running",
+      "sessionId": 58070,
+      "exitMarker": "/tmp/astrolift-nvke-verification-browser-collect.exit"
+    }
+  },
+  "implemented": [
+    "Explicit verification-browser mode retains the reviewed native pin and all existing CLI context qualification before starting Chromium.",
+    "Only an owned loopback Storybook frontend and actual App endpoint are selected through owner-only private config/log files.",
+    "Dropped preparation reply followed by browser reload, historical read and private retry must produce a prepared immutable verification record with matching native summary hashes and one attempt. Original operation, guard, native runs, parent plan and chart retention checks remain in the shared scenario."
+  ],
+  "remaining": [
+    "Complete scenario collection and diagnose native context unavailable before actual runtime qualification.",
+    "Run real CLI and browser scenarios without increasing authority or process timeouts."
+  ],
+  "continuationAuthorized": false
+}
