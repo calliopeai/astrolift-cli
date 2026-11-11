@@ -57,7 +57,7 @@ replays the original installation or releases its uncertainty fence.`, RunE: nvk
 		}
 		group.AddCommand(leaf)
 	}
-	group.AddCommand(newNVKEAgentInstallPlanChartsCommand(), newNVKEAgentInstallPlanTreeCommand(), newNVKEAgentInstallPlanContextCommand(), newNVKEAgentInstallPlanVerificationCommand(), newNVKEAgentInstallPlanImageCommand(), newNVKEAgentInstallPlanWorkloadCommand(), newNVKEAgentInstallPlanImageBindingCommand())
+	group.AddCommand(newNVKEAgentInstallPlanChartsCommand(), newNVKEAgentInstallPlanTreeCommand(), newNVKEAgentInstallPlanContextCommand(), newNVKEAgentInstallPlanVerificationCommand(), newNVKEAgentInstallPlanImageCommand(), newNVKEAgentInstallPlanWorkloadCommand(), newNVKEAgentInstallPlanImageBindingCommand(), newNVKEAgentInstallPlanImmutableCommand(false), newNVKEAgentInstallPlanImmutableCommand(true))
 	return group
 }
 
