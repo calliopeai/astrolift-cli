@@ -270,8 +270,14 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             issued.plaintext,
             world.org.slug,
             *arguments,
-            # The product permits 300s chart work with a 360s private API timeout.
-            process_timeout=380,
+            # Artifact commands review five parent records before their final
+            # private request. Each private HTTP call keeps its existing 360s
+            # budget; do not accidentally cap the whole serial command as one
+            # request. Four ordinary metadata calls and local journal work have
+            # separate bounded allowance. Native preparation still has 300s.
+            process_timeout=(6 * 360 + 4 * 60 + 20)
+            if arguments[:2] == ("agent", "install-plan")
+            else 380,
         )
         for private in (
             "PRIVATE_CHART_CONTENT",
