@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-11T21:49:59.417315+00:00",
+  "recordedAt": "2026-11-11T22:05:54.477762+00:00",
   "scope": "Actual App parent registration/direct runtime read, compiled CLI and HTTP-backed Chromium qualification harness",
-  "status": "static-and-real-schema-import-qualified-connected-read-queued-no-pass-claimed",
+  "status": "host-native-sdk-read-failed-fresh-instrumented-run-active-no-connected-pass-claimed",
   "static": {
     "exitCode": 0,
     "checks": [
@@ -80,7 +80,25 @@
     "report": "/tmp/astrolift-nvke-pull-runtime-host-browser-v1.json",
     "exitMarker": "/tmp/astrolift-nvke-pull-runtime-host-browser-v1.exit",
     "dependency": "/tmp/astrolift-nvke-pull-runtime-host-native-v1.json",
-    "status": "queued-no-pass-claimed"
+    "status": "dependency-failed-app-cli-browser-not-started",
+    "terminalResult": {
+      "exitCode": 1,
+      "elapsedSeconds": 519.9051520833746,
+      "checks": {
+        "failureStage": "dependency",
+        "failureType": "AssertionError"
+      },
+      "cleanup": [],
+      "sourceFiles": 229,
+      "sdkFiles": 252,
+      "programSha256": "0ef3b1df2e987808ae2a260625488128ec4f3cd74d98e6f3bee5470eb071ad19",
+      "network": "none",
+      "readOnlyRoot": true,
+      "privilegedNestedRuntime": true,
+      "cpus": 2,
+      "memoryGiB": 2,
+      "scope": "Host SDK over owned opaque mTLS bridge to actual native runtime correspondence fixture. Controlled uncertain original and Kubernetes peers. Actual App parent registration and browser reads through the held fixture; not physical installation qualification."
+    }
   },
   "coverageRequiredByHarness": [
     "Verify real authority against held owned Linux agent through opaque mTLS bridge",
@@ -105,5 +123,44 @@
     "Connected native App/CLI/browser result pending; Secret-only pairing and controlled HTTP browser preflight are separate evidence",
     "Privileged nested containerd and controlled Kubernetes peers are not live kubelet/registry/scheduling/physical installation proof",
     "No final PR/main merge, CONFLICT deployment, full NVKE or backlog completion claimed"
-  ]
+  ],
+  "retainedHostNativeFailure": {
+    "report": "/tmp/astrolift-nvke-pull-runtime-host-native-v1.json",
+    "reportSha256": "4cc5017eca23e902dcb0d2cb98115cdf5942eb955acaa6bd661868a6db213412",
+    "result": {
+      "exitCode": 1,
+      "elapsedSeconds": 1165.2029811255634,
+      "checks": {
+        "failureStage": "host-sdk-native-correspondence",
+        "failureType": "NvkeError"
+      },
+      "cleanup": [
+        {
+          "ownedProxy": 0
+        },
+        {
+          "ownedContainer": 0
+        }
+      ],
+      "sourceFiles": 229,
+      "sdkFiles": 252,
+      "programSha256": "0ef3b1df2e987808ae2a260625488128ec4f3cd74d98e6f3bee5470eb071ad19",
+      "network": "none",
+      "readOnlyRoot": true,
+      "privilegedNestedRuntime": true,
+      "cpus": 2,
+      "memoryGiB": 2,
+      "scope": "Host SDK over owned opaque mTLS bridge to actual native runtime correspondence fixture. Controlled uncertain original and Kubernetes peers. No App/database/browser or physical installation qualification."
+    },
+    "finding": "Actual native route fixture signaled ready. Host frozen SDK raised NvkeError during correspondence read. Earlier runner retained only the exception type, so error code and failed request boundary are unknown. Both owned proxy and container cleanup passed. No App/CLI/browser stage started. No cause or product failure class inferred."
+  },
+  "freshDiagnosticNativeAndAppRun": {
+    "runner": "/tmp/astrolift-nvke-pull-runtime-host-native-v2.py",
+    "pidFile": "/tmp/astrolift-nvke-pull-runtime-host-native-v2.pid",
+    "report": "/tmp/astrolift-nvke-pull-runtime-host-native-v2.json",
+    "exitMarker": "/tmp/astrolift-nvke-pull-runtime-host-native-v2.exit",
+    "status": "pending-no-pass-claimed",
+    "scope": "Fresh owned fixture, unchanged frozen native/SDK sources, explicit SDK request preflight and identity boundary, fixed request labels/closed error codes/type+function-line contexts without values. Private handoff is retained under owner-only mode. Only an exact host/native summary match can start the actual App/PostgreSQL/CLI/browser stage in that same fresh fixture."
+  },
+  "hostOfflineDiagnosis": "Frozen SDK constructor passed with a verified SSL context on the host without any network request. This narrows only constructor/provenance setup; it does not diagnose the failed read."
 }
