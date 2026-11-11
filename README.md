@@ -2078,6 +2078,15 @@ parent rows, exercises a deliberately lost read response and explicit repeat
 read, and requires every row to remain unchanged. It creates no parent records.
 Its static/import checks do not establish a connected browser qualification;
 that requires running it against the actual App/database/native fixture.
+The opt-in `scripts/integration/test_nvke_pull_runtime_browser.py` consumes a
+private owned native handoff selected by `NVKE_TEST_PULL_RUNTIME_HOST_HANDOFF`
+and a compiled CLI selected by `ASTROLIFT_NVKE_CLI`. It verifies the actual authority, matches the controlled uncertain original,
+registers the retained native parents through normal App preparation paths,
+compares direct App and compiled CLI results with the native summary, and
+requires two successful audited browser reads. Parent registration uses
+`scripts/integration/pull_runtime_parent_qualification.py`; no prepared App rows
+are fabricated. Original dispatch and physical installation remain outside this
+fixture. The connected test is pending qualification.
 
 For host/App qualification against a disposable Linux agent, the integration-only
 `DockerAgentBridge` in `scripts/integration/docker_agent_bridge.py` carries opaque
