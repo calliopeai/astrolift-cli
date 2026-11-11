@@ -1958,6 +1958,33 @@ Results expose source digests, bounded counts, sizes and observation times. Thes
 artifacts do not authorize native continuation or release the original uncertainty
 fence; fresh platform, credential, import/use and linked admission checks remain.
 
+### Admitted-Pod pull-authority observations
+
+`astro nvke agent install-plan pull-authority prepare|review|retry-preparation`
+uses the reviewed operation, plan, chart, tree, workload and image-binding flags.
+Select a distinct `--artifact` UUID. Preparation requires private `--file` JSON
+and a private `--request-file` metadata journal, saved before the request is sent.
+
+The JSON contains exactly `format: 1`, `artifactId`, `planId`, `planDigest`,
+`treeId`, `treeDigest`, `bindingId`, `bindingDigest`, `selectedPods`,
+`maximumBytes`, `maximumCalls` and `timeoutSeconds`. `selectedPods` maps explicit
+`namespace/pod-name` keys to distinct live Pod UIDs. The byte budget is a canonical
+positive decimal string up to 67,108,864; calls are integers up to 32,768 and must
+allow two reads per selected Pod plus the cluster identity bracket. Timeout is
+1–300 seconds. Duplicate keys, aliases, nulls, paths and unsupported fields refuse.
+
+The journal binds exact input bytes and reviewed source metadata without storing
+Pod names or UIDs. Preserve it after a lost reply and use `review`; explicit
+`retry-preparation` uses the server's original encrypted intent and caller/token.
+Review and retry take no new private input or credential path. Results contain
+only source digests, observation time and Pod/account/Secret/missing-reference
+counts. Counts are checked against the selected Pod scope and read-call budget.
+
+This observes admitted-Pod references separately from current ServiceAccount
+references. It does not prove workload ownership, native kubelet/plugin or
+original/proposed registry credential correspondence, successful pulls or linked
+admission. Continuation remains false and the original uncertainty fence stays.
+
 ### Node/image platform observations
 
 `astro nvke agent install-plan node-platforms prepare|review|retry-preparation`
