@@ -60,7 +60,7 @@
     "mandatory unresolved state and continuationAuthorized=false"
   ],
   "remaining": [
-    "final current-source repinning and Linux agent-route qualification",
+    "final current-source combined repinning",
     "source-event refusal investigation",
     "CPU/importer, scheduling, credentials, availability, phase use and linked admission"
   ],
@@ -95,5 +95,16 @@
     "runtimeProfiles": 5,
     "logPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.log",
     "exitPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.exit"
+  },
+  "linuxAgentRoute": {
+    "scope": "direct mTLS agent route with five profiles and offline cold recovery; App/CLI/browser proof has separate frozen pins",
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "metadataPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.json",
+    "logPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.exit",
+    "sourceManifestPath": "/tmp/astrolift-nvke-host-platform-linux-v2-sources.json",
+    "sourceManifestMatches": true
   }
 }
