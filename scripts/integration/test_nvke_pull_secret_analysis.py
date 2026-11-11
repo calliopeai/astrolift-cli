@@ -34,6 +34,16 @@ def test_compiled_cli_secret_analysis_recovery(
     dropped_cli_replies,
     monkeypatch,
 ):
+    import os
+    from pathlib import Path
+
+    if os.getenv("NVKE_TEST_PAIRING_GUARD_PROFILE"):
+        monkeypatch.syspath_prepend(
+            str(Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]) / "kubernetes/nvke")
+        )
+        from pairing_guard_profile import install
+
+        install(monkeypatch)
     pipeline.test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         world,
         binary,

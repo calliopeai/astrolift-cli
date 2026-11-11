@@ -6,6 +6,12 @@ import re
 import stat
 
 FIELDS = {
+    "prepareNvkeOperatorInstallPlanPullAuthority",
+    "reviewNvkeOperatorInstallPlanPullAuthority",
+    "recoverNvkeOperatorInstallPlanPullAuthorityPreparation",
+    "prepareNvkeOperatorInstallPlanPullSecretAnalysis",
+    "reviewNvkeOperatorInstallPlanPullSecretAnalysis",
+    "recoverNvkeOperatorInstallPlanPullSecretAnalysisPreparation",
     "createNvkeSite",
     "configureNvkeOperatorAuthority",
     "verifyNvkeOperatorAuthority",
