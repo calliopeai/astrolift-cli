@@ -100,7 +100,15 @@ def asgi_endpoint(settings, dropped_cli_replies):
     ],
 )
 def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
-    world, binary, tmp_path, asgi_endpoint, dropped_cli_replies, monkeypatch, client
+    world,
+    binary,
+    tmp_path,
+    asgi_endpoint,
+    dropped_cli_replies,
+    monkeypatch,
+    client,
+    *,
+    secret_analysis=False,
 ):
     if client == "browser" and (
         not os.getenv("NVKE_TEST_TREE_FRONTEND")
@@ -176,6 +184,10 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         revision = "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
     if client == "pull-authority":
         revision = "b9569418e1ce2fab8298d580c55021160a27489e"
+    if secret_analysis:
+        assert client == "pull-authority"
+        assert os.environ["NVKE_TEST_PULL_KEYRING_PROFILE"]
+        revision = "c011be8"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -411,10 +423,23 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
 
                     monkeypatch.setattr(audit, "_bundle_descriptors", audit_descriptors)
                 make_engine = case.make_engine
-                profiles = {}
+                profiles = (
+                    {
+                        "pull_keyring_profile": os.environ[
+                            "NVKE_TEST_PULL_KEYRING_PROFILE"
+                        ]
+                    }
+                    if secret_analysis
+                    else {}
+                )
 
                 def combined_engine(**options):
-                    for key in ("render_profile", "image_profile", "platform_profile"):
+                    for key in (
+                        "render_profile",
+                        "image_profile",
+                        "platform_profile",
+                        "pull_keyring_profile",
+                    ):
                         if key in options:
                             profiles[key] = options[key]
                     return make_engine(**{**profiles, **options})
@@ -468,7 +493,15 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             if client == "pull-authority":
                 from pull_authority_cli_qualification import PullAuthorityCapture
 
-                node_capture = PullAuthorityCapture(
+                if secret_analysis:
+                    from pull_secret_analysis_cli_qualification import (
+                        PullSecretAnalysisCapture,
+                    )
+
+                    capture_class = PullSecretAnalysisCapture
+                else:
+                    capture_class = PullAuthorityCapture
+                node_capture = capture_class(
                     case, native, context_capture, image_capture
                 )
             credentials = private_file(
