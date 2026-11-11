@@ -2070,3 +2070,15 @@ The command accepts no private input or recovery journal, never prepares or
 retries a capture, and keeps continuation unauthorized. Registry access, actual
 image availability, ownership/scheduling and linked native admission require
 separate evidence.
+
+For host/App qualification against a disposable Linux agent, the integration-only
+`DockerAgentBridge` in `scripts/integration/docker_agent_bridge.py` carries opaque
+TLS bytes over `docker exec` to the container's loopback listener. It binds one
+exact container/run nonce, preserves end-to-end client certificate checks and
+uses no published container port or external container network. It does not
+create installation admissions. The manual
+`scripts/integration/qualify_docker_agent_bridge.py` accepts a prepared private
+`--profile`, an `--opscode` checkout and a fresh `--output` prefix; it freezes the
+runtime sources, verifies real host mTLS and missing-client refusal, checks run
+binding and target immutability, and cleans up its proxy/container. Its passing
+record qualifies transport only, not App/PostgreSQL/artifact or lifecycle flows.
