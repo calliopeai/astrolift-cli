@@ -1,0 +1,94 @@
+{
+  "format": 1,
+  "scope": "compiled-cli-and-browser-real-app-postgres-native-agent-immutable-artifact-recovery",
+  "status": "pinned-source-native-client-qualification-passed-not-installation-admission",
+  "revisions": {
+    "cli": "627924eedb40ff1f162948fab8ef8b61f0fa3c02",
+    "app": "2ed01aa25601d641cc7e92471f7fcabd43a3a5fb",
+    "ops": "65a0833483f101514604798f536f68c11a4ecd1f"
+  },
+  "sourceSha256": {
+    "scripts/integration/test_nvke_immutable_browser.py": "a1fcafe327a0d936896b32262075d2c51d449467efd7612b63fe8870fce2fa20",
+    "scripts/integration/immutable_cli_qualification.py": "49454885b0aa23bc483bdd0dc427f6dcf42ea27e895307850797a453dfad857e",
+    "scripts/integration/immutable_browser_qualification.py": "a395d1e714960cb388d4a31a108a14b3b1b8fea0f47465dbcc0957afe345c6e3",
+    "scripts/integration/test_nvke_install_plan_tree.py": "2b1c90be944c8b849128dcf1d9b933552ede19361092868a2f09680d85be9212",
+    "scripts/integration/request_timing_qualification.py": "9385ae6984250c49e99212e2107752f2fd9474290f49759f1fa5344fae5091ba"
+  },
+  "compiledCliSha256": "74256d6bb5a5b92da745adc4c75e96dc94a76ba8227f18f0c61366ec507f3156",
+  "compiledCliUnchangedAfterRun": true,
+  "check": {
+    "exitCode": 0,
+    "tests": 1,
+    "skipped": 0,
+    "seconds": 4983.75,
+    "sessionId": 88454,
+    "logPath": "/tmp/astrolift-nvke-immutable-browser-native-v1.log",
+    "logSha256": "5194229de280252d739887ac29d8fe63af140a95d7a3824648da25254a0cce78",
+    "exitMarker": "/tmp/astrolift-nvke-immutable-browser-native-v1.exit"
+  },
+  "browserReports": [
+    {
+      "mode": "execution",
+      "passed": true,
+      "calls": [
+        "PrepareNvkeInstallPlanImmutableExecutionTree",
+        "ReviewNvkeInstallPlanImmutableExecutionTree",
+        "RetryNvkeInstallPlanImmutableExecutionTree"
+      ],
+      "logPath": "/tmp/astrolift-nvke-immutable-browser-native-v1-temp/test_compiled_cli_and_browser_0/immutable-execution-browser-private.log",
+      "logSha256": "434e72c5f187020904f39ec49244fb162927d542336cf36e288f9cc2ef6f514b",
+      "pageErrors": []
+    },
+    {
+      "mode": "payload",
+      "passed": true,
+      "calls": [
+        "PrepareNvkeInstallPlanImagePayload",
+        "ReviewNvkeInstallPlanImagePayload",
+        "RetryNvkeInstallPlanImagePayload"
+      ],
+      "logPath": "/tmp/astrolift-nvke-immutable-browser-native-v1-temp/test_compiled_cli_and_browser_0/immutable-payload-browser-private.log",
+      "logSha256": "baf86c61c4b85c38b0f1b2515f2c3436af1dc7b33e72ab30a45b647555e486b1",
+      "pageErrors": []
+    }
+  ],
+  "requestTimings": {
+    "prepareNvkeOperatorInstallPlanImagePayload": {
+      "calls": 4,
+      "dropped": 2,
+      "maximumSeconds": 184.445
+    },
+    "reviewNvkeOperatorInstallPlanImagePayload": {
+      "calls": 2,
+      "dropped": 0,
+      "maximumSeconds": 126.259
+    },
+    "recoverNvkeOperatorInstallPlanImagePayloadPreparation": {
+      "calls": 2,
+      "dropped": 0,
+      "maximumSeconds": 131.081
+    },
+    "prepareNvkeOperatorInstallPlanImmutableExecutionTree": {
+      "calls": 2,
+      "dropped": 2,
+      "maximumSeconds": 242.299
+    },
+    "reviewNvkeOperatorInstallPlanImmutableExecutionTree": {
+      "calls": 2,
+      "dropped": 0,
+      "maximumSeconds": 215.573
+    },
+    "recoverNvkeOperatorInstallPlanImmutableExecutionTreePreparation": {
+      "calls": 2,
+      "dropped": 0,
+      "maximumSeconds": 258.367
+    }
+  },
+  "canonicalQualification": "astrolift-opscode/kubernetes/nvke/qualification/management-immutable-clients-native-local.json",
+  "limits": [
+    "Exact detached revisions above only; later main merges and node/platform stages are not implicitly covered by this run.",
+    "Browser acceptance uses the actual production hook/panel in a controlled Storybook API peer with reviewed source fixtures; full live operation-page navigation and CONFLICT deployment remain unqualified.",
+    "Task-owned native fixture only. No original retained VM/job/receipt reset, replay or continuation.",
+    "Fresh resource/defaulting/operator/node/importer/credential/availability/phase-use closure and linked admission remain open. No final PR, main merge or deployment claim."
+  ]
+}
