@@ -2099,3 +2099,12 @@ create installation admissions. The manual
 runtime sources, verifies real host mTLS and missing-client refusal, checks run
 binding and target immutability, and cleans up its proxy/container. Its passing
 record qualifies transport only, not App/PostgreSQL/artifact or lifecycle flows.
+
+Qualification wrappers can use `scripts/integration/qualification_result.py` to
+require named literal-true success checks and integer-zero cleanup statuses.
+Explicit failure metadata rejects an otherwise zero process status. The retained
+host-native v2 report has a false zero marker from exception-variable shadowing;
+`qualification/nvke-pull-runtime-browser-integration-local.json` records the
+corrective assessment. It is an unsuccessful integrated run, despite its host
+SDK matching the native summary. The corrected fixture/tool-binding run remains
+separately pending.
