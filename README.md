@@ -2071,6 +2071,14 @@ retries a capture, and keeps continuation unauthorized. Registry access, actual
 image availability, ownership/scheduling and linked native admission require
 separate evidence.
 
+The integration helper `scripts/integration/pull_runtime_browser_qualification.py`
+accepts an existing real App source and prepared parent records for the owned
+HTTP-backed browser story. It snapshots the original operation and all supplied
+parent rows, exercises a deliberately lost read response and explicit repeat
+read, and requires every row to remain unchanged. It creates no parent records.
+Its static/import checks do not establish a connected browser qualification;
+that requires running it against the actual App/database/native fixture.
+
 For host/App qualification against a disposable Linux agent, the integration-only
 `DockerAgentBridge` in `scripts/integration/docker_agent_bridge.py` carries opaque
 TLS bytes over `docker exec` to the container's loopback listener. It binds one
