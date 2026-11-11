@@ -1,0 +1,102 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-11T21:26:34.597796+00:00",
+  "scope": "Reusable opaque host-to-owned-Linux-agent bridge for connected client qualification",
+  "status": "actual-mtls-transport-qualified-app-native-read-pairing-pending",
+  "sourceParent": "407403f",
+  "actualQualification": {
+    "exitCode": 0,
+    "elapsedSeconds": 5.203620332293212,
+    "checks": {
+      "wrongRunNonceRefusedBeforeProxy": true,
+      "hostToActualAgentVerifiedMTLSIdentity": true,
+      "targetSnapshotUnaffectedByCallerFieldChanges": true,
+      "clientCertificateRequired": true,
+      "proxySessions": 2,
+      "agentClosedWithoutAdmissions": true
+    },
+    "failure": null,
+    "cleanup": [
+      {
+        "resource": "owned-proxy",
+        "exitCode": 0
+      },
+      {
+        "resource": "owned-container",
+        "exitCode": 0
+      }
+    ],
+    "sourceManifest": "/private/tmp/astrolift-nvke-host-agent-bridge-v4.sources.json",
+    "sourceFiles": 229,
+    "allFrozenSourcesUnchanged": true,
+    "harnessSourceSha256": {
+      "qualify_docker_agent_bridge.py": "b7ce8971e8f174d6900020d23f7ec76b7291d821beb989131344a7ea89ae97f9",
+      "docker_agent_bridge.py": "fbd62d092a9feb809d6cc6950bc618c89959c0c2c23927764b85543815a3ffcd"
+    },
+    "harnessSourcesUnchanged": true,
+    "network": "none-with-owned-loopback-opaque-stdio-proxy",
+    "privileged": false,
+    "readOnlyRoot": true,
+    "capabilities": "all-dropped",
+    "cpus": 1,
+    "memoryGiB": 1,
+    "scope": "Actual host/owned Linux agent mTLS identity and client certificate refusal; no App/database/artifact/lifecycle proof",
+    "protectedOriginalsChanged": false,
+    "log": "/private/tmp/astrolift-nvke-host-agent-bridge-v4.log"
+  },
+  "checks": {
+    "exitCode": 0,
+    "elapsedSeconds": 5.3647888749837875,
+    "checks": [
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "format",
+          "--check",
+          "scripts/integration/docker_agent_bridge.py",
+          "scripts/integration/qualify_docker_agent_bridge.py"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "check",
+          "scripts/integration/docker_agent_bridge.py",
+          "scripts/integration/qualify_docker_agent_bridge.py"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+          "-B",
+          "scripts/integration/qualify_docker_agent_bridge.py",
+          "--profile",
+          "/tmp/astrolift-nvke-linux-profile-20261110.json",
+          "--opscode",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-opscode-platform-resolution",
+          "--output",
+          "/tmp/astrolift-nvke-host-agent-bridge-v4"
+        ],
+        "exitCode": 0
+      }
+    ]
+  },
+  "coverage": [
+    "Exact immutable container/run/port binding checked through the owned Docker label before proxy startup; wrong run refused before connection",
+    "Changing caller-visible fields after startup cannot retarget the captured bridge target; actual mTLS identity still matches the original agent",
+    "Opaque byte forwarding, actual CA/hostname/client fingerprint checks and missing-client-certificate refusal; no TLS body or private credentials logged",
+    "Network-disabled readonly-root container, capabilities all dropped, no published ports, one CPU/one GiB; no native admission records created",
+    "Proxy workers and owned container cleaned up, all 229 frozen runtime sources and both harness files unchanged"
+  ],
+  "retainedAttempt": {
+    "report": "/tmp/astrolift-nvke-host-agent-bridge-v1.json",
+    "scope": "Agent reached readiness, but a disposable internal Docker network did not publish the endpoint. Owned container/network cleaned up; replaced by opaque stdio forwarding without changing protected forwards."
+  },
+  "limits": [
+    "Host mTLS identity transport is not App/PostgreSQL/SDK artifact or browser integration proof",
+    "No original/protected VM, operation, socket forward or installation state changed; no source replay or reset",
+    "No full NVKE completion, final PR, merge or deployment claim"
+  ]
+}
