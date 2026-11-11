@@ -94,6 +94,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "image-binding-browser",
         "immutable",
         "node-platforms",
+        "pull-authority",
         "workload-image",
         "workload-image-browser",
     ],
@@ -149,6 +150,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             "image-binding-browser",
             "immutable",
             "node-platforms",
+            "pull-authority",
             "workload-image",
             "workload-image-browser",
         }
@@ -165,12 +167,15 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "image-binding-browser",
         "immutable",
         "node-platforms",
+        "pull-authority",
     }:
         revision = "c67a6fe84b4653624de1862d5dc27fe3eb35f285"
     if client == "immutable":
         revision = "65a0833"
     if client == "node-platforms":
         revision = "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+    if client == "pull-authority":
+        revision = "b9569418e1ce2fab8298d580c55021160a27489e"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -232,6 +237,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "image-binding-browser",
         "immutable",
         "node-platforms",
+        "pull-authority",
         "workload-image",
         "workload-image-browser",
     }:
@@ -341,6 +347,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding-browser",
                 "immutable",
                 "node-platforms",
+                "pull-authority",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -393,6 +400,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding-browser",
                 "immutable",
                 "node-platforms",
+                "pull-authority",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -414,6 +422,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding-browser",
                 "immutable",
                 "node-platforms",
+                "pull-authority",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -425,6 +434,12 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 from node_platform_cli_qualification import NodePlatformsCapture
 
                 node_capture = NodePlatformsCapture(
+                    case, native, context_capture, image_capture
+                )
+            if client == "pull-authority":
+                from pull_authority_cli_qualification import PullAuthorityCapture
+
+                node_capture = PullAuthorityCapture(
                     case, native, context_capture, image_capture
                 )
             credentials = private_file(
@@ -533,6 +548,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "image-binding-browser",
                     "immutable",
                     "node-platforms",
+                    "pull-authority",
                     "workload-image",
                     "workload-image-browser",
                 }:
@@ -554,6 +570,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "image-binding-browser",
                     "immutable",
                     "node-platforms",
+                    "pull-authority",
                     "workload-image",
                     "workload-image-browser",
                 }:
@@ -838,6 +855,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding-browser",
                 "immutable",
                 "node-platforms",
+                "pull-authority",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -898,6 +916,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                         "image-binding-browser",
                         "immutable",
                         "node-platforms",
+                        "pull-authority",
                         "workload-image",
                         "workload-image-browser",
                     }
@@ -908,6 +927,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding-browser",
                 "immutable",
                 "node-platforms",
+                "pull-authority",
             }:
                 from image_binding_cli_qualification import qualify_image_binding
 
