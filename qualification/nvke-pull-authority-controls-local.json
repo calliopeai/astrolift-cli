@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "CLI pull-authority prepare/review/explicit retry and exact private metadata journals",
-  "status": "local-cli-gates-qualified-live-app-pairing-pending",
+  "status": "local-cli-gates-and-clean-build-qualified-live-app-pairing-pending",
   "sourceBaseRevision": "975bf4fc6fe60cb02888525b077a84a6e62b088b",
   "sources": {
     "cmd/nvke_install_plan.go": "823c1652d0ffefb0ae9859fdb420bf60b7851280d682cbf1b0273e3050154edf",
@@ -78,5 +78,20 @@
     "logPath": "/tmp/astrolift-nvke-pull-integration-cli-integrity-v1.log",
     "logSha256": "2347bd873143c9b749e3c71929f477a6fd67aacff277b8edfe6a48730e4b1963",
     "exitMarker": "/tmp/astrolift-nvke-pull-integration-cli-integrity-v1.exit"
+  },
+  "cleanBuild": {
+    "exitCode": 0,
+    "sourceRevision": "65dcc56a68b28491e63da96332b7ce960ac37077",
+    "standaloneClone": "/tmp/astrolift-nvke-pull-authority-cli-build-v1-src",
+    "sourceClean": true,
+    "binaryPath": "/tmp/astrolift-nvke-pull-authority-cli-build-v1/astro",
+    "binarySha256": "ee178da868397fa41c0c86d42cdb6ea1402f2f46104432465bcfc02ab7c3f41f",
+    "vcsStamped": true,
+    "compiler": "go1.26.11",
+    "logPath": "/tmp/astrolift-nvke-pull-authority-cli-build-v1.log",
+    "logSha256": "cc85812b003406e6df1bfbcaa5939c6e17908523073d088e19a97c94637ae49b",
+    "buildInfoPath": "/tmp/astrolift-nvke-pull-authority-cli-build-v1-buildinfo.txt",
+    "buildInfoSha256": "4f4fd5de46f7e7bbd0d58246a695f5eb45d7781be1153c679b73cb223ef2bc52",
+    "exitMarker": "/tmp/astrolift-nvke-pull-authority-cli-build-v1.exit"
   }
 }
