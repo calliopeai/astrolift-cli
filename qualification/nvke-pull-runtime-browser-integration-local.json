@@ -1,0 +1,109 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-11T21:49:59.417315+00:00",
+  "scope": "Actual App parent registration/direct runtime read, compiled CLI and HTTP-backed Chromium qualification harness",
+  "status": "static-and-real-schema-import-qualified-connected-read-queued-no-pass-claimed",
+  "static": {
+    "exitCode": 0,
+    "checks": [
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "format",
+          "--check",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/pull_runtime_browser_qualification.py",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/pull_runtime_parent_qualification.py",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/test_nvke_pull_runtime_browser.py"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.06161299999803305,
+        "log": "/tmp/astrolift-nvke-pull-runtime-browser-integration-static-v2-0.log"
+      },
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "check",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/pull_runtime_browser_qualification.py",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/pull_runtime_parent_qualification.py",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/test_nvke_pull_runtime_browser.py"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.014891750179231167,
+        "log": "/tmp/astrolift-nvke-pull-runtime-browser-integration-static-v2-1.log"
+      },
+      {
+        "command": [
+          "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+          "-m",
+          "py_compile",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/pull_runtime_browser_qualification.py",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/pull_runtime_parent_qualification.py",
+          "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/scripts/integration/test_nvke_pull_runtime_browser.py"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.08909149933606386,
+        "log": "/tmp/astrolift-nvke-pull-runtime-browser-integration-static-v2-2.log"
+      },
+      {
+        "command": [
+          "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+          "-c",
+          "import django;django.setup();import test_nvke_pull_runtime_browser;import pull_runtime_parent_qualification as helper;import importlib;[(getattr(importlib.import_module(\"astrolift_clusters.\"+module),\"prepare\"),getattr(importlib.import_module(\"astrolift_clusters.schema.\"+module),converter)) for module,_,converter in helper.STAGES.values()];print(\"Actual preparation/schema/test imports passed\")"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 4.592247332446277,
+        "log": "/tmp/astrolift-nvke-pull-runtime-browser-integration-static-v2-3.log"
+      }
+    ],
+    "sourceSha256": {
+      "scripts/integration/pull_runtime_browser_qualification.py": "0bda51fb3b1f96592a04e0745963b980d5ba5f669304ff864e914d2bb761c7d9",
+      "scripts/integration/pull_runtime_parent_qualification.py": "deb474c762596d51675d14a66963bb72edbf0d3e816c80096f1823a88762ecae",
+      "scripts/integration/test_nvke_pull_runtime_browser.py": "07410aed9c0bf543ea648b055a994e059b3e78d5cce1e2723868a4d99b0f9097"
+    },
+    "sourcesUnchanged": true,
+    "scope": "Static and actual preparation/schema/test imports; connected read qualification remains separate"
+  },
+  "staticReport": "/tmp/astrolift-nvke-pull-runtime-browser-integration-static-v2.json",
+  "staticReportSha256": "e703a2723b489778a3c1ee821df72e3fef51514530fb236310bd2ca406fea14b",
+  "compiledCli": {
+    "exitCode": 0,
+    "elapsedSeconds": 18.46722404193133,
+    "revision": "b644533b8c81de34cea41c363deae8f08ac6f11a",
+    "binary": "/tmp/astrolift-nvke-pull-runtime-cli-clean-build-v1/astro",
+    "binarySha256": "6035290980bb9bf1f5585fad2668f6b622814ef18427e892bf6bc34c1acfba71",
+    "cleanVcsStamp": true,
+    "scope": "Clean binary for actual runtime-correspondence client pairing; no connected read pass claimed"
+  },
+  "queuedConnectedRun": {
+    "runner": "/tmp/astrolift-nvke-pull-runtime-host-browser-v1.py",
+    "pidFile": "/tmp/astrolift-nvke-pull-runtime-host-browser-v1.pid",
+    "report": "/tmp/astrolift-nvke-pull-runtime-host-browser-v1.json",
+    "exitMarker": "/tmp/astrolift-nvke-pull-runtime-host-browser-v1.exit",
+    "dependency": "/tmp/astrolift-nvke-pull-runtime-host-native-v1.json",
+    "status": "queued-no-pass-claimed"
+  },
+  "coverageRequiredByHarness": [
+    "Verify real authority against held owned Linux agent through opaque mTLS bridge",
+    "Controlled uncertain original matches native job/intent; no original execution dispatched",
+    "Register each retained exact parent body through normal App prepare APIs and require exact native summary equality; no fabricated prepared App rows",
+    "Compare direct App and compiled CLI correspondence with native expected summary and exact public analysis/node parents",
+    "Browser deliberately loses first successful response, requires explicit repeated read, stable summary and no automatic read/retry or persistent result/bearer storage",
+    "Require all supplied retained parent rows/original unchanged and exactly two additional successful runtime browser audit records"
+  ],
+  "retainedHarnessSetupFailures": [
+    {
+      "report": "/tmp/astrolift-nvke-pull-secret-analysis-clients-browser-v4.json",
+      "scope": "Secret-only browser runner imported testsettings instead of config.test_settings; stopped before DB/native fixture. Corrected separate v5 run remains separate."
+    },
+    {
+      "report": "/tmp/astrolift-nvke-pull-runtime-browser-integration-static-v1.json",
+      "scope": "Ruff launched from App backend selected its 120-column config for CLI 88-column integration scripts. Corrected runner uses the CLI cwd; source formatting did not change."
+    }
+  ],
+  "limits": [
+    "Static/import checks and clean binary compilation do not qualify the connected path",
+    "Connected native App/CLI/browser result pending; Secret-only pairing and controlled HTTP browser preflight are separate evidence",
+    "Privileged nested containerd and controlled Kubernetes peers are not live kubelet/registry/scheduling/physical installation proof",
+    "No final PR/main merge, CONFLICT deployment, full NVKE or backlog completion claimed"
+  ]
+}
