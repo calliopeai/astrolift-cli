@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `astro nvke agent install-plan node-platforms prepare|review|retry-preparation`, with exact source reviews, explicit runtime/node scope, canonical byte budgets and private metadata recovery journals. Observations keep continuation unauthorized (#214).
+
 - Add organization-owned NVKE management commands: the 88-action controller/tenant/operator/datastore vocabulary, site and credential configuration, native schema discovery, paginated operation metadata, private recovery files, readiness-aware waiting, cancellation and explicit reconciliation. Preserve all native JSON fields and opaque versions. Sensitive results require an explicit private output file or stdout opt-in. Bootstrap/access/telemetry and live controller qualification remain in progress (#211).
 
 - Add `astro agent artifact <task-id> <name>` (platform #2488): print one artifact a run attached to its result (a JUnit report, coverage, a conformance report or another text file) as stored, through `agentTaskArtifact`, or write it with `-o <file>` with mode 0600. The content is checked against the SHA-256 the server reports before anything is printed or written; a mismatch prints nothing and exits 1. `--json` prints the artifact record, or with `-o` the file it wrote. An unknown name points at `astro agent inspect`, which now lists the task's artifacts with their kind, media type, size and SHA-256, also under `--json`. A server older than platform #2488 leaves the list out of `inspect`, and `artifact` says so in one line.

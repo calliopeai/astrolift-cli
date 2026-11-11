@@ -1957,3 +1957,34 @@ the original caller/token. Neither command needs a new private input file.
 Results expose source digests, bounded counts, sizes and observation times. These
 artifacts do not authorize native continuation or release the original uncertainty
 fence; fresh platform, credential, import/use and linked admission checks remain.
+
+### Node/image platform observations
+
+`astro nvke agent install-plan node-platforms prepare|review|retry-preparation`
+uses the same reviewed operation, plan, chart, tree, workload and binding flags
+as immutable artifact controls. Choose a distinct `--artifact` UUID. Preparation
+requires private `--file` JSON and a private `--request-file` metadata journal.
+
+The input contains exactly `format: 1`, `artifactId`, `planId`, `planDigest`,
+`treeId`, `treeDigest`, `bindingId`, `bindingDigest`, `nodePlatforms`,
+`maximumImageBytes`, `maximumMetadataBytes`, `maximumBytes`,
+`maximumObservationBytes`, `maximumHelperBytes`, `maximumCalls`, `maximumPairs`
+and `timeoutSeconds`. Each node entry contains exactly `uid`, `runtimeProfile`
+and `platform`. Platform requires `os`/`architecture`, with optional `variant`,
+`os.version` and string-array `os.features`. Node UIDs must be distinct. Supported
+profiles are containerd 2.3.0, 2.3.7, 2.2.3, 2.1.7 and 1.7.31, named
+`containerd/v<version>`.
+
+All byte limits are canonical positive decimal strings. Image/helper budgets
+are int64; metadata/observation budgets are at most 64 MiB; output is at most
+16 MiB. Calls are at most 65,536 and at least `4 * nodes + 4`; pairs are at most
+100,000; timeout is 1–300 seconds. Private input is limited to 1 MiB. Duplicate
+keys, aliases, unknown fields, caller helper paths and malformed summaries refuse.
+
+The journal saves only source identities and the exact input hash before API
+preparation. It excludes node names, platforms and credentials. After a lost
+reply, review the retained artifact first. Explicit retry uses the server's
+original encrypted intent and caller/token. No command automatically replays
+preparation. Results expose digests, bounded counts and historical observation
+time. CPU/importer attestation, scheduling, credentials, availability, fresh phase
+use and linked admission remain required; continuation stays unauthorized.

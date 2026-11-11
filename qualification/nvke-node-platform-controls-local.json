@@ -1,0 +1,69 @@
+{
+  "format": 1,
+  "scope": "node/platform prepare, review and explicit retry CLI/API controls",
+  "status": "local command/API controls qualified; paired native CLI proof pending",
+  "sources": {
+    "cmd/nvke_install_plan.go": "b61bd6851e7766677c58a258b4eb3b88b8173b4ce7dfa49ceb217d9ec5e1bc6e",
+    "cmd/nvke_install_plan_immutable.go": "6861eb9a8348adba1ca1c1a4855cc045ccf49bdadfb789e4edc15fc5f4564e29",
+    "cmd/nvke_install_plan_node_platforms.go": "bc6aecc80587c94ee10e44743059eae3540e89949fcc512137d70a9f98f46bd4",
+    "cmd/nvke_install_plan_node_platforms_test.go": "223957528f87770bbbf40d4620326ec9c4e8f71f798c24510eed493bb76b8356",
+    "internal/api/nvke_install_plan_node_platforms.go": "5e60a0f560a9320fe1f1157b0bfd84fb411def05007d4b72a8338def7eabc790",
+    "README.md": "d44d58fb3b8c2f9ee575546a44a94ca8084060cd3c94cf0975a2ee5ebcc96816",
+    "CHANGELOG.md": "aac2e030df05dd967495a1695b3a0ff55cb96c7e00a89725c629d876f09072dd"
+  },
+  "checks": [
+    {
+      "check": "format",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-format-v1.log"
+    },
+    {
+      "check": "test",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-test-v1.log"
+    },
+    {
+      "check": "vet",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-vet-v1.log"
+    },
+    {
+      "check": "lint",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-lint-v1.log"
+    },
+    {
+      "check": "build",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-build-v1.log"
+    }
+  ],
+  "focused": {
+    "runnerPid": 80730,
+    "logPath": "/tmp/astrolift-nvke-node-platform-cli-focused-v2.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-cli-focused-v2.exit",
+    "exitCode": 0,
+    "scope": "new node/platform request, HTTP-peer recovery/journal and result validation tests, plus existing immutable command regressions"
+  },
+  "invariants": [
+    "common exact original/plan/chart/tree/workload/binding reviews retained for both old and new commands",
+    "all five runtime profile names and closed node/platform scope",
+    "canonical int64 byte budgets without numeric coercion",
+    "metadata-only owner-private journal before preparation",
+    "changed exact input refuses journal reuse",
+    "lost response does not automatically replay preparation",
+    "review/retry take no new private input",
+    "mandatory unresolved state and continuationAuthorized=false"
+  ],
+  "remaining": [
+    "real paired CLI/App/Postgres/agent node-stage recovery",
+    "Storybook-first browser surface",
+    "source-event refusal investigation",
+    "CPU/importer, scheduling, credentials, availability, phase use and linked admission"
+  ],
+  "compiledBinary": {
+    "path": "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/astro",
+    "sha256": "ddc7929ea1e2e860bd3ca30721a84df51f7dd905e886c70469498b38a78cb1a3",
+    "sourceBaseAtBuild": "5cadc07 with the recorded current source file hashes"
+  }
+}

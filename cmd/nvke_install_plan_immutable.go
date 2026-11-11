@@ -215,99 +215,14 @@ func validateNVKEInstallPlanImmutable(row *api.NVKEInstallPlanImmutableArtifact,
 }
 
 func runNVKEAgentInstallPlanImmutable(cmd *cobra.Command, ctx context.Context, c *api.Client, id, verb string, sealedTree bool) error {
-	planID, artifactID, digest := resourceStringFlag(cmd, "plan"), resourceStringFlag(cmd, "artifact"), resourceStringFlag(cmd, "plan-digest")
-	treeID, treeDigest := resourceStringFlag(cmd, "tree"), resourceStringFlag(cmd, "tree-digest")
-	treeVersion, _ := cmd.Flags().GetInt("tree-version")
-	chartID, chartDigest := resourceStringFlag(cmd, "chart-artifact"), resourceStringFlag(cmd, "chart-artifact-digest")
-	version, _ := cmd.Flags().GetInt("plan-version")
-	chartVersion, _ := cmd.Flags().GetInt("chart-artifact-version")
-	workloadID, workloadDigest := resourceStringFlag(cmd, "workload"), resourceStringFlag(cmd, "workload-digest")
-	workloadVersion, _ := cmd.Flags().GetInt("workload-version")
-	bindingID, bindingDigest := resourceStringFlag(cmd, "binding"), resourceStringFlag(cmd, "binding-digest")
-	bindingVersion, _ := cmd.Flags().GetInt("binding-version")
-	if bindingVersion < 1 || !nvkeDigestPattern.MatchString(bindingDigest) {
-		return errors.New("review the exact image-binding version and SHA-256")
-	}
-	identities := map[string]bool{}
-	for _, value := range []string{id, planID, chartID, treeID, artifactID, workloadID, bindingID} {
-		if nvkeGUID(value) != nil || identities[value] {
-			return errors.New("review distinct exact original, plan, chart, tree and workload UUIDs")
-		}
-		identities[value] = true
-	}
-	if workloadVersion < 1 || !nvkeDigestPattern.MatchString(workloadDigest) || version < 1 || chartVersion < 1 || treeVersion < 1 || !nvkeDigestPattern.MatchString(treeDigest) || !nvkeDigestPattern.MatchString(digest) || !nvkeDigestPattern.MatchString(chartDigest) {
-		return errors.New("review exact plan and chart publication versions and SHA-256 digests")
-	}
-	review, source, err := nvkeAgentJobReview(cmd, ctx, c, id)
+	reviewedSource, err := reviewNVKEImageBindingSources(cmd, ctx, c, id)
 	if err != nil {
 		return err
 	}
-	if source.Status != "UNCERTAIN" || source.OperationKey != "tooling.management.install" {
-		return errors.New("immutable artifacts requires the original uncertain management installation")
-	}
-	selected, err := c.NVKEAgentAuthority(ctx, source.SiteID)
-	if err != nil {
-		return err
-	}
-	if err = validateNVKEAgentReply(selected, api.NVKEAgentReview{SiteID: source.SiteID, ExpectedSiteVersion: review.ExpectedSiteVersion, ExpectedVersion: review.ExpectedAuthorityVersion}, "verify"); err != nil {
-		return err
-	}
-	plan, err := c.ReviewNVKEInstallPlan(ctx, api.NVKEInstallPlanReview{NVKEAgentJobReview: review, PlanID: planID}, false)
-	if err != nil {
-		return err
-	}
-	if err = validateNVKEInstallPlan(plan, source, review, selected, planID); err != nil {
-		return err
-	}
-	if plan.Version != version || plan.Plan.PlanDigest != digest {
-		return errors.New("the prepared plan changed; review before immutable artifacts")
-	}
-	parent := api.NVKEInstallPlanChartsSource{NVKEInstallPlanReview: api.NVKEInstallPlanReview{NVKEAgentJobReview: review, PlanID: planID}, ExpectedPlanVersion: version, PlanDigest: digest}
-	publication, err := c.ReviewNVKEInstallPlanCharts(ctx, api.NVKEInstallPlanChartsReview{NVKEInstallPlanChartsSource: parent, ArtifactID: chartID}, false)
-	if err != nil {
-		return err
-	}
-	if err = validateNVKEInstallPlanCharts(publication, plan, chartID, nvkeChartLimits{}); err != nil {
-		return err
-	}
-	if publication.Version != chartVersion || publication.ArtifactDigest != chartDigest {
-		return errors.New("the prepared chart publication changed; review before immutable artifacts")
-	}
-	input := api.NVKEInstallPlanTreeSource{NVKEInstallPlanChartsSource: parent, ChartArtifactID: chartID, ExpectedChartArtifactVersion: chartVersion, ChartArtifactDigest: chartDigest}
-	tree, err := c.ReviewNVKEInstallPlanTree(ctx, api.NVKEInstallPlanTreeReview{NVKEInstallPlanTreeSource: input, ArtifactID: treeID}, false)
-	if err != nil {
-		return err
-	}
-	if err = validateNVKEInstallPlanTree(tree, plan, publication, treeID, 0); err != nil {
-		return err
-	}
-	if tree.Version != treeVersion || tree.TreeDigest != treeDigest {
-		return errors.New("the execution tree changed; review before immutable artifacts")
-	}
-
-	workloadSource := api.NVKEInstallPlanWorkloadSource{NVKEInstallPlanTreeSource: input, TreeID: treeID, ExpectedTreeVersion: treeVersion, TreeDigest: treeDigest}
-	workload, err := c.ReviewNVKEInstallPlanWorkload(ctx, api.NVKEInstallPlanWorkloadReview{NVKEInstallPlanWorkloadSource: workloadSource, ArtifactID: workloadID}, false)
-	if err != nil {
-		return err
-	}
-	if err = validateNVKEInstallPlanWorkload(workload, plan, publication, tree, workloadID); err != nil {
-		return err
-	}
-	if workload.Version != workloadVersion || workload.WorkloadDigest != workloadDigest {
-		return errors.New("the workload inventory changed; review before preparing immutable artifacts")
-	}
-	bindingSource := api.NVKEInstallPlanImageBindingSource{NVKEInstallPlanWorkloadSource: workloadSource, WorkloadID: workloadID, ExpectedWorkloadVersion: workloadVersion, WorkloadDigest: workloadDigest}
-	binding, err := c.ReviewNVKEInstallPlanImageBinding(ctx, api.NVKEInstallPlanImageBindingReview{NVKEInstallPlanImageBindingSource: bindingSource, ArtifactID: bindingID}, false)
-	if err != nil {
-		return err
-	}
-	if err = validateNVKEInstallPlanImageBinding(binding, plan, publication, tree, workload, bindingID); err != nil {
-		return err
-	}
-	if binding.Version != bindingVersion || binding.BindingDigest != bindingDigest {
-		return errors.New("the reviewed image binding changed")
-	}
-	inputSource := api.NVKEInstallPlanImmutableSource{NVKEInstallPlanImageBindingSource: bindingSource, BindingID: bindingID, ExpectedBindingVersion: bindingVersion, BindingDigest: bindingDigest}
+	review, source := reviewedSource.review, reviewedSource.source
+	plan, publication, tree := reviewedSource.plan, reviewedSource.publication, reviewedSource.tree
+	workload, binding := reviewedSource.workload, reviewedSource.binding
+	inputSource, artifactID := reviewedSource.input, reviewedSource.artifactID
 	var row *api.NVKEInstallPlanImmutableArtifact
 	var limits nvkeImmutableBody
 	if verb == "prepare" {
@@ -338,4 +253,113 @@ func runNVKEAgentInstallPlanImmutable(cmd *cobra.Command, ctx context.Context, c
 		}
 	}
 	return nvkeJSON(cmd, row)
+}
+
+type nvkeReviewedImageBindingSources struct {
+	review      api.NVKEAgentJobReview
+	source      *api.NVKEOperation
+	plan        *api.NVKEInstallPlan
+	publication *api.NVKEInstallPlanCharts
+	tree        *api.NVKEInstallPlanTree
+	workload    *api.NVKEInstallPlanWorkload
+	binding     *api.NVKEInstallPlanImageBinding
+	input       api.NVKEInstallPlanImmutableSource
+	artifactID  string
+}
+
+func reviewNVKEImageBindingSources(cmd *cobra.Command, ctx context.Context, c *api.Client, id string) (*nvkeReviewedImageBindingSources, error) {
+	planID, artifactID, digest := resourceStringFlag(cmd, "plan"), resourceStringFlag(cmd, "artifact"), resourceStringFlag(cmd, "plan-digest")
+	treeID, treeDigest := resourceStringFlag(cmd, "tree"), resourceStringFlag(cmd, "tree-digest")
+	treeVersion, _ := cmd.Flags().GetInt("tree-version")
+	chartID, chartDigest := resourceStringFlag(cmd, "chart-artifact"), resourceStringFlag(cmd, "chart-artifact-digest")
+	version, _ := cmd.Flags().GetInt("plan-version")
+	chartVersion, _ := cmd.Flags().GetInt("chart-artifact-version")
+	workloadID, workloadDigest := resourceStringFlag(cmd, "workload"), resourceStringFlag(cmd, "workload-digest")
+	workloadVersion, _ := cmd.Flags().GetInt("workload-version")
+	bindingID, bindingDigest := resourceStringFlag(cmd, "binding"), resourceStringFlag(cmd, "binding-digest")
+	bindingVersion, _ := cmd.Flags().GetInt("binding-version")
+	if bindingVersion < 1 || !nvkeDigestPattern.MatchString(bindingDigest) {
+		return nil, errors.New("review the exact image-binding version and SHA-256")
+	}
+	identities := map[string]bool{}
+	for _, value := range []string{id, planID, chartID, treeID, artifactID, workloadID, bindingID} {
+		if nvkeGUID(value) != nil || identities[value] {
+			return nil, errors.New("review distinct exact original, plan, chart, tree and workload UUIDs")
+		}
+		identities[value] = true
+	}
+	if workloadVersion < 1 || !nvkeDigestPattern.MatchString(workloadDigest) || version < 1 || chartVersion < 1 || treeVersion < 1 || !nvkeDigestPattern.MatchString(treeDigest) || !nvkeDigestPattern.MatchString(digest) || !nvkeDigestPattern.MatchString(chartDigest) {
+		return nil, errors.New("review exact plan and chart publication versions and SHA-256 digests")
+	}
+	review, source, err := nvkeAgentJobReview(cmd, ctx, c, id)
+	if err != nil {
+		return nil, err
+	}
+	if source.Status != "UNCERTAIN" || source.OperationKey != "tooling.management.install" {
+		return nil, errors.New("immutable artifacts requires the original uncertain management installation")
+	}
+	selected, err := c.NVKEAgentAuthority(ctx, source.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateNVKEAgentReply(selected, api.NVKEAgentReview{SiteID: source.SiteID, ExpectedSiteVersion: review.ExpectedSiteVersion, ExpectedVersion: review.ExpectedAuthorityVersion}, "verify"); err != nil {
+		return nil, err
+	}
+	plan, err := c.ReviewNVKEInstallPlan(ctx, api.NVKEInstallPlanReview{NVKEAgentJobReview: review, PlanID: planID}, false)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateNVKEInstallPlan(plan, source, review, selected, planID); err != nil {
+		return nil, err
+	}
+	if plan.Version != version || plan.Plan.PlanDigest != digest {
+		return nil, errors.New("the prepared plan changed; review before immutable artifacts")
+	}
+	parent := api.NVKEInstallPlanChartsSource{NVKEInstallPlanReview: api.NVKEInstallPlanReview{NVKEAgentJobReview: review, PlanID: planID}, ExpectedPlanVersion: version, PlanDigest: digest}
+	publication, err := c.ReviewNVKEInstallPlanCharts(ctx, api.NVKEInstallPlanChartsReview{NVKEInstallPlanChartsSource: parent, ArtifactID: chartID}, false)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateNVKEInstallPlanCharts(publication, plan, chartID, nvkeChartLimits{}); err != nil {
+		return nil, err
+	}
+	if publication.Version != chartVersion || publication.ArtifactDigest != chartDigest {
+		return nil, errors.New("the prepared chart publication changed; review before immutable artifacts")
+	}
+	input := api.NVKEInstallPlanTreeSource{NVKEInstallPlanChartsSource: parent, ChartArtifactID: chartID, ExpectedChartArtifactVersion: chartVersion, ChartArtifactDigest: chartDigest}
+	tree, err := c.ReviewNVKEInstallPlanTree(ctx, api.NVKEInstallPlanTreeReview{NVKEInstallPlanTreeSource: input, ArtifactID: treeID}, false)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateNVKEInstallPlanTree(tree, plan, publication, treeID, 0); err != nil {
+		return nil, err
+	}
+	if tree.Version != treeVersion || tree.TreeDigest != treeDigest {
+		return nil, errors.New("the execution tree changed; review before immutable artifacts")
+	}
+
+	workloadSource := api.NVKEInstallPlanWorkloadSource{NVKEInstallPlanTreeSource: input, TreeID: treeID, ExpectedTreeVersion: treeVersion, TreeDigest: treeDigest}
+	workload, err := c.ReviewNVKEInstallPlanWorkload(ctx, api.NVKEInstallPlanWorkloadReview{NVKEInstallPlanWorkloadSource: workloadSource, ArtifactID: workloadID}, false)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateNVKEInstallPlanWorkload(workload, plan, publication, tree, workloadID); err != nil {
+		return nil, err
+	}
+	if workload.Version != workloadVersion || workload.WorkloadDigest != workloadDigest {
+		return nil, errors.New("the workload inventory changed; review before preparing immutable artifacts")
+	}
+	bindingSource := api.NVKEInstallPlanImageBindingSource{NVKEInstallPlanWorkloadSource: workloadSource, WorkloadID: workloadID, ExpectedWorkloadVersion: workloadVersion, WorkloadDigest: workloadDigest}
+	binding, err := c.ReviewNVKEInstallPlanImageBinding(ctx, api.NVKEInstallPlanImageBindingReview{NVKEInstallPlanImageBindingSource: bindingSource, ArtifactID: bindingID}, false)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateNVKEInstallPlanImageBinding(binding, plan, publication, tree, workload, bindingID); err != nil {
+		return nil, err
+	}
+	if binding.Version != bindingVersion || binding.BindingDigest != bindingDigest {
+		return nil, errors.New("the reviewed image binding changed")
+	}
+	inputSource := api.NVKEInstallPlanImmutableSource{NVKEInstallPlanImageBindingSource: bindingSource, BindingID: bindingID, ExpectedBindingVersion: bindingVersion, BindingDigest: bindingDigest}
+	return &nvkeReviewedImageBindingSources{review: review, source: source, plan: plan, publication: publication, tree: tree, workload: workload, binding: binding, input: inputSource, artifactID: artifactID}, nil
 }
