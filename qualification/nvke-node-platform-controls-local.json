@@ -8,8 +8,12 @@
     "cmd/nvke_install_plan_node_platforms.go": "bc6aecc80587c94ee10e44743059eae3540e89949fcc512137d70a9f98f46bd4",
     "cmd/nvke_install_plan_node_platforms_test.go": "223957528f87770bbbf40d4620326ec9c4e8f71f798c24510eed493bb76b8356",
     "internal/api/nvke_install_plan_node_platforms.go": "5e60a0f560a9320fe1f1157b0bfd84fb411def05007d4b72a8338def7eabc790",
-    "README.md": "d44d58fb3b8c2f9ee575546a44a94ca8084060cd3c94cf0975a2ee5ebcc96816",
-    "CHANGELOG.md": "aac2e030df05dd967495a1695b3a0ff55cb96c7e00a89725c629d876f09072dd"
+    "README.md": "7a006621ce6ada14c7d5665cdf38f361cefbff60fc25581cf7626b94550d78f4",
+    "CHANGELOG.md": "aac2e030df05dd967495a1695b3a0ff55cb96c7e00a89725c629d876f09072dd",
+    "scripts/integration/test_nvke_install_plan_tree.py": "04872b628c7f4ca62cd9daf33f868bb93d1a0efc29eb2a27a2820805cd2b4c3b",
+    "scripts/integration/node_platform_cli_qualification.py": "b8d7df951bdfcdee20c3fcb4d304e73a6a48af332934c928f1debaa890213119",
+    "scripts/integration/node_platform_browser_qualification.py": "7d575001986d48c89c1c996910665378a5f85f4f572bb7cf4297505546541c2b",
+    "scripts/integration/test_nvke_node_platform_browser.py": "c89fe410f5f796025cefa9269d6c1e96df881dadf3e70782383f4ac2cdb8a4ae"
   },
   "checks": [
     {
@@ -57,7 +61,6 @@
   ],
   "remaining": [
     "real paired CLI/App/Postgres/agent node-stage recovery",
-    "Storybook-first browser surface",
     "source-event refusal investigation",
     "CPU/importer, scheduling, credentials, availability, phase use and linked admission"
   ],
@@ -65,5 +68,16 @@
     "path": "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/astro",
     "sha256": "ddc7929ea1e2e860bd3ca30721a84df51f7dd905e886c70469498b38a78cb1a3",
     "sourceBaseAtBuild": "5cadc07 with the recorded current source file hashes"
+  },
+  "pairedHarness": {
+    "status": "static checks and source preflight passed; native execution pending",
+    "checksPath": "/tmp/astrolift-nvke-node-platform-peer-cli-v1.json",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-peer-cli-v1.exit",
+    "exitCode": 0,
+    "scope": "format, full Go tests, vet, lint, Python syntax and Ruff; final pinned-source validation supports the two tracked relative Go symlinks without following sources outside the selected tree",
+    "sourcePreflightLog": "/tmp/astrolift-nvke-node-platform-source-preflight-v1.log",
+    "sourcePreflightExit": "/tmp/astrolift-nvke-node-platform-source-preflight-v1.exit",
+    "sourcePreflightExitCode": 0,
+    "agentRevision": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
   }
 }

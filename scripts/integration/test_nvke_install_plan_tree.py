@@ -93,6 +93,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "image-binding",
         "image-binding-browser",
         "immutable",
+        "node-platforms",
         "workload-image",
         "workload-image-browser",
     ],
@@ -147,6 +148,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             "image-binding",
             "image-binding-browser",
             "immutable",
+            "node-platforms",
             "workload-image",
             "workload-image-browser",
         }
@@ -158,10 +160,17 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
         )
     )
-    if client in {"image-binding", "image-binding-browser", "immutable"}:
+    if client in {
+        "image-binding",
+        "image-binding-browser",
+        "immutable",
+        "node-platforms",
+    }:
         revision = "c67a6fe84b4653624de1862d5dc27fe3eb35f285"
     if client == "immutable":
         revision = "65a0833"
+    if client == "node-platforms":
+        revision = "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -222,6 +231,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "image-binding",
         "image-binding-browser",
         "immutable",
+        "node-platforms",
         "workload-image",
         "workload-image-browser",
     }:
@@ -246,7 +256,17 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         }
         assert actual == expected
         for name in sorted(expected):
-            assert (source / name).read_bytes() == subprocess.check_output(
+            path = source / name
+            if path.is_symlink():
+                target = os.readlink(path)
+                assert not Path(target).is_absolute()
+                assert path.resolve(strict=True).is_relative_to(
+                    source.resolve() / "kubernetes/nvke"
+                )
+                actual_bytes = os.fsencode(target)
+            else:
+                actual_bytes = path.read_bytes()
+            assert actual_bytes == subprocess.check_output(
                 ["git", "show", revision + ":" + name], cwd=source
             )
     monkeypatch.syspath_prepend(str(source / "kubernetes/nvke"))
@@ -320,6 +340,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding",
                 "image-binding-browser",
                 "immutable",
+                "node-platforms",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -357,7 +378,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 profiles = {}
 
                 def combined_engine(**options):
-                    for key in ("render_profile", "image_profile"):
+                    for key in ("render_profile", "image_profile", "platform_profile"):
                         if key in options:
                             profiles[key] = options[key]
                     return make_engine(**{**profiles, **options})
@@ -371,6 +392,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding",
                 "image-binding-browser",
                 "immutable",
+                "node-platforms",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -391,12 +413,20 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding",
                 "image-binding-browser",
                 "immutable",
+                "node-platforms",
                 "workload-image",
                 "workload-image-browser",
             }:
                 from context_cli_qualification import ContextCapture
 
                 context_capture = ContextCapture(case, native)
+            node_capture = None
+            if client == "node-platforms":
+                from node_platform_cli_qualification import NodePlatformsCapture
+
+                node_capture = NodePlatformsCapture(
+                    case, native, context_capture, image_capture
+                )
             credentials = private_file(
                 "mtls.json",
                 {
@@ -502,6 +532,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "image-binding",
                     "image-binding-browser",
                     "immutable",
+                    "node-platforms",
                     "workload-image",
                     "workload-image-browser",
                 }:
@@ -522,6 +553,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     "image-binding",
                     "image-binding-browser",
                     "immutable",
+                    "node-platforms",
                     "workload-image",
                     "workload-image-browser",
                 }:
@@ -805,6 +837,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "image-binding",
                 "image-binding-browser",
                 "immutable",
+                "node-platforms",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -864,12 +897,18 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                         "image-binding",
                         "image-binding-browser",
                         "immutable",
+                        "node-platforms",
                         "workload-image",
                         "workload-image-browser",
                     }
                     else None,
                 )
-            if client in {"image-binding", "image-binding-browser", "immutable"}:
+            if client in {
+                "image-binding",
+                "image-binding-browser",
+                "immutable",
+                "node-platforms",
+            }:
                 from image_binding_cli_qualification import qualify_image_binding
 
                 binding_summary = qualify_image_binding(
@@ -885,6 +924,19 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     workload_summary,
                     image_summary,
+                    tmp_path,
+                )
+            if node_capture:
+                node_capture.qualify(
+                    run,
+                    private_file,
+                    dropped_cli_replies,
+                    job,
+                    tree_flags,
+                    plan,
+                    tree,
+                    workload_summary,
+                    binding_summary,
                     tmp_path,
                 )
             if client == "immutable":
