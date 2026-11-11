@@ -381,6 +381,35 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 monkeypatch.setattr(
                     native.agent.OperatorAgent, "install_plan", observed_install_plan
                 )
+                if client == "pull-authority":
+                    import resource
+                    import qualify_bootstrap as audit
+
+                    original_descriptors = audit._bundle_descriptors
+
+                    def audit_descriptors(stamps):
+                        before = (
+                            len(os.listdir("/dev/fd"))
+                            if os.path.isdir("/dev/fd")
+                            else None
+                        )
+                        result = original_descriptors(stamps)
+                        if result is None:
+                            print(
+                                "Owned source audit enrollment:",
+                                json.dumps(
+                                    {
+                                        "watchedPaths": len(stamps),
+                                        "openDescriptorsBefore": before,
+                                        "softDescriptorLimit": resource.getrlimit(
+                                            resource.RLIMIT_NOFILE
+                                        )[0],
+                                    }
+                                ),
+                            )
+                        return result
+
+                    monkeypatch.setattr(audit, "_bundle_descriptors", audit_descriptors)
                 make_engine = case.make_engine
                 profiles = {}
 
