@@ -10,6 +10,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from astrolift_clusters.models import NvkeInstallPlanPullAuthority
+from pull_authority_cli_qualification import require_offline_replay
 
 
 def run_pull_authority_browser(
@@ -107,7 +108,8 @@ def run_pull_authority_browser(
     reads_after_prepare = []
 
     def no_cold_collect(*args, **kwargs):
-        assert not restarted, "Cold browser recovery repeated Pod pull collection"
+        if restarted:
+            require_offline_replay(kwargs.get("read_response"))
         return original_collect(*args, **kwargs)
 
     def no_cold_transport(*args, **kwargs):

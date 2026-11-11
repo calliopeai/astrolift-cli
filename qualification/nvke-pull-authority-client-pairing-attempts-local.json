@@ -1,0 +1,127 @@
+{
+  "format": 1,
+  "status": "corrected-pairing-in-progress-not-qualified",
+  "scope": "Compiled pull-observation CLI and browser integration qualification, retained failures and exact offline replay gate",
+  "recordedAt": "2026-11-11T16:02:52.881590+00:00",
+  "sourceParent": "d6209e85d0b0f43786698d6fbed6bb82ca08ba1b",
+  "sourceSha256": {
+    "scripts/integration/pull_authority_cli_qualification.py": "438d5be894b32317743ef03b8496e58e3b74157bc522e1062ed6a1c46e5a35f1",
+    "scripts/integration/pull_authority_browser_qualification.py": "0e3f0465f2ecece57d3ce0b9ce7aa74512b5eea70fa9a9c68e24d23f68113961"
+  },
+  "checks": {
+    "go": [
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "fmt",
+          "./..."
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-pull-clients-go-checks-v2-0.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "test",
+          "./...",
+          "-count=1"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-pull-clients-go-checks-v2-1.log",
+        "logSha256": "6003ae123d4a263c5162c6cb9a4b9adf088891dd6c16e607f4ea8aa9fcebbc28"
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "vet",
+          "./..."
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-pull-clients-go-checks-v2-2.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": [
+          "make",
+          "lint"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-pull-clients-go-checks-v2-3.log",
+        "logSha256": "32c0f2dc5b6bbdd4444d5a65a5c7e8224ee3fb55866900d418f546419aace63a"
+      }
+    ],
+    "pythonStatic": [
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "check",
+          "--select",
+          "E9,F63,F7,F82,F401",
+          "scripts/integration/pull_authority_cli_qualification.py",
+          "scripts/integration/pull_authority_browser_qualification.py"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-pull-replay-static-v1-0.log",
+        "logSha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+      },
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "format",
+          "--check",
+          "scripts/integration/pull_authority_cli_qualification.py",
+          "scripts/integration/pull_authority_browser_qualification.py"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-pull-replay-static-v1-1.log",
+        "logSha256": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938"
+      }
+    ],
+    "tripwire": {
+      "exitCode": 0,
+      "realOfflineReplayAccepted": true,
+      "freshCallbackRefused": true,
+      "sameNameImposterRefused": true,
+      "newNetworkReads": 0
+    }
+  },
+  "attempts": [
+    {
+      "report": "/tmp/astrolift-nvke-pull-authority-clients-native-v1.json",
+      "reportSha256": "869a64a023a39b6684972b9206e2036fbcb2afcf3f3b30b9942b4fea8144207e",
+      "exitCode": 1,
+      "frozenSourcesUnchanged": true,
+      "log": "/tmp/astrolift-nvke-pull-authority-clients-native-v1.log",
+      "logSha256": "100b11df91393a199ff3e2eff225ddce8a85920fc55ff1596d3a2e27a50c5359",
+      "reason": "Runner descriptor limit refused source-watch enrollment during image preparation before the pull stage."
+    },
+    {
+      "report": "/tmp/astrolift-nvke-pull-authority-clients-native-v2.json",
+      "reportSha256": "3ccbb991ee06f8d0ab79a191388838590051d8282b1e9d268eafc89ffee4fe71",
+      "exitCode": 1,
+      "frozenSourcesUnchanged": true,
+      "log": "/tmp/astrolift-nvke-pull-authority-clients-native-v2.log",
+      "logSha256": "997eb1e1dc756b58c48164b8ca696b74497accdb6dc0a4ff3dbf45b16f9aa11d",
+      "reason": "Image and pull preparation completed; cold review was refused because the qualification tripwire blocked collect() even when verify_observation used it for exact offline transcript replay."
+    }
+  ],
+  "correctedGate": [
+    "Allow only the exact nested replay code object in the pinned verify_observation function",
+    "Reject fresh collection and same-name replacement callbacks",
+    "Keep FrozenKubernetesRead construction forbidden during cold recovery",
+    "Assert actual Kubernetes and registry request counts and original parent/native admission records remain unchanged"
+  ],
+  "pendingRun": {
+    "driver": "/tmp/astrolift-nvke-pull-authority-clients-native-v3.py",
+    "pidFile": "/tmp/astrolift-nvke-pull-authority-clients-native-v3.pid",
+    "report": "/tmp/astrolift-nvke-pull-authority-clients-native-v3.json",
+    "sourceManifest": "/tmp/astrolift-nvke-pull-authority-clients-v3-sources.json",
+    "sourceManifestSha256": "bf441fb691832e87925c1d137596ca7d809c49e3aa3e44d3ac5ea2477fb58090"
+  },
+  "limits": [
+    "No complete compiled CLI/App/agent/browser pairing pass is claimed by this checkpoint",
+    "The original runtime Go implementation is unchanged from the clean stamped binary source; only qualification tripwires changed here",
+    "Full NVKE source/runtime/credential/phase-use/linked-admission qualification, final green PRs/merge, deployment/live validation and executable backlog remain pending"
+  ]
+}

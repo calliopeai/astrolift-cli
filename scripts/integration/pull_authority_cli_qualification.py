@@ -3,10 +3,25 @@
 import copy
 import hashlib
 import json
+import types
 from unittest.mock import patch
 from uuid import uuid4
 
 from astrolift_clusters.models import NvkeInstallPlanPullAuthority, NvkeOperation
+
+
+def require_offline_replay(read_response):
+    import management_workload_pull_authority as pulls
+
+    replay_codes = {
+        value
+        for value in pulls.verify_observation.__code__.co_consts
+        if isinstance(value, types.CodeType) and value.co_name == "replay"
+    }
+    assert len(replay_codes) == 1
+    assert getattr(read_response, "__code__", None) in replay_codes, (
+        "Cold recovery attempted fresh Pod collection"
+    )
 
 
 class PullAuthorityCapture:
@@ -125,12 +140,16 @@ class PullAuthorityCapture:
         assert len(attempts) == 1 and (artifact / "index.json").is_file()
         pod_reads = len(self.context.kube.flow.http.requests)
         self.images.restart()
+        original_collect = service.store.pulls.collect
+        offline_replays = []
+
+        def replay_only(*args, **kwargs):
+            require_offline_replay(kwargs.get("read_response"))
+            offline_replays.append(True)
+            return original_collect(*args, **kwargs)
+
         with (
-            patch.object(
-                service.store.pulls,
-                "collect",
-                side_effect=AssertionError("Cold Pod pull recollection"),
-            ),
+            patch.object(service.store.pulls, "collect", side_effect=replay_only),
             patch.object(
                 service.store.transport,
                 "FrozenKubernetesRead",
@@ -151,6 +170,7 @@ class PullAuthorityCapture:
                 )
                 == result
             )
+        assert offline_replays
         assert result["id"] == artifact_id and result["podCount"] == len(self.selected)
         assert result["serviceAccountCount"] == 1 and result["secretCount"] == 1
         assert not result["continuationAuthorized"]
