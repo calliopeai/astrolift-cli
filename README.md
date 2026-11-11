@@ -2056,3 +2056,17 @@ interpretation choice, not observed kubelet configuration. Candidates cover only
 admitted Pod Secrets under the pinned native profile; they do not establish node
 keyrings/plugins, runtime trust, registry authorization, successful pulls,
 availability or linked admission. Continuation stays false.
+
+`astro nvke agent install-plan pull-runtime review OPERATION_GUID` reads historical
+Pod/node pull correspondence from already prepared captures. Supply the normal
+original source flags and `--pull-authority`, `--pull-authority-version`,
+`--pull-authority-digest`, `--artifact` (existing Secret analysis),
+`--analysis-version`, `--analysis-digest`, `--node-platform`,
+`--node-platform-version` and `--node-platform-digest`. The analysis and node
+flags use the analysis authorityDigest and node platformDigest (signed capture
+index digests), rather than their public artifactDigest tags. Output includes both exact
+public parent records, counts, a correspondence digest and historical times.
+The command accepts no private input or recovery journal, never prepares or
+retries a capture, and keeps continuation unauthorized. Registry access, actual
+image availability, ownership/scheduling and linked native admission require
+separate evidence.
