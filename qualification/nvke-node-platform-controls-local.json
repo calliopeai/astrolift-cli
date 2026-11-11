@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "node/platform prepare, review and explicit retry CLI/API controls",
-  "status": "local command/API controls qualified; paired native CLI proof pending",
+  "status": "command/API contracts and actual frozen CLI/App/browser/mTLS recovery qualified at recorded pins",
   "sources": {
     "cmd/nvke_install_plan.go": "b61bd6851e7766677c58a258b4eb3b88b8173b4ce7dfa49ceb217d9ec5e1bc6e",
     "cmd/nvke_install_plan_immutable.go": "6861eb9a8348adba1ca1c1a4855cc045ccf49bdadfb789e4edc15fc5f4564e29",
@@ -60,17 +60,19 @@
     "mandatory unresolved state and continuationAuthorized=false"
   ],
   "remaining": [
-    "real paired CLI/App/Postgres/agent node-stage recovery",
+    "final current-source repinning and Linux agent-route qualification",
     "source-event refusal investigation",
     "CPU/importer, scheduling, credentials, availability, phase use and linked admission"
   ],
   "compiledBinary": {
-    "path": "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser/astro",
-    "sha256": "ddc7929ea1e2e860bd3ca30721a84df51f7dd905e886c70469498b38a78cb1a3",
-    "sourceBaseAtBuild": "5cadc07 with the recorded current source file hashes"
+    "path": "/tmp/astrolift-nvke-node-platform-clients-cli-v1/astro",
+    "sha256": "eeb7dc0a849ab3d4c5002defa7097298f84199f6dc0ba5d58d3499c1d1e35c3c",
+    "sourceRevision": "5da5dae230c4bf24262605a4fe75814eb340b168",
+    "cleanVcsBuild": true,
+    "buildMetadataPath": "/tmp/astrolift-nvke-node-platform-cli-build-v4.json"
   },
   "pairedHarness": {
-    "status": "static checks and source preflight passed; native execution pending",
+    "status": "actual frozen native qualification passed",
     "checksPath": "/tmp/astrolift-nvke-node-platform-peer-cli-v1.json",
     "exitPath": "/tmp/astrolift-nvke-node-platform-peer-cli-v1.exit",
     "exitCode": 0,
@@ -79,5 +81,19 @@
     "sourcePreflightExit": "/tmp/astrolift-nvke-node-platform-source-preflight-v1.exit",
     "sourcePreflightExitCode": 0,
     "agentRevision": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+  },
+  "pairedNative": {
+    "evidence": "nvke-node-platform-cli-browser-native-local.json",
+    "sourcePins": {
+      "app": "34c208745ff96b4a64446986d5cf337693414b5c",
+      "cli": "5da5dae230c4bf24262605a4fe75814eb340b168",
+      "opscode": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+    },
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "runtimeProfiles": 5,
+    "logPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.exit"
   }
 }
