@@ -27,6 +27,21 @@ FIELDS = {
     "prepareNvkeOperatorInstallPlanVerification",
     "reviewNvkeOperatorInstallPlanVerification",
     "recoverNvkeOperatorInstallPlanVerificationPreparation",
+    "prepareNvkeOperatorInstallPlanImage",
+    "reviewNvkeOperatorInstallPlanImage",
+    "recoverNvkeOperatorInstallPlanImagePreparation",
+    "prepareNvkeOperatorInstallPlanWorkload",
+    "reviewNvkeOperatorInstallPlanWorkload",
+    "recoverNvkeOperatorInstallPlanWorkloadPreparation",
+    "prepareNvkeOperatorInstallPlanImageBinding",
+    "reviewNvkeOperatorInstallPlanImageBinding",
+    "recoverNvkeOperatorInstallPlanImageBindingPreparation",
+    "prepareNvkeOperatorInstallPlanImagePayload",
+    "reviewNvkeOperatorInstallPlanImagePayload",
+    "recoverNvkeOperatorInstallPlanImagePayloadPreparation",
+    "prepareNvkeOperatorInstallPlanImmutableExecutionTree",
+    "reviewNvkeOperatorInstallPlanImmutableExecutionTree",
+    "recoverNvkeOperatorInstallPlanImmutableExecutionTreePreparation",
 }
 
 
