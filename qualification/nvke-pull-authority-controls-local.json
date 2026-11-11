@@ -1,0 +1,82 @@
+{
+  "format": 1,
+  "scope": "CLI pull-authority prepare/review/explicit retry and exact private metadata journals",
+  "status": "local-cli-gates-qualified-live-app-pairing-pending",
+  "sourceBaseRevision": "975bf4fc6fe60cb02888525b077a84a6e62b088b",
+  "sources": {
+    "cmd/nvke_install_plan.go": "823c1652d0ffefb0ae9859fdb420bf60b7851280d682cbf1b0273e3050154edf",
+    "cmd/nvke_install_plan_pull_authority.go": "956aa63e9dd19d36b3f190d45e6f4f16ad7de78d64e6ebd832e4fc415c5a5041",
+    "cmd/nvke_install_plan_pull_authority_test.go": "b3fd6d5dce9420457c74dda5d793ab20041411755a4535542b8572dca6536190",
+    "internal/api/nvke_install_plan_pull_authority.go": "fc678dc51730b2a454357947551de30fac530d73cc5e02af0e4fbafb431343e6",
+    "README.md": "69ea7799bd3c1456974b3de70647ab6fc45860ed1aba4bbc4835e16f101ff1dd"
+  },
+  "checks": [
+    {
+      "command": [
+        "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+        "test",
+        "./...",
+        "-count=1"
+      ],
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-pull-authority-cli-v1-0.log",
+      "logSha256": "46456ed7dec01c347ce8a03874d834377ee1cd6e53aef1de760c33beca1e1cb5"
+    },
+    {
+      "command": [
+        "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+        "vet",
+        "./..."
+      ],
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-pull-authority-cli-v1-1.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "make",
+        "lint"
+      ],
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-pull-authority-cli-v1-2.log",
+      "logSha256": "32c0f2dc5b6bbdd4444d5a65a5c7e8224ee3fb55866900d418f546419aace63a"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-pull-authority-cli-v1-3.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "formatter": {
+    "exitCode": 0,
+    "command": "go fmt ./...",
+    "logPath": "/tmp/astrolift-nvke-pull-authority-cli-format-v1.log",
+    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exitMarker": "/tmp/astrolift-nvke-pull-authority-cli-format-v1.exit"
+  },
+  "compiler": "go1.26.11",
+  "verified": [
+    "Explicit namespace/Pod-to-UID map, unique UIDs, canonical byte/call/time limits, native name lengths and strict duplicate/null/unknown-field refusal",
+    "Exact input byte hash and reviewed source metadata persisted in a private exclusive journal before GraphQL preparation; Pod selections omitted from the journal",
+    "Lost reply is never automatically retried; changed input cannot reuse the journal, and historical review/explicit retry accept no private input",
+    "Public GraphQL metadata bound to the original operation/plan/chart/tree/workload/image binding, false continuation, exact digests and consistent bounded counts",
+    "Whole CLI Go tests, go vet, make lint, go fmt and diff checks pass"
+  ],
+  "limits": [
+    "Actual compiled CLI against the App/agent and browser integration remain pending",
+    "These controls record selected admitted-Pod observations, not workload ownership or kubelet/plugin/registry credential correspondence",
+    "Native availability, fresh phase use and linked admission remain mandatory; full NVKE release/merge/CONFLICT deployment not complete"
+  ],
+  "sourceIntegrity": {
+    "exitCode": 0,
+    "pid": 43053,
+    "logPath": "/tmp/astrolift-nvke-pull-integration-cli-integrity-v1.log",
+    "logSha256": "2347bd873143c9b749e3c71929f477a6fd67aacff277b8edfe6a48730e4b1963",
+    "exitMarker": "/tmp/astrolift-nvke-pull-integration-cli-integrity-v1.exit"
+  }
+}
