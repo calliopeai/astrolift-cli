@@ -1920,3 +1920,40 @@ reply preserves the original UUID: use `image-binding review`, then an explicit
 intent under its original caller/token. Results contain only digests, counts,
 verified bytes and observation time. Binding evidence does not authorize native
 continuation or replace operator/platform/credential/import/fresh-use checks.
+
+
+### Immutable phase payloads and execution trees
+
+`astro nvke agent install-plan image-payload prepare|review|retry-preparation` and
+`astro nvke agent install-plan immutable-execution-tree prepare|review|retry-preparation`
+prepare and recover artifacts for the original uncertain management installation.
+Keep the reviewed operation/site/authority, plan, chart, tree and workload flags
+used by `image-binding`, and add `--binding`, `--binding-version` and
+`--binding-digest`. The binding digest is the binding's `bindingDigest`, not its
+public `artifactDigest`. Choose a distinct `--artifact` UUID. Each command reviews
+all parents and the image binding before requesting the selected artifact.
+
+Preparation requires private `--file` input and a private `--request-file`
+metadata journal. Both request kinds contain exactly `format: 1`, `artifactId`,
+`planId`, `planDigest`, `treeId`, `treeDigest`, `bindingId`, `bindingDigest`,
+`maximumBytes` and `timeoutSeconds`. Phase payloads additionally require `item`
+and `maximumResources`. Sealed trees instead require `payloadBindings`: one entry
+for every original phase, including completed phases, keyed by its exact name.
+Each entry contains only `{ "artifactId": "PAYLOAD_UUID", "artifactDigest":
+"PUBLIC_PAYLOAD_ARTIFACT_SHA256" }`. Payload UUIDs must be distinct from each
+other and all parent/output UUIDs. No private file paths or dispatch controls are
+accepted in the request.
+
+Byte budgets are canonical positive decimal strings: at most 67,108,864 for a
+phase payload and 9,223,372,036,854,775,807 for a sealed tree. Payload resource
+budgets are 1–10,000; timeout is 1–300 seconds. Duplicate keys, aliases, unknown
+fields, mismatched sources and malformed summaries are refused. The journal is
+saved before API preparation and contains reviewed source metadata and an input
+hash; it omits phase names and payload selections. Changed input cannot reuse it.
+
+After a lost response, keep the original artifact UUID and use `review` first.
+`retry-preparation` explicitly uses the server's retained encrypted intent under
+the original caller/token. Neither command needs a new private input file.
+Results expose source digests, bounded counts, sizes and observation times. These
+artifacts do not authorize native continuation or release the original uncertainty
+fence; fresh platform, credential, import/use and linked admission checks remain.
