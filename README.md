@@ -1988,3 +1988,13 @@ original encrypted intent and caller/token. No command automatically replays
 preparation. Results expose digests, bounded counts and historical observation
 time. CPU/importer attestation, scheduling, credentials, availability, fresh phase
 use and linked admission remain required; continuation stays unauthorized.
+
+The owned integration case `scripts/integration/test_nvke_node_platform_browser.py`
+qualifies the compiled CLI and production browser recovery controller against
+real persistence and the authenticated native agent. Select the frontend and
+Storybook with `NVKE_TEST_NODE_PLATFORMS_FRONTEND` and
+`NVKE_TEST_NODE_PLATFORMS_STORYBOOK`, and all five compiled selectors with
+`NVKE_TEST_PLATFORM_HELPERS`. The case retains the existing pinned native-tool
+and database fixture requirements. Controlled Node API responses verify transport,
+source binding and cold recovery; they do not attest physical CPUs or importer
+binaries, scheduling, image availability or native admission.
