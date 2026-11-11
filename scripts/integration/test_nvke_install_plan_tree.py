@@ -92,6 +92,7 @@ def asgi_endpoint(settings, dropped_cli_replies):
         "workload-browser",
         "image-binding",
         "image-binding-browser",
+        "immutable",
         "workload-image",
         "workload-image-browser",
     ],
@@ -145,6 +146,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             "workload-browser",
             "image-binding",
             "image-binding-browser",
+            "immutable",
             "workload-image",
             "workload-image-browser",
         }
@@ -156,8 +158,10 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             else "8ad214a1a71f6b082707da5317e20a612a54ae7e"
         )
     )
-    if client in {"image-binding", "image-binding-browser"}:
+    if client in {"image-binding", "image-binding-browser", "immutable"}:
         revision = "c67a6fe84b4653624de1862d5dc27fe3eb35f285"
+    if client == "immutable":
+        revision = "65a0833"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -217,6 +221,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
         "workload-browser",
         "image-binding",
         "image-binding-browser",
+        "immutable",
         "workload-image",
         "workload-image-browser",
     }:
@@ -308,6 +313,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
             if client in {
                 "image-binding",
                 "image-binding-browser",
+                "immutable",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -358,6 +364,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "local-image-browser",
                 "image-binding",
                 "image-binding-browser",
+                "immutable",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -377,6 +384,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "workload-browser",
                 "image-binding",
                 "image-binding-browser",
+                "immutable",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -487,6 +495,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 if image_capture and client not in {
                     "image-binding",
                     "image-binding-browser",
+                    "immutable",
                     "workload-image",
                     "workload-image-browser",
                 }:
@@ -506,6 +515,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 if client in {
                     "image-binding",
                     "image-binding-browser",
+                    "immutable",
                     "workload-image",
                     "workload-image-browser",
                 }:
@@ -788,6 +798,7 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                 "workload-browser",
                 "image-binding",
                 "image-binding-browser",
+                "immutable",
                 "workload-image",
                 "workload-image-browser",
             }:
@@ -846,15 +857,16 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     in {
                         "image-binding",
                         "image-binding-browser",
+                        "immutable",
                         "workload-image",
                         "workload-image-browser",
                     }
                     else None,
                 )
-            if client in {"image-binding", "image-binding-browser"}:
+            if client in {"image-binding", "image-binding-browser", "immutable"}:
                 from image_binding_cli_qualification import qualify_image_binding
 
-                qualify_image_binding(
+                binding_summary = qualify_image_binding(
                     case,
                     image_capture,
                     run,
@@ -867,6 +879,23 @@ def test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry(
                     data,
                     workload_summary,
                     image_summary,
+                    tmp_path,
+                )
+            if client == "immutable":
+                from immutable_cli_qualification import qualify_immutable_artifacts
+
+                qualify_immutable_artifacts(
+                    case,
+                    image_capture,
+                    run,
+                    private_file,
+                    dropped_cli_replies,
+                    job,
+                    tree_flags,
+                    plan,
+                    tree,
+                    workload_summary,
+                    binding_summary,
                     tmp_path,
                 )
             if client == "image-binding-browser":
