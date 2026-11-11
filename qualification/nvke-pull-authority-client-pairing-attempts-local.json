@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "status": "corrected-pairing-in-progress-not-qualified",
+  "status": "frozen-client-pairing-qualified-with-retained-failures",
   "scope": "Compiled pull-observation CLI and browser integration qualification, retained failures and exact offline replay gate",
   "recordedAt": "2026-11-11T16:02:52.881590+00:00",
   "sourceParent": "d6209e85d0b0f43786698d6fbed6bb82ca08ba1b",
@@ -123,5 +123,22 @@
     "No complete compiled CLI/App/agent/browser pairing pass is claimed by this checkpoint",
     "The original runtime Go implementation is unchanged from the clean stamped binary source; only qualification tripwires changed here",
     "Full NVKE source/runtime/credential/phase-use/linked-admission qualification, final green PRs/merge, deployment/live validation and executable backlog remain pending"
-  ]
+  ],
+  "successfulAttempt": {
+    "exitCode": 0,
+    "elapsedSeconds": 2463.95543945767,
+    "sourceManifest": "/tmp/astrolift-nvke-pull-authority-clients-v3-sources.json",
+    "sourceManifestSha256": "bf441fb691832e87925c1d137596ca7d809c49e3aa3e44d3ac5ea2477fb58090",
+    "allFrozenSourcesUnchanged": true,
+    "binary": "/tmp/astrolift-nvke-pull-authority-cli-build-v1/astro",
+    "binarySha256": "ee178da868397fa41c0c86d42cdb6ea1402f2f46104432465bcfc02ab7c3f41f",
+    "realPostgreSQL17": true,
+    "descriptorLimit": 65536,
+    "log": "/tmp/astrolift-nvke-pull-authority-clients-native-v3.log",
+    "clientStage": "pull-authority",
+    "noOriginalInstallationMutationAuthorized": true,
+    "logSha256": "d0797bc5d0a4d952661854b7b4ff3b235d00e85f84f25e27edc9bd2fe371a205",
+    "pytestResult": "1 passed, 4 warnings in 2451.57s"
+  },
+  "successfulAttemptScope": "Actual App persistence/API + SDK/mTLS agent + compiled CLI + Chromium hook/panel; discarded-response and cold offline recovery without recollection. Frozen App b438479b6, Ops b9569418e, CLI runtime 65dcc56 with committed qualification fixture overlays. Does not qualify later keyring executor, full operation-page navigation, native installation admission or deployment."
 }
