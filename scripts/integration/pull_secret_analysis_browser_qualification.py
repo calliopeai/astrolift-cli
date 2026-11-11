@@ -180,9 +180,9 @@ def run_pull_secret_analysis_browser(
     assert row.summary["imageUseCount"] == len(capture.selected)
     assert row.summary["candidateCount"] == len(capture.selected)
     assert row.summary["missingReferenceCount"] == 0
-    assert row.summary["pullAuthorityId"] == pull["id"]
-    assert row.summary["pullAuthorityVersion"] == pull["version"]
-    assert row.summary["pullAuthorityDigest"] == pull["authorityDigest"]
+    assert row.source_binding["pull_authority"] == pull["id"]
+    assert row.source_binding["pull_authority_version"] == pull["version"]
+    assert row.source_binding["pull_authority_digest"] == pull["authorityDigest"]
     assert row.summary["analyzedAt"] == report["analyzedAt"]
     assert row.summary["sourceObservedAt"] == report["sourceObservedAt"]
     assert row.summary["continuationAuthorized"] is False
