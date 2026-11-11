@@ -2025,3 +2025,34 @@ Storybook with `NVKE_TEST_NODE_PLATFORMS_FRONTEND` and
 and database fixture requirements. Controlled Node API responses verify transport,
 source binding and cold recovery; they do not attest physical CPUs or importer
 binaries, scheduling, image availability or native admission.
+### Private Secret candidate interpretation
+
+`astro nvke agent install-plan pull-secret-analysis prepare|review|retry-preparation`
+adds `--pull-authority`, `--pull-authority-version` and `--pull-authority-digest`
+to the exact original/plan/chart/tree/workload/image-binding flags above. Use the
+prepared pull observation's `authorityDigest` and a distinct `--artifact` UUID.
+
+Preparation takes private `--file` JSON (or `-` for stdin) and a private
+`--request-file` metadata journal. The JSON contains exactly `format: 1`,
+`artifactId`, `planId`, `planDigest`, `treeId`, `treeDigest`, `bindingId`,
+`bindingDigest`, `pullAuthorityId`, `pullAuthorityDigest`, `imageSelections`,
+`maximumBytes`, `maximumHelperBytes` and `timeoutSeconds`. Each of 1–1,024 image
+selections contains exactly `podKey` (`namespace/pod-name`), `imagePointer`
+(`/spec/containers/N/image`, `/spec/initContainers/N/image` or
+`/spec/ephemeralContainers/N/image`) and an explicit boolean
+`ensureSecretPulledImages`. Image uses must be distinct. Both byte budgets are
+canonical positive decimal strings up to 67,108,864; the per-helper output budget
+cannot exceed the total budget. Timeout is an integer from 1–300 seconds.
+
+The fsynced journal binds the parent observation, exact input-byte SHA and source
+metadata without retaining image selections or credentials. After a lost reply,
+preserve the artifact ID and journal and use `review`. Explicit
+`retry-preparation` uses the original encrypted server intent; review and retry
+accept no new input file. Changed input bytes or parent metadata refuse reuse.
+
+Output contains only source metadata, capture/interpretation times and image-use,
+candidate and missing-reference counts. The feature setting is an explicit
+interpretation choice, not observed kubelet configuration. Candidates cover only
+admitted Pod Secrets under the pinned native profile; they do not establish node
+keyrings/plugins, runtime trust, registry authorization, successful pulls,
+availability or linked admission. Continuation stays false.
