@@ -1,0 +1,76 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-13T04:15:26.464781+00:00",
+  "scope": "Exact containerd/v2.3.4 node-platform request validation",
+  "status": "full-local-cli-gates-qualified-live-234-pairing-pending",
+  "checks": {
+    "exitCode": 0,
+    "checks": [
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "fmt",
+          "./..."
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-containerd-234-cli-checks-v1.0.log"
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "vet",
+          "./..."
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-containerd-234-cli-checks-v1.1.log"
+      },
+      {
+        "command": [
+          "make",
+          "lint"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-containerd-234-cli-checks-v1.2.log"
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "test",
+          "./...",
+          "-count=1"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-containerd-234-cli-checks-v1.3.log"
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "build",
+          "-o",
+          "/tmp/astrolift-nvke-containerd-234-cli-checks-v1-astro",
+          "."
+        ],
+        "exitCode": 0,
+        "log": "/tmp/astrolift-nvke-containerd-234-cli-checks-v1.4.log"
+      }
+    ],
+    "sourcesUnchanged": true,
+    "sourceFiles": 354,
+    "elapsedSeconds": 846.4708474995568
+  },
+  "coverage": [
+    "Accept explicit 2.3.4 alongside the five existing exact profiles",
+    "Refuse unqualified neighboring 2.3.3/2.3.5 and unknown profiles before transport",
+    "Keep exact UIDs, private request journals, budgets and immutable parent pins unchanged",
+    "All Go packages tested, complete vet, lint zero issues and CLI build passed"
+  ],
+  "sourceSha256": {
+    "cmd/nvke_install_plan_node_platforms.go": "d0fc850dba3e61bba6904ad93e99ac87d3ff8a295f5081a5ff33476c1fa7163a",
+    "cmd/nvke_install_plan_node_platforms_test.go": "de4a5d4dc20e8eb54852477cae76d57409da0d758d829e2bd4bdf4898424e1ba",
+    "README.md": "f5386ed57ed6060c090dd0adaea6e9eaf6c07dfb68fe1412c52f0ed1d0d930df"
+  },
+  "limits": [
+    "No live containerd 2.3.4 daemon/Node pairing established by these controlled CLI checks",
+    "Final component alignment, source activation, release merge and deployment remain pending"
+  ]
+}

@@ -1999,7 +1999,7 @@ The input contains exactly `format: 1`, `artifactId`, `planId`, `planDigest`,
 and `timeoutSeconds`. Each node entry contains exactly `uid`, `runtimeProfile`
 and `platform`. Platform requires `os`/`architecture`, with optional `variant`,
 `os.version` and string-array `os.features`. Node UIDs must be distinct. Supported
-profiles are containerd 2.3.0, 2.3.7, 2.2.3, 2.1.7 and 1.7.31, named
+profiles are containerd 2.3.0, 2.3.4, 2.3.7, 2.2.3, 2.1.7 and 1.7.31, named
 `containerd/v<version>`.
 
 All byte limits are canonical positive decimal strings. Image/helper budgets
