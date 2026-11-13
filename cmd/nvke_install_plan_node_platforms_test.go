@@ -91,22 +91,24 @@ func TestNVKENodePlatformsStrictScopeAndBudgets(t *testing.T) {
 	if err != nil || parsed.MaximumImageBytes != "9007199254740993" || parsed.MaximumHelperBytes != "9223372036854775807" {
 		t.Fatalf("exact large budgets changed: %v", err)
 	}
-	for _, profile := range []string{"containerd/v2.3.0", "containerd/v2.3.7", "containerd/v2.2.3", "containerd/v2.1.7", "containerd/v1.7.31"} {
+	for _, profile := range []string{"containerd/v2.3.0", "containerd/v2.3.4", "containerd/v2.3.7", "containerd/v2.2.3", "containerd/v2.1.7", "containerd/v1.7.31"} {
 		if _, err := parseNVKENodePlatformsBody([]byte(strings.Replace(body, "containerd/v2.3.0", profile, 1))); err != nil {
 			t.Fatal(profile, err)
 		}
 	}
 	cases := map[string]string{
-		"alias":        strings.Replace(body, `"uid":`, `"UID":`, 1),
-		"profile":      strings.Replace(body, "containerd/v2.3.0", "containerd/v99", 1),
-		"duplicate":    strings.Replace(body, `"uid":"private-uid"`, `"uid":"private-uid","uid":"private-uid"`, 1),
-		"null-feature": strings.Replace(body, `"os.features":["owned"]`, `"os.features":[null]`, 1),
-		"null-variant": strings.Replace(body, `"variant":"v8"`, `"variant":null`, 1),
-		"calls":        strings.Replace(body, `"maximumCalls":512`, `"maximumCalls":7`, 1),
-		"calls-type":   strings.Replace(body, `"maximumCalls":512`, `"maximumCalls":true`, 1),
-		"decimal":      strings.Replace(body, `"maximumImageBytes":"9007199254740993"`, `"maximumImageBytes":"01"`, 1),
-		"bytes-type":   strings.Replace(body, `"maximumImageBytes":"9007199254740993"`, `"maximumImageBytes":9007199254740993`, 1),
-		"path":         strings.Replace(body, `"variant":"v8"`, `"helperProgram":"/PRIVATE"`, 1),
+		"alias":           strings.Replace(body, `"uid":`, `"UID":`, 1),
+		"profile":         strings.Replace(body, "containerd/v2.3.0", "containerd/v99", 1),
+		"unqualified-233": strings.Replace(body, "containerd/v2.3.0", "containerd/v2.3.3", 1),
+		"unqualified-235": strings.Replace(body, "containerd/v2.3.0", "containerd/v2.3.5", 1),
+		"duplicate":       strings.Replace(body, `"uid":"private-uid"`, `"uid":"private-uid","uid":"private-uid"`, 1),
+		"null-feature":    strings.Replace(body, `"os.features":["owned"]`, `"os.features":[null]`, 1),
+		"null-variant":    strings.Replace(body, `"variant":"v8"`, `"variant":null`, 1),
+		"calls":           strings.Replace(body, `"maximumCalls":512`, `"maximumCalls":7`, 1),
+		"calls-type":      strings.Replace(body, `"maximumCalls":512`, `"maximumCalls":true`, 1),
+		"decimal":         strings.Replace(body, `"maximumImageBytes":"9007199254740993"`, `"maximumImageBytes":"01"`, 1),
+		"bytes-type":      strings.Replace(body, `"maximumImageBytes":"9007199254740993"`, `"maximumImageBytes":9007199254740993`, 1),
+		"path":            strings.Replace(body, `"variant":"v8"`, `"helperProgram":"/PRIVATE"`, 1),
 	}
 	for name, value := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -119,7 +119,7 @@ func parseNVKENodePlatformsBody(text []byte) (nvkeNodePlatformsBody, error) {
 	if json.Unmarshal(fields["nodePlatforms"], &rows) != nil {
 		return body, invalid
 	}
-	profiles := map[string]bool{"containerd/v2.3.0": true, "containerd/v2.3.7": true, "containerd/v2.2.3": true, "containerd/v2.1.7": true, "containerd/v1.7.31": true}
+	profiles := map[string]bool{"containerd/v2.3.0": true, "containerd/v2.3.4": true, "containerd/v2.3.7": true, "containerd/v2.2.3": true, "containerd/v2.1.7": true, "containerd/v1.7.31": true}
 	uids := map[string]bool{}
 	for name, row := range rows {
 		selected := body.NodePlatforms[name]
