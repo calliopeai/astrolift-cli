@@ -1,0 +1,8 @@
+[ingress]
+class = "envoy"
+
+[ingress.auth]
+kind = "oidc"
+auth_proxy_host = "auth.astro.conflict.cloud"
+discovery_url = "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_xU96Y7DAg/.well-known/openid-configuration"
+client_id = "1unkru25uqbon23mnhj2cpv3hd"
