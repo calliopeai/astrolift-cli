@@ -1,0 +1,51 @@
+{
+  "format": 1,
+  "scope": "actual-local-image-browser-cli-app-postgres-pinned-agent-recovery",
+  "status": "one-real-browser-api-native-case-qualified",
+  "nativeRevision": "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22",
+  "frontendRevision": "3a9e35e52",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "b135eba1bc89391221993d9dda6998f86611c18de18e325464140faf75ed651e",
+    "scripts/integration/image_cli_qualification.py": "2b0be64f387c5dcd108979afcbf7590b4b3e271fbafb0c5f18b73337b9b04e13",
+    "scripts/integration/local_image_browser_qualification.py": "2b30e7de6dde81740d469d9afc5d90d9734abd5cb5f148f4fedf4e6ce77d5a3b"
+  },
+  "binarySha256": "fa49094a39606e300483bfb09bcd690e4b97eb8d0533c45dd254498bb5ed1080",
+  "checks": {
+    "sessionId": 61055,
+    "logPath": "/tmp/astrolift-nvke-local-image-browser-app-agent.log",
+    "logSha256": "989f89149471d65f7d4bbbf17e4083b1d317f6d82d71300dadc9ffd1f7f464b1",
+    "exitMarker": "/tmp/astrolift-nvke-local-image-browser-app-agent.exit",
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "seconds": 1589.37,
+    "privateBrowserLogPath": "/private/var/folders/c8/l3r0mzqx13dgdr6t5mn3gpjh0000gn/T/pytest-of-ragelink/pytest-7777/test_compiled_cli_tree_prepare0/local-image-browser-private.log",
+    "privateBrowserLogSha256": "49b243f539a4837584c35d38fe3ada85d66e708cab691ccc39ebff12259b38db"
+  },
+  "browserReport": {
+    "passed": true,
+    "sourceKind": "local",
+    "calls": [
+      "PrepareNvkeInstallPlanImage",
+      "ReviewNvkeInstallPlanImage",
+      "RetryNvkeInstallPlanImage"
+    ],
+    "artifactDigest": "621f2c5a126c481c2772c8920156ed4f4d31c046fc56687e05e8355cd68bf730",
+    "captureDigest": "56d5dd57b8535b9f73efe581dd293eb4ff3c91311c4cdf15d452394e170528c1",
+    "rootDigest": "sha256:87b21c12b6f6cb90b8d2a60827387e2b0ddccc1a7de631465970fb61ed41bf0b",
+    "observedAt": "2026-11-10T11:30:33.994948+00:00",
+    "pageErrors": []
+  },
+  "coverage": [
+    "Compiled CLI parent/local-image recovery followed by Chromium through actual App API, Postgres, SDK and exact native mTLS agent.",
+    "Lost browser prepare reply; metadata-only reload without RPC; explicit historical review and retained retry, three browser RPCs total.",
+    "One image work attempt, same evidence/time, local source kind, no registry transport/profile.",
+    "Original operation/receipt/guard, runs, parent database rows and native plan/chart/tree stores unchanged; no admission links."
+  ],
+  "limits": [
+    "Storybook hook/panel with private loopback API forwarding, not a production Next login/route acceptance test.",
+    "Controlled original-failure and dependency setup; not a complete production installation.",
+    "Workload/platform/credential closure, import/rewrite, phase-use proof and linked admission remain pending.",
+    "No main merge or deployment."
+  ]
+}

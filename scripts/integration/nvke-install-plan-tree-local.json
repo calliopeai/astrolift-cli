@@ -1,0 +1,34 @@
+{
+  "format": 1,
+  "scope": "compiled-cli-asgi-postgresql-mtls-execution-tree-recovery-local-qualification",
+  "cliSourceRevision": "c641f4c010d1cc5783b49d9590d572b9aaddf93c",
+  "applicationRevision": "532e6e1073c46b5dd6cdb30f3c76e750d32b57ce",
+  "opscodeRevision": "b0f9d26dd5467d97eef92d6d728dca33e0bf5777",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "b60b4e19ea91d6da4cb3856aaced3cf0991dcb782cf712bf84f0f0ea2a6137ee"
+  },
+  "compiledBinarySha256": "e33e04aef89c69a1e8bd78f2b5b458deb7df882bb98fbab97b5a433db15a48bb",
+  "checks": {
+    "passed": 1,
+    "skipped": 0,
+    "exitCode": 0,
+    "logSha256": "f81d0630e0cce4de8bb658f1409d79d44cb53c7c4c0641c499a041a580e171a4",
+    "pythonRuff": "passed",
+    "agentTimeoutSeconds": 300
+  },
+  "evidence": [
+    "Compiled astro commands use an actual ASGI application, PostgreSQL, scoped bearer token and owned mTLS native operator. Plan and chart publication use actual Helm 4 and the snapshot-built chart helper with controlled generated deployment/Kubernetes reads.",
+    "Tree preparation writes its private metadata-only recovery journal before the GraphQL request. Deliberately discarding the successful application reply preserves a prepared database row and published agent tree without automatic replay.",
+    "Cold restart preserves the owned operator endpoint and instance. Compiled tree review and explicit original-token private retry return the same tree metadata and create no new tree attempt.",
+    "Complete original operation, plan and chart database rows, native receipt, install guard, run directory membership and empty linked reservations remain unchanged."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "Controlled local native receipt/deployment and Kubernetes observations do not qualify retained Linux installation or actual browser/API tree controls.",
+    "The fixture selects the supported 300-second agent timeout and permits the private CLI request deadline; default 30-second agent timing is not qualified by this scenario.",
+    "Native rendering, image closure/private registry policy, fresh skipped-resource/credential proof, remaining-only selection and linked once-only execution remain open.",
+    "No original native replay, VM restart, main merge or production deployment."
+  ]
+}

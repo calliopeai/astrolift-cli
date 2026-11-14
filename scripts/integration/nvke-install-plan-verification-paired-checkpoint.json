@@ -1,0 +1,119 @@
+{
+  "format": 1,
+  "scope": "actual-compiled-cli-app-agent-verification-acceptance-harness",
+  "status": "actual-compiled-cli-app-native-verification-acceptance-passed",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "2f8b03588600c35643ba581d24ec0dfaf25177473ab94354db71fb9131e7315b",
+    "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
+    "scripts/integration/context_cli_qualification.py": "6aa6ead768ae1755ef6ddc3c9125716cb6e23d8b875114ced2f76662eb279309"
+  },
+  "agentRevision": "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38",
+  "binary": {
+    "exitCode": 0,
+    "path": "/tmp/astrolift-nvke-verification-cli-built-v1/astro",
+    "sha256": "9ab936a04b50a5b5402f1d6393e25afeedae7b07972c0d014f2ac703a51c8849"
+  },
+  "checks": {
+    "pythonSyntax": "both changed drivers parse",
+    "ruff": "both changed drivers passed",
+    "collection": {
+      "exitCode": 0,
+      "selectedNode": "test_nvke_install_plan_tree.py::test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry[verification]",
+      "logSha256": "739ba0a08f274e3adf9ab344b26231f01f6974d58612974d73f1e11441305cfe"
+    },
+    "actualAcceptance": {
+      "status": "failed",
+      "sessionId": 62575,
+      "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v1.exit",
+      "database": "test_astro_nvke_verification_20261109",
+      "scope": "No verification acceptance claimed. Diagnose repeated SDK source traversal, qualify bounded complete source snapshots, then rerun unchanged timeout with metadata-only request timings.",
+      "exitCode": 1,
+      "failureStage": "context prepare before verification",
+      "reason": "compiled CLI harness subprocess exceeded existing 380-second budget"
+    },
+    "requestTimingPrivacy": {
+      "exitCode": 0,
+      "testsPassed": 2,
+      "logPath": "/tmp/astrolift-nvke-verification-request-timing-privacy.log"
+    },
+    "actualAcceptanceV2": {
+      "status": "failed",
+      "sessionId": 74407,
+      "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v2.exit",
+      "timingPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v2-timings.jsonl",
+      "database": "test_astro_nvke_verification_20261109",
+      "appSourceRevision": "471e10d05",
+      "agentRevision": "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38",
+      "processTimeoutSeconds": 380,
+      "sourceSha256": {
+        "scripts/integration/test_nvke_install_plan_tree.py": "b5a42f5a40c2356bc06c2f18bf154b8dfb18cd2047cda1a41b8ec260f91e6da6",
+        "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7",
+        "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
+        "scripts/integration/test_nvke_contracts.py": "0e484ecab149ba46825ab9161179255ce42a67206c1d748b7fbfc5690fd79198",
+        "scripts/integration/request_timing_qualification.py": "f0a82fe07340d391fe18390f008ce87a8e7e00261c2ff09ee4ae1875a9aff7f4"
+      },
+      "scope": "Real unchanged-timeout acceptance with 123-to-39 SDK graph traversal reduction. Native setup diagnosis succeeded but 292 seconds versus 300-second context budget leaves a remaining hot path; no acceptance claim until terminal success.",
+      "exitCode": 1,
+      "failureStage": "compiled CLI context preparation preflight, before verification acceptance",
+      "reason": "Retained source review calls consume the unchanged process budget before context collection; exact ASGI timing evidence retained.",
+      "logSha256": "f6ade9a469c77ba258cda1f32290c262e799bee5bd482f7ac69b989f1f886c76",
+      "sourceReviewTimings": [
+        {
+          "field": "reviewNvkeOperatorInstallPlanTree",
+          "seconds": 167.383,
+          "status": 200,
+          "completed": true,
+          "dropped": false
+        },
+        {
+          "field": "reviewNvkeOperatorInstallPlanTree",
+          "seconds": 238.736,
+          "status": 200,
+          "completed": true,
+          "dropped": false
+        },
+        {
+          "field": "astroliftNvkeOperatorInstallPlanItemPage",
+          "seconds": 60.108,
+          "status": null,
+          "completed": true,
+          "dropped": false
+        }
+      ]
+    },
+    "actualAcceptanceV3": {
+      "status": "passed",
+      "sessionId": 24419,
+      "logPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v3.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-cli-app-paired-v3.exit",
+      "timingPath": "/tmp/astrolift-nvke-verification-cli-app-paired-v3-timings.jsonl",
+      "database": "test_astro_nvke_verification_20261109",
+      "appSourceRevision": "06d9cad1f",
+      "agentSourceRevision": "c93fe5f5dcafd870dd6d34211a4a034b600b1b70",
+      "processTimeoutSeconds": 380,
+      "sourceSha256": {
+        "scripts/integration/test_nvke_install_plan_tree.py": "9a0b150e7c176751bcfd7b48341518e16ac4c77fade48d30782a99426cb9c531",
+        "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
+        "scripts/integration/verification_cli_qualification.py": "996c2f7f771bbdf5579cc87b4edde954cc1c973529be9ba7991ddf3395b815f7"
+      },
+      "scope": "Actual compiled CLI/App/PostgreSQL/native mTLS after all 64 agent tests and both current-runtime SDK mTLS cases passed. Native context fixture now observed at 21.535 seconds; all original timeout/authority/source/budget checks remain unchanged.",
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 518.89,
+      "logSha256": "3b583937364ab21cf5d1301336d932b5248251e460e6bd4b19c050438eca5051"
+    }
+  },
+  "implemented": [
+    "The explicit verification scenario pins new native runtime/helper source files while preserving all older scenario pins. It prepares actual native parent/context artifacts through the compiled CLI and real App/agent/Kubernetes path.",
+    "A discarded App preparation reply must leave a prepared App/native record, one native attempt and an exact metadata-only CLI journal. Same-endpoint cold restart and explicit historical read/private retry must not recollect.",
+    "Acceptance checks signed index digest, capture/context/chart/source metadata, unchanged original full App/native records/guard and parent/context snapshots."
+  ],
+  "remaining": [
+    "Actual browser/App/native verification acceptance is running separately. Full surface/live/resource/credential/schema/image/admission and release work remain open.",
+    "No paired acceptance or live production proof is claimed by static checks or collection."
+  ],
+  "continuationAuthorized": false
+}

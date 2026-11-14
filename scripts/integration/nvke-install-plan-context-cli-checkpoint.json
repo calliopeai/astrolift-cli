@@ -1,0 +1,81 @@
+{
+  "format": 1,
+  "scope": "compiled-cli-authenticated-render-context-checkpoint",
+  "status": "local-cli-qualified",
+  "baseRevision": "6d7f3d96342734fe993c3a8165fd27e4b09fb203",
+  "sourceSha256": {
+    "cmd/nvke_install_plan_context.go": "f5a852c8c0f244a7076662a13d644aec6f679e63b778e129abaa0086b000903b",
+    "cmd/nvke_install_plan_context_test.go": "37af355748ef53aa99b20533c913ebfded02bcb5c31435637670d2332d4ab9e3",
+    "cmd/nvke_install_plan.go": "cd5712f849b0f33465f8616097cfb493b10e8065afed5f52255a6a3800303584",
+    "cmd/nvke_metrics_test.go": "757f4f0cc5d62fef8a453e65f2b7dcd1ff89a86ba36528aaa97b62fc517abddb",
+    "internal/api/nvke_install_plan_context.go": "79b8c903a954897ce06b62548ad417f0f8dce32a241c2c0b83b757229acf41e6",
+    "internal/api/nvke_install_plan_test.go": "68f6cd8ead96d936ecd1c4ff4f3f36e8966a6919b997b752881987adb293a67e",
+    "README.md": "5c4e58b96ef355886001480b12b307e7a2d71a28881dbbcf59713ce56e4e9f03"
+  },
+  "checks": {
+    "focused": {
+      "exitCode": 0,
+      "passedCasesIncludingSubtests": 73,
+      "logSha256": "27553d002d8df937b34dbfe87ee2e30074db1fea701887c14b1077f0fd76ff0d"
+    },
+    "initialFull": {
+      "exitCode": 1,
+      "failure": "The existing metrics public-file fixture was created as mode 0600 under umask 077, so the expected rejection was not exercised. Explicit chmod(0644) fixes the fixture; production private credential validation is unchanged. Vet/lint/build were not reached in this run.",
+      "logSha256": "b25bde4009fe25a6428081e2bf2b4ba0fef1f934ea8c8ff04d32b60db590ab59"
+    },
+    "fixtureCorrection": {
+      "exitCode": 0,
+      "scope": "All preserve/clear/reject metrics credential cases pass under umask 077 after explicit public-fixture chmod.",
+      "logSha256": "6c61dc8aaf6f61282a6ab27c79bff26f2475bcd9f973718b785591cd65b09a5b"
+    },
+    "finalFull": {
+      "status": "passed",
+      "topLevelPassed": 1054,
+      "passedCasesIncludingSubtests": 2175,
+      "skipped": 2,
+      "testAndVetLogSha256": "00355dfae7fe61d4c4710d67bdf31bef042aa67bdf042612725cae91bc127c45",
+      "initialLintLaunchFailure": "make could not find golangci-lint in PATH; no linter diagnostics were produced. The existing /tmp/astrolift-nvke-tools/golangci-lint is selected for the remaining stages.",
+      "completionMarker": "/tmp/astrolift-nvke-context-cli-finalize.exit",
+      "logPath": "/tmp/astrolift-nvke-context-cli-finalize.log",
+      "testExitCode": 0,
+      "vetExitCode": 0,
+      "lintExitCode": 0,
+      "buildExitCode": 0,
+      "diffCheckExitCode": 0,
+      "lintTool": "/tmp/astrolift-nvke-tools/golangci-lint",
+      "lintToolVersion": "2.15.0",
+      "lintBuildLogSha256": "a8231841e039b390bf45d78d7bf75332a57517adfd6ed77a3dae6c4ced163420"
+    },
+    "nativeOptIns": {
+      "exitCode": 0,
+      "passed": 2,
+      "skipped": 0,
+      "tests": [
+        "TestNVKEToolingRealRunThroughCobra",
+        "TestRealPreparedNativeBundle"
+      ],
+      "scope": "Actual pinned native version and bootstrap-manifest utilities through the runner, including Cobra output/private-artifact handling; no infrastructure operation.",
+      "logSha256": "fbdc99e9b7385c192fc3a27b68b0fd80a4237af9c88312486aad0658db3a7786"
+    },
+    "combinedGoCoverage": {
+      "topLevelPassed": 1056,
+      "remainingOptInSkips": 0,
+      "scope": "Union of the full 1054-pass suite and the two explicitly enabled native-utility cases on byte-identical sources."
+    }
+  },
+  "builtCli": {
+    "path": "/tmp/astrolift-nvke-context-cli-built-v1/astro",
+    "sha256": "cb3795abe8cd8faa9e3ac1374cd76e437eb7f340ecb7e2651589b9d05655e975"
+  },
+  "implemented": [
+    "Context prepare/review/retry-preparation commands use the exact original operation/site/authority, reviewed plan/chart/tree versions and digests, Helm item and original ordinal.",
+    "Source-bound server paging confirms the exact Helm item before private capture. Scalar bounds and native item names are checked; decimal revision above 2^53 retains precision.",
+    "An owner-only metadata journal binds exact input bytes and source before POST. Unknown/duplicate/aliased fields, null mode/limits, unsafe budgets, source drift and changed journals refuse.",
+    "Lost replies preserve the identity and journal without automatic replay. Read/retry send no private input; server retry requires original actor/token. Results reject private, unbound, truncated or authorizing data."
+  ],
+  "continuationAuthorized": false,
+  "remaining": [
+    "Qualify actual compiled CLI -> App API -> agent/Kubernetes mTLS/frozen-helper capture, lost reply and cold recovery.",
+    "Finish Storybook/UI integration, legacy agent timeout diagnosis, phase/schema/image closure, linked admission, retained live acceptance, review/merge and deployment."
+  ]
+}

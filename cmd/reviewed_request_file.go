@@ -16,20 +16,21 @@ import (
 // reviewedStartRequest is metadata only. Inputs and bearer credentials never
 // belong in this recovery record; the server owns the encrypted frozen inputs.
 type reviewedStartRequest struct {
-	Format            int    `json:"format"`
-	Kind              string `json:"kind"`
-	Server            string `json:"server"`
-	OrganizationID    string `json:"organizationId"`
-	ActorUserID       int    `json:"actorUserId"`
-	TargetID          string `json:"targetId"`
-	TargetName        string `json:"targetName"`
-	RequestID         string `json:"requestId"`
-	Version           int    `json:"version,omitempty"`
-	Ref               string `json:"ref,omitempty"`
-	Revision          string `json:"revision,omitempty"`
-	InputSchemaDigest string `json:"inputSchemaDigest,omitempty"`
-	IntervalSeconds   int    `json:"intervalSeconds,omitempty"`
-	ExpectedSource    string `json:"expectedSource,omitempty"`
+	NVKESource        *api.NVKEResourceSource `json:"nvkeSource,omitempty"`
+	Format            int                     `json:"format"`
+	Kind              string                  `json:"kind"`
+	Server            string                  `json:"server"`
+	OrganizationID    string                  `json:"organizationId"`
+	ActorUserID       int                     `json:"actorUserId"`
+	TargetID          string                  `json:"targetId"`
+	TargetName        string                  `json:"targetName"`
+	RequestID         string                  `json:"requestId"`
+	Version           int                     `json:"version,omitempty"`
+	Ref               string                  `json:"ref,omitempty"`
+	Revision          string                  `json:"revision,omitempty"`
+	InputSchemaDigest string                  `json:"inputSchemaDigest,omitempty"`
+	IntervalSeconds   int                     `json:"intervalSeconds,omitempty"`
+	ExpectedSource    string                  `json:"expectedSource,omitempty"`
 }
 
 func reviewedRequestScope(cmd *cobra.Command, client *api.Client) (string, int, error) {
@@ -48,7 +49,7 @@ func reviewedRequestScope(cmd *cobra.Command, client *api.Client) (string, int, 
 }
 
 func (r reviewedStartRequest) checkScope(kind, server, org string, actor int) error {
-	if r.Format != 1 || r.Kind != kind || r.Server != server || r.OrganizationID != org || r.ActorUserID != actor {
+	if (r.NVKESource != nil && kind != nvkeResourceRequestKind) || r.Format != 1 || r.Kind != kind || r.Server != server || r.OrganizationID != org || r.ActorUserID != actor {
 		return errors.New("request file belongs to another server, organization, actor or command; use its original scope to reconcile")
 	}
 	if _, err := uuid.Parse(r.RequestID); err != nil {

@@ -1,0 +1,122 @@
+{
+  "format": 1,
+  "scope": "source-bound-workload-inventory-cli-controls",
+  "status": "local-client-and-actual-api-native-cli-browser-workload-recovery-qualified-release-incomplete",
+  "sourceSha256": {
+    "README.md": "794bcc38747e7eaff656455a66e574111b4b0bb26a9599e94cd683be9d042d60",
+    "cmd/nvke_install_plan.go": "7940a3a3cbd537f171d35a508084ef536bffa66e271f3734fcc1d446cb5e8207",
+    "cmd/nvke_install_plan_workload.go": "4d85eda397194fda98aea87c7343b3aff101b4dde7713c66f74732571796448e",
+    "cmd/nvke_install_plan_workload_test.go": "b9daa00ca551b60b0dc5e02dbb636176b86945c417ed13bc810db0798037e784",
+    "internal/api/nvke_install_plan_workload.go": "dbc49f51d68b91a524b4e51526894561e2ced4365daa9133fb36e9f408e30a0c"
+  },
+  "checks": {
+    "focused": {
+      "sessionId": 54728,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-focused-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-focused-v2.log",
+      "logSha256": "ce7ed8406daeb34778e12c82cce32956f1ea67ebe327abe674487d319095ddbb"
+    },
+    "fullTest": {
+      "sessionId": 25548,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-test-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-test-v2.log",
+      "logSha256": "ddce918e477610e0004bcf18804e93af24b9d9202efa86c9767a997f3a99b58a"
+    },
+    "vet": {
+      "sessionId": 25548,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-vet-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-vet-v2.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "lint": {
+      "sessionId": 25548,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-lint-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-lint-v2.log",
+      "logSha256": "32c0f2dc5b6bbdd4444d5a65a5c7e8224ee3fb55866900d418f546419aace63a"
+    },
+    "build": {
+      "sessionId": 25548,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-build-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-build-v2.log",
+      "logSha256": "6a1cb113362c36685f6d1ddd090acd91ea6c9fe855ac249ebc274e0939def00c"
+    },
+    "actualCliApiNative": {
+      "sessionId": 4799,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-app-agent-v1.log",
+      "logSha256": "01eeaca65450c72d4f982c140cb5dd81435f031746830986cd5a4557d14b4d5b",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 278.95
+    },
+    "actualBrowserApiNative": {
+      "sessionId": 79886,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-browser-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-browser-app-agent-v1.log",
+      "logSha256": "889d91b1bc6af7674b307f48cc641f67ab450da09743477b91bd054cda61665b",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 431.9
+    }
+  },
+  "retainedFailures": [
+    {
+      "sessionId": 30472,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-focused-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-focused-v1.log",
+      "logSha256": "fb3718d6000515913e14086c460ed529d5d9f1bbb5187f02fcfc0d487e76100d",
+      "reason": "new fixture used a mismatched plan digest; corrected to the existing reviewed fixture digest before successful focused run"
+    },
+    {
+      "sessionId": 2460,
+      "exitCode": 2,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-test-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-test-v1.log",
+      "logSha256": "6f253f45b538bfbd6f72791e39f527bb0a52291908d608c646f71569985c8648",
+      "reason": "host filesystem exhausted during executable builds and temporary documentation exports; not a passing gate"
+    },
+    {
+      "sessionId": 2460,
+      "exitCode": 2,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-lint-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-lint-v1.log",
+      "logSha256": "5b323a539802d50a87c5be14b46e0354c858a6edb08d42604d19606e720629bc",
+      "reason": "lint binary absent from PATH; the existing owned binary was selected for subsequent gates"
+    }
+  ],
+  "coverage": [
+    "prepare review and explicit original-intent retry bind exact original plan chart and tree versions/digests",
+    "private recovery journal precedes mutation and contains source metadata plus input hash without context bindings",
+    "lost reply preserves the journal and does not replay automatically",
+    "changed private input cannot reuse the journal identity",
+    "closed binding keys and nested duplicate keys are refused before journal or mutation",
+    "stale truncated authorizing or inconsistent summaries are refused",
+    "bounded count/digest observations keep continuation unauthorized",
+    "Actual compiled CLI and Chromium use the App API, real PostgreSQL and pinned authenticated native agent with the owned Kubernetes context fixture",
+    "Lost preparation replies after durable publication, native agent cold restart, reload without RPC, explicit historical review and retained-intent retry preserve digests and observation time",
+    "One native collection attempt per artifact; parent artifacts, original uncertain operation and native guards remain unchanged; continuation stays unauthorized"
+  ],
+  "limits": [
+    "Actual client/API/PostgreSQL/native proof uses owned Kubernetes and Helm fixtures; full live NVKE acceptance remains pending",
+    "Published CLI runtime source repinning and coordinated release remain separate gates",
+    "Full signed image closure, platform/credential correspondence and linked continuation remain incomplete"
+  ],
+  "integrationSourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "bbeb6a1cf0a942e796db14df49f65f28dc5f8b7059ae74cf67a8bb3268e82940",
+    "scripts/integration/workload_browser_qualification.py": "21a49758cdcd9fb4cfec493f447235b5830a8a78ea8851d1423b8fdc1c7ab54d",
+    "scripts/integration/workload_cli_qualification.py": "02f6aedbbab38721a4d8a803881d8d89fb526ad59bcb2a80f6d9474f905dc52e"
+  },
+  "runtimePins": {
+    "appBase": "3dff73116",
+    "cli": "a55746c",
+    "opscode": "58b643a0a50f71d822deade7fb633b98acded4f9"
+  }
+}

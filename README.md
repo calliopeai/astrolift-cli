@@ -238,6 +238,157 @@ astro ci deploy                 # enqueues + polls until terminal state
 or set `ASTROLIFT_DEPLOY_TIMEOUT` (Go duration) to override the
 30-minute polling cap.
 
+### NVIDIA Kubernetes Engine
+
+`astro nvke` manages organization-owned NVKE sites through the Astrolift API.
+The `controller`, `tenant`, `operator`, and `datastore` groups expose all 88 pinned
+native API/resource actions. Complete native parameters, including provider,
+release, networking, authentication and opaque concurrency fields, use JSON
+files. `catalog` returns the connected server's schemas and exact permissions.
+
+```bash
+astro nvke catalog --org acme --json
+astro nvke site list --org acme --limit 50 --json
+astro nvke datastore create-machine-image --org acme --site SITE_GUID \
+  --file create-image.json --request-file image-recovery.json --wait --json
+astro nvke operation get OPERATION_GUID --org acme --json
+astro nvke operation result OPERATION_GUID --org acme --output private-result.json
+```
+
+Input files must be private (`0600` on POSIX or protected Windows ACLs); `--file -`
+reads stdin. Requests flush a private recovery identity before admission. Retry
+with that same file and unchanged input after a lost reply. Acceptance is distinct
+from readiness; a local wait timeout does not cancel remote work. Native results
+are sensitive and require an explicit output file, or `--output -` for stdout.
+New requests preserve exact UTF-8 JSON text and the reviewed actor. Use
+`--inventory` on a native list action to collect a complete saved inventory;
+`resource list/get` browse its server-paged metadata. `resource editor` writes a
+private edit document, and `--source-operation`, `--source-version` and optional
+`--resource-key` bind a native action to that reviewed observation. The server
+supplies immutable targets and native preconditions. `operation diagnostics`
+reads typed historical status; `operation recover` checks the original receipt
+without the native input file or another admission. Existing recovery files keep
+their original protocol and cannot change mode.
+
+`access list/enroll/revoke` manages explicit imported workload access grants.
+Enrollment uses a successful controller `get-cluster` observation with explicit
+site and source versions; revocation uses the reviewed binding version. These
+commands never fetch a kubeconfig or change native infrastructure. Downloads
+continue to verify live Kubernetes ownership.
+
+`operation maintenance OPERATION_GUID --site SITE_GUID --version VERSION` reads
+typed historical renewal/rotation state, workflow identity and retained-lock
+evidence. It preserves missing values as null and never starts native work.
+
+`temporal get/configure/verify/enable/disable/remove` manages the separate native
+Temporal authority. Configuration requires an explicit address, namespace, queue,
+and reviewed site/authority versions. Credentials use a private JSON file or stdin;
+omitting the file preserves them and `--clear-credentials` clears them. Verification
+proves namespace access only. After a lost configuration reply, inspect metadata
+before reviewing another change. `temporal workflow request WORKFLOW` submits the
+three pinned native maintenance workflows with an explicit cluster observation,
+authority version, private input and durable request file. `temporal workflow
+recover` only looks up that original receipt. Lost-node retirement additionally
+requires explicit teardown acknowledgement. `temporal workflow history WORKFLOW`
+reads exact owner history pages. `temporal workflow reset` admits a reviewed etcd
+rotation reset from a private JSON review; `reset recover` only looks up its
+original receipt. The server sends at most one native reset RPC and never
+repeats an unconfirmed sending intent. Renewal reset is unsupported.
+
+`metrics get/configure/verify/enable/disable/remove` manages a separate metrics
+scrape URL and write-only bearer/TLS credentials. `metrics catalog` shows the
+pinned credential gauges and vocabulary. `metrics request` requires a successful
+controller read plus reviewed site, metrics authority and source versions, and
+flushes its private recovery file before admission. `metrics recover` only looks
+up that original receipt. `metrics observation/certificates/samples` read a saved
+credential observation at its exact operation version, with server pagination and
+search for both page views. Missing evidence remains null, numeric values retain
+reported decimal precision, and expiry comparison is explicitly at scrape time.
+Latest inspection failure and retained certificate expiry remain separate facts.
+
+See [NVKE management](docs/nvke.md) for configuration, pagination, cancellation,
+reconciliation, the complete command families and qualification limits.
+
+Remote native tooling is available through `astro nvke agent`. Its `catalog`
+returns every command and option declared by the connected server. Configure a
+reviewed HTTPS endpoint, persistent instance GUID and bundle manifest SHA-256 with
+`configure --site GUID --site-version N --authority-version 0 --endpoint URL
+--instance GUID --bundle-sha256 SHA --credentials-file PRIVATE.json`, then refresh
+the returned site/authority versions and run `verify`. Credentials use
+`caPem`, `clientCertificatePem` and `clientKeyPem`; omission preserves the existing
+sealed pair. `get`, `enable`, `disable` and `remove` expose the remaining lifecycle.
+
+`agent request --site GUID --site-version N --authority-version N --file PRIVATE.json
+--request-file NEW-RECOVERY.json` sends the complete native command envelope as
+text through Astro's encrypted outbox. Use `--acknowledge-infrastructure-change`
+for reviewed bootstrap/install/access changes. The recovery file retains identity,
+versions and a digest, never the private input. `agent recover --request-file FILE`
+looks up the original receipt without re-admitting work or needing the input file.
+Optional `--wait` uses a local deadline and does not cancel remote effects.
+
+Use existing `nvke operation get/wait/cancel/result` for agent jobs.
+`agent reconcile OPERATION_GUID --site GUID --site-version N --authority-version N
+--version N` reads the original uncertain job under reviewed current admin
+authority. `agent artifact OPERATION_GUID` with those same reviewed flags,
+`--name ARTIFACT --output NEW-PRIVATE-FILE` streams protected chunks, checks size
+and SHA-256, and never prints artifact bytes. Failed downloads retain a private
+partial file. Increase `--max-bytes` explicitly for diagnostics larger than 64 MiB.
+Native process completion needs separate infrastructure readiness checks.
+
+`agent stop OPERATION_GUID --site GUID --site-version N --authority-version N
+--version N` uses reviewed current admin authority to stop/fence an uncertain
+original job after its observer has closed. A capable agent durably rejects a
+delayed submission of a provably never-admitted UUID/intent; legacy or incomplete
+admission history cannot certify absence. An admitted job stops only its owned
+process group; infrastructure effects can remain uncertain. An unconfirmed reply
+requires inspecting and reconciling the original operation. The command never
+replays native work or performs infrastructure rollback.
+
+Local operator tools are available under `astro nvke tooling`. `tooling catalog`
+shows the immutable runner/source pins offline. `tooling prepare` builds the pinned
+native binary; `tooling run` invokes bootstrap, site-spec/render/inspection utilities,
+or management-stack installation/check/access setup with native arguments after `--`:
+
+```bash
+astro nvke tooling prepare --checkout /path/to/nvke --output /private/nvke-bundle --json
+mkdir -m 700 /private/site-workspace
+astro nvke tooling run --bundle /private/nvke-bundle --workspace /private/site-workspace \
+  --json -- management install --kubeconfig management.kubeconfig \
+  --sitespec site.yaml --stack-config stack.json --arch linux/amd64 --dry-run
+```
+
+These operator commands support Linux/macOS and require Python 3.12+ plus the upstream
+native toolchain (Git/Go for preparation; Kubernetes/Helm and bootstrap prerequisites
+for execution). `--python` selects a runtime explicitly. The CLI returns metadata and
+private output-file paths; native output is kept in the workspace. Preserve its attempt
+records after failure or interruption and inspect retained infrastructure before recovery.
+
+`astro nvke tooling management-apis --bundle DIR --profile PROFILE.json --output NEW.json`
+renders source-pinned private operator/tenant API deployments, the additional CRDs,
+tenant-scoped RBAC, ClusterIP services and an ingress policy. It requires Python 3.12+
+with PyYAML; `--python` can select a virtual environment. The profile supplies a
+cluster-unique name, runtime/tenant namespaces and immutable operator/tenant image
+references. An empty `clients` list denies pod ingress; allowed clients must bind both
+namespace and nonempty pod labels. `--json` returns only the manifest-source revision
+and output SHA-256. Output is a new mode-0600 file and is never replaced.
+
+The default management stack's three CRDs must already exist. This command renders
+manifests without applying them or installing the management-engine controller.
+Upstream API caller authentication is deferred, so private access remains required.
+
+`astro nvke tooling management-controller --bundle DIR --profile PROFILE.json --output NEW.json`
+renders the pinned native manager with tenant-scoped NVKECluster/ConfigMap permissions,
+cluster-scoped release reads, leader election, preserved pod security and denied ingress.
+Its explicit profile binds a digest image, tenant namespace, existing provider-template
+ConfigMap and private controller endpoint/authentication mode. All six CRDs must already
+exist; the template ConfigMap belongs in the tenant namespace. Python 3.12+ with PyYAML
+is required. Both the renderer and its helper module are pinned and isolated from ambient
+imports. Output is exclusive and mode 0600. See [NVKE tooling](docs/nvke.md) for profile
+fields and the distinction between rendering and qualified installation.
+The manifest source pin and image digests do not independently establish binary
+build/release provenance. Hosted API/UI installation control and declarative
+reconciliation are separate work.
+
 ### As an operator
 
 Operator commands configure the platform itself rather than tenant
@@ -1322,6 +1473,22 @@ astro docs search '"immutable manifest"' --json
 does not establish a live installation’s capability, storage setup or model
 health.
 
+### NVKE scoped login and automation
+
+`astro auth login --scope nvke-read` requests only NVKE read access.
+`astro auth login --scope nvke` requests NVKE read, resource management and
+administration, including workload credentials and native maintenance where
+your roles permit it. Both profiles carry only NVKE scopes, apply to the
+approved organization, and do not carry app access or the platform `admin`
+wildcard. The browser names the requested scopes before approval. Refresh keeps
+that profile; ordinary CLI sign-ins stay unchanged.
+
+The server must advertise `identity.nvke_scopes`; incompatible servers are refused
+before sign-in. For automation, create an expiring API token with `read:nvke`,
+`manage:nvke` and/or `admin:nvke` through the token picker. Each scope carries only
+its corresponding NVKE permission, so select read separately where required.
+Roles, organization membership, revocation and expiry continue to restrict it.
+
 ### Zentinelle read-only login
 
 `astro auth login --scope zentinelle` requests the usual CLI scopes plus
@@ -1350,3 +1517,594 @@ acceptance tests and target repository/branch. Remove `--dry-run` to submit it
 through normal agent dispatch. `--issue`, `--branch` and `--attempt` select its
 review identity. Missing references, blocked dependencies and stories without
 a test command are refused. This does not acquire a factory scheduler lease.
+
+
+### NVKE infrastructure providers
+
+`astro nvke providers` exposes the pinned NICo/LaunchLayer registry and saved
+installation, configuration, manager and credential-check observations. Collection
+uses an explicitly reviewed enabled management-Kubernetes (`DATASTORE`)
+connection; it never selects an ambient kubeconfig or another API surface.
+Both `nvke.read` and `nvke.admin` are required to collect and read private history.
+READ-only access can recover the original operation metadata.
+
+```sh
+astro nvke providers catalog
+astro nvke providers request --site <site-guid> --site-version 7 \
+  --connection <datastore-connection-guid> --connection-version 3 \
+  --request-file ./provider-request.json --wait
+astro nvke providers recover --request-file ./provider-request.json --wait
+astro nvke providers observation <operation-guid> --site <site-guid> --version 9
+astro nvke providers identities <operation-guid> --site <site-guid> --version 9 \
+  --provider nico --limit 25 --search ''
+```
+
+The new private request file is created exclusively and flushed before admission.
+It contains caller/server/organization/site metadata, connection ID/version, native
+pin, deadline and request UUID. Native endpoints, credentials and provider names or
+inventory are excluded. Keep this original file after a lost reply; retrying it
+checks the original receipt before live site/connection metadata. A missing
+receipt cannot change the tuple. `recover` never admits another collection and
+works after connection removal; successful receipts must report the exact frozen
+source. A local wait timeout does not cancel remote collection.
+
+History reads use the exact successful operation/version and admitted source,
+without reading a current connection. Times preserve nanoseconds and generations
+and counts remain decimal strings. Optional booleans remain null when unknown.
+Collection success can retain partial/unknown facts and does not certify provider
+readiness; credential health and manager availability are independent. Identity
+search covers the full saved list on the server. Pass `nextCursor` as `--after`
+with the same provider/search/page size and operation version; do not reuse it for
+another view. No historical command probes native services or exports Secret values.
+
+Native provider controllers, credentials and physical infrastructure require
+separate qualification; controlled native HTTP fixtures do not establish those
+outcomes. `--json` is available on every command.
+
+NVKE operation watchers stop on a read failure and report its safe category
+(transport, HTTP/GraphQL refusal, invalid response, unavailable receipt or identity
+mismatch). They retain the original operation ID and a read-only
+`astro nvke operation get ID` recovery command. No retry or new native admission
+is performed; a stopped watcher does not cancel remote execution.
+
+`astro nvke agent install-review OPERATION_GUID --site GUID --site-version N
+--authority-version N --version N` prepares an audited review of the original
+uncertain management install under current administrator and read permissions.
+The reply must match the original operation and current verified agent identity,
+bundle and versions. It prints typed readiness facts, decimal-string counters
+and null unknowns, with no native inputs or raw diagnostics. A successful review
+keeps the original install uncertain and authorizes no continuation or guard
+release. Refresh source metadata after a refused or unavailable review.
+
+`astro nvke agent install-plan` exposes read-only remaining-install proposals:
+
+```sh
+astro nvke agent install-plan prepare OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --file PRIVATE_PLAN.json --request-file NEW_PRIVATE_RECOVERY.json
+astro nvke agent install-plan review OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID
+astro nvke agent install-plan items OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-digest SHA256 --limit 25
+```
+
+The private preparation body has `format: 1`, the matching `planId`,
+`maximumInputBytes` as a positive decimal string, and `request: null` to inherit
+original authenticated inputs or a complete native management-install envelope.
+Optional `overrides.options` and `overrides.files` merge into that request; null
+removes a field. Full native request fields remain available. Files require
+private permissions or protected Windows ACLs; `--file -` accepts stdin.
+
+Preparation flushes a metadata-only recovery journal before the API mutation.
+Reusing that journal requires the same server, organization, actor, source
+versions, plan identity and exact private input bytes. A lost reply retains the
+plan UUID; use `review` to recover the saved result without the private input.
+`retry-preparation` explicitly asks the server to repeat only its retained
+preparation intent and requires the original preparation actor/API token.
+An incomplete agent plan remains refused; it is never silently overwritten.
+
+`items` and `workloads` first review the retained plan header, then read one
+server page. Both accept `--plan-digest`, `--limit` (1–100), `--search` (up to 200
+characters) and `--after` from the exact same source/view/search/limit. Follow
+`nextCursor` explicitly; the CLI never silently changes paging scope. Workload
+counters remain decimal strings and unknown readiness stays null. Returned
+source/agent identity, digests, phase observations and proposed actions are
+validated before output; arbitrary peer diagnostics are excluded.
+
+Plan requests use a bounded six-minute HTTP deadline to accommodate native
+rendering and source verification; cancelling a local wait does not cancel remote
+preparation. These commands require current administrator/read permissions and
+the original UNCERTAIN management installation. They do not continue installation, replay the
+original native command, mark its failure successful or release its effect fence.
+The proposal still requires dependency closure and live skipped-resource checks
+before any future reviewed execution path.
+
+
+`astro nvke agent install-plan charts` prepares or reviews chart artifacts for an
+exact prepared plan. This stage never executes an installation or authorizes
+continuation:
+
+```sh
+astro nvke agent install-plan charts prepare OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --artifact NEW_ARTIFACT_UUID \
+  --file PRIVATE_CHART_REQUEST.json --request-file NEW_PRIVATE_RECOVERY.json
+astro nvke agent install-plan charts review OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --artifact ARTIFACT_UUID
+astro nvke agent install-plan charts retry-preparation OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --artifact ARTIFACT_UUID
+```
+
+The private JSON body requires `format: 1`, the matching `artifactId`, `planId`
+and `planDigest`, plus positive decimal int64-string `maximumBytes` and
+`maximumExpandedBytes`. Optional `timeoutSeconds` is an integer from 1 to 3600
+(default 300); `allowPlainHttp` defaults to false and accepts only a boolean.
+Unknown or duplicate fields, null controls, numeric byte budgets, identity
+mismatches and overflows are refused. Private files and stdin follow the same
+permissions/size rules as plan preparation.
+
+Preparation first reviews the parent and validates its exact version/digest. It
+then exclusively writes and flushes a metadata-only artifact journal before the
+private preparation mutation. The journal binds server, organization, current
+actor, original source versions, plan version/digest, artifact UUID and exact-text
+SHA-256. Reusing it with changed text, authority or source is refused. Private
+request text is not stored in the journal or printed.
+
+After a lost reply, keep the artifact UUID and use `charts review` to recover the
+saved result without downloading again. `retry-preparation` explicitly requests
+the server's original encrypted intent and requires its original caller/token;
+it accepts no private input. No command silently retries preparation. An
+incomplete stage remains explicit. Results preserve exact decimal byte strings
+and must retain the remaining-verification state and `continuationAuthorized:
+false`; foreign, stale, truncated, over-budget or authorizing results are refused.
+The new routes require a matching application version. Local transport tests are
+separate from the pending combined API/CLI/agent qualification and retained Linux
+installation; full closure and reviewed native continuation remain open.
+
+`astro nvke agent install-plan tree` prepares a private execution tree bound to an
+exact prepared plan and chart publication:
+
+```sh
+astro nvke agent install-plan tree prepare OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --chart-artifact CHART_UUID \
+  --chart-artifact-version N --chart-artifact-digest SHA256 --artifact NEW_TREE_UUID \
+  --file PRIVATE_TREE_REQUEST.json --request-file NEW_PRIVATE_RECOVERY.json
+astro nvke agent install-plan tree review OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --chart-artifact CHART_UUID \
+  --chart-artifact-version N --chart-artifact-digest SHA256 --artifact TREE_UUID
+astro nvke agent install-plan tree retry-preparation OPERATION_GUID --site SITE_GUID \
+  --site-version N --authority-version N --version N --plan PLAN_UUID \
+  --plan-version N --plan-digest SHA256 --chart-artifact CHART_UUID \
+  --chart-artifact-version N --chart-artifact-digest SHA256 --artifact TREE_UUID
+```
+
+The private JSON request contains exactly `format: 1`, `artifactId`, `planId`,
+`planDigest`, `chartArtifactId`, `chartArtifactDigest` and a positive decimal
+int64-string `maximumBytes`. All identities must match the reviewed source; the
+original job, plan, chart publication and tree UUIDs must be distinct. Duplicate,
+unknown, case-aliased or null fields, numeric budgets and overflows are refused.
+The same private-file and stdin rules as plan preparation apply.
+
+Preparation verifies both publications and flushes a metadata-only recovery
+journal before sending the exact private text. The journal also binds the chart
+publication version/digest. Changed text or source cannot reuse that journal.
+After a lost reply, retain the tree UUID and use `tree review`; it does not rebuild
+the tree. `retry-preparation` explicitly uses the server's encrypted original
+intent and requires its original caller/token. Neither command accepts new private
+text or silently replays preparation.
+
+Results preserve decimal byte strings and validate the complete source tuple,
+chart digest, tree digest, file count and byte budget. The tree cannot report fewer
+files than published charts or fewer bytes than their archives. Its state remains
+`requires-native-rendering-images-and-live-verification` with
+`continuationAuthorized: false`. Native rendering, image closure, fresh skipped
+resource verification and reviewed continuation remain separate required stages.
+These commands require the paired application and operator-agent tree routes.
+
+### Authenticated install render contexts
+
+`astro nvke agent install-plan context` captures one reviewed Helm item's render
+context through the original agent and frozen credential. Configure the agent's
+private render profile before preparing the parent plan. Obtain the item name
+and original ordinal from `install-plan items`, and retain the prepared plan,
+chart publication and execution-tree versions and digests.
+
+```sh
+astro nvke agent install-plan context prepare OPERATION_GUID \
+  --site SITE_GUID --site-version 7 --authority-version 3 --version 4 \
+  --plan PLAN_GUID --plan-version 2 --plan-digest PLAN_SHA256 \
+  --chart-artifact CHART_GUID --chart-artifact-version 2 --chart-artifact-digest CHART_SHA256 \
+  --tree TREE_GUID --tree-version 2 --tree-digest TREE_SHA256 \
+  --item nktp --ordinal 6 --artifact CONTEXT_GUID \
+  --file private-context.json --request-file private-context-recovery.json
+```
+
+The private JSON contains exactly `format: 1`, `artifactId`, `planId`,
+`planDigest`, `treeId`, `treeDigest`, `item`, `revision`, `upgrade`,
+`maximumBytes`, `maximumArtifactBytes`, `maximumCalls`, `maximumIterations`,
+`timeoutSeconds`. IDs, digests and item must match the reviewed flags. Revision
+and byte limits are decimal strings; for example revision `"9007199254740993"`
+retains its precision. Install mode is `upgrade: false` with revision `"1"`.
+The byte limit is 1–536870912, artifact limit 65536–134217728, call limit 1–2048,
+iteration limit 1–64 and timeout 1–300 seconds. No helper, credential or endpoint
+fields are accepted. Input files and the metadata recovery journal use owner-only
+permissions; `--file -` accepts private stdin.
+
+Use `context review` with the same source flags, item, ordinal and artifact UUID
+after an unconfirmed result; it takes no private input or journal argument.
+`context retry-preparation` explicitly retries the server's retained intent and
+requires its original caller/token. A failed or lost response never triggers an
+automatic preparation retry. Preserve the original artifact and journal.
+
+The CLI confirms the retained Helm item and ordinal before capture, binds every
+parent publication, and outputs only checked metadata and hashes. Historical
+context capture leaves the original uncertain install intact. Fresh phase,
+resource, credential and image verification and linked native admission remain
+required; these commands never authorize continuation.
+
+### Signed install render verification
+
+`astro nvke agent install-plan verification prepare|review|retry-preparation`
+revalidates the exact retained context using the original frozen credentials.
+It requires the paired App verification mutations and agent verification route.
+Retain the original job, plan, chart, tree and context versions and digests.
+
+```sh
+astro nvke agent install-plan verification prepare OPERATION_GUID \
+  --site SITE_GUID --site-version 7 --authority-version 3 --version 4 \
+  --plan PLAN_GUID --plan-version 2 --plan-digest PLAN_SHA256 \
+  --chart-artifact CHART_GUID --chart-artifact-version 2 --chart-artifact-digest CHART_SHA256 \
+  --tree TREE_GUID --tree-version 2 --tree-digest TREE_SHA256 \
+  --context CONTEXT_GUID --context-version 2 --context-digest CONTEXT_SHA256 \
+  --item nktp --ordinal 6 --artifact VERIFICATION_GUID \
+  --file private-verification.json --request-file private-verification-recovery.json
+```
+
+The private JSON contains exactly `format: 1`, `artifactId`, `contextId`,
+`contextDigest`, `planId`, `planDigest`, `treeId`, `treeDigest`, `item`,
+`maximumBytes`, `maximumCaptureAgeSeconds`, `maximumCalls` and `timeoutSeconds`.
+The byte limit is a canonical decimal string in 1–536870912; capture age is
+1–3600 seconds, calls 1–2048 and timeout 1–300 seconds. The six original/job and
+artifact UUIDs must be distinct. The source IDs, digests and item must match the
+reviewed flags. Private files and the metadata journal use owner-only permissions;
+`--file -` accepts stdin. The journal precedes preparation and binds the exact
+input bytes, caller, server and every reviewed source version/digest.
+
+After an unconfirmed result, use `verification review` with the same source flags
+and artifact UUID. It reads the retained historical observation without another
+collection. `verification retry-preparation` explicitly retries the server's
+retained private intent and requires its original caller/token. Neither accepts
+private request text; neither command automatically repeats a failed preparation.
+Use a new artifact UUID to request a new observation.
+
+The CLI checks context/capture/chart hashes, source versions, original item ordinal,
+verification/index digests and bounded public counts before displaying metadata.
+Historical recovery preserves `observedAt`; it does not renew freshness for phase
+use. The result retains `continuationAuthorized: false` and
+`requires-phase-use-resource-credential-schema-images-and-linked-admission`.
+Fresh phase/skipped-resource/original credential checks, schema policy, image closure
+and linked native admission remain required. The original uncertain install stays
+in place; these commands never authorize native continuation or replay.
+
+
+### Source-bound registry and local images
+
+`astro nvke agent install-plan image prepare|review|retry-preparation` captures
+an OCI registry image through the original agent. Configure the agent's private
+image-policy profile before preparing the parent plan; the request selects a
+reviewed policy alias. Retain the original operation, plan, chart publication and
+execution-tree versions and digests.
+
+```sh
+astro nvke agent install-plan image prepare OPERATION_GUID \
+  --site SITE_GUID --site-version 7 --authority-version 3 --version 4 \
+  --plan PLAN_GUID --plan-version 2 --plan-digest PLAN_SHA256 \
+  --chart-artifact CHART_GUID --chart-artifact-version 2 --chart-artifact-digest CHART_SHA256 \
+  --tree TREE_GUID --tree-version 2 --tree-digest TREE_SHA256 \
+  --artifact IMAGE_GUID --file private-image.json --request-file private-image-recovery.json
+```
+
+The private JSON contains exactly `format: 1`, `artifactId`, `planId`,
+`planDigest`, `treeId`, `treeDigest`, `reference`, `policy`, `maximumBytes`,
+`maximumCalls` and `timeoutSeconds`. IDs and digests must match the reviewed
+flags. `maximumBytes` is a canonical decimal string in 1–9223372036854775807;
+calls are 1–4096 and timeout is 1–300 seconds. Reference is a registry image
+reference without a URL scheme; policy is a reviewed logical alias. Credentials,
+output paths and arbitrary transport settings are not accepted. Private files
+use owner-only permissions; `--file -` accepts private stdin.
+
+For a digest-pinned OCI layout already retained by the signed execution tree,
+use `--source-kind local` on prepare, review and retry. The local JSON replaces
+`policy` and `maximumCalls` with exactly `sourceKind: "local"`; it retains
+`maximumBytes` and `timeoutSeconds`. The reference must end in `@sha256:` plus
+64 lowercase hex digits or `@sha512:` plus 128. Local verification uses no
+registry profile or transport and imports no image. The response kind must match
+`--source-kind` (default `registry`); local preparation also checks the requested
+root digest. Kind changes require a new artifact and journal.
+
+Preparation flushes a metadata-only journal binding the exact private input hash,
+caller, server and every source version/digest before sending the request. The
+journal contains no image reference, policy or credentials. After an unconfirmed
+result, retain the artifact UUID and use `image review` with the same source flags.
+It reads historical metadata without a new collection. `image retry-preparation`
+explicitly uses the server's retained private intent and requires its original
+caller/token. Neither command accepts replacement private text or automatically
+repeats preparation.
+
+The CLI checks source bindings, signed artifact/source/capture digests, the OCI
+root digest, positive byte/blob counts and observation timestamp before output.
+Preparation also checks the reviewed byte limit. Historical recovery does not
+renew freshness. The result retains `continuationAuthorized: false` and
+`requires-workload-platform-credential-phase-use-and-linked-admission`.
+Rendered workload/platform closure, credential equivalence,
+fresh use-time verification and linked native admission remain required.
+
+
+The owned image integration case runs the compiled CLI through the real App API
+and Postgres to a source-pinned agent and a private TLS registry fixture. It covers
+lost replies, cold-agent historical read and explicit retry with one native image
+work attempt, unchanged registry read counts during recovery and unchanged
+original operation/parent artifacts. Select the exact pytest case
+`test_compiled_cli_tree_prepare_lost_reply_cold_review_and_private_retry[image]`
+in `scripts/integration/test_nvke_install_plan_tree.py`; select the compiled binary,
+private backend test environment, native bundle, Helm/helper and Opscode source via
+the existing integration environment variables. The pinned agent revision and
+exact local run evidence are in `scripts/integration/nvke-install-plan-image-app-agent-local.json`.
+This fixture does not prove workload/platform closure, live cluster admission or
+production installation.
+
+
+### Reviewed workload inventory
+
+`astro nvke agent install-plan workload prepare|review|retry-preparation` collects
+and recovers the all-item inventory for one reviewed execution tree. Use the
+same original-operation, plan, chart-artifact and tree UUID/version/digest flags
+as image preparation, with a distinct `--artifact` UUID. Preparation requires a
+private `--file` JSON request and a private `--request-file` metadata journal.
+
+The JSON contains `format: 1`, `artifactId`, `planId`, `planDigest`, `treeId`,
+`treeDigest`, `contextBindings`, `maximumBytes`, `maximumResources` and
+`timeoutSeconds`. Each Helm item has an exact
+`"item-name": {"contextId": "UUID", "contextDigest": "SHA256"}` binding; native
+items use the server's frozen inputs. Byte limits are canonical decimal strings
+up to 67,108,864; resource limits are 1–10,000 and timeout is 1–300 seconds.
+No helper, kubeconfig, private path or native command enters the request.
+
+The journal is written before acquisition and retains source metadata and the
+complete input hash. After a lost reply, preserve its UUID and source versions
+and use `workload review`. `retry-preparation` explicitly reuses the server's
+retained private intent under the original caller/token. Output contains counts,
+digests and observation time. Inventory collection keeps native continuation
+unauthorized; signed image closure and linked admission remain separate work.
+
+Registry image acquisition may bind a reviewed workload inventory with
+`astro nvke agent install-plan image prepare|review|retry-preparation` and the
+complete `--workload <uuid> --workload-version <version> --workload-digest <sha256>`
+triple. The private preparation JSON must include the matching `workloadId` and
+`workloadDigest`. The CLI reviews that inventory before acquisition and retains
+the tuple in its private metadata journal. Historical review and retry must keep
+it; omitting it cannot downgrade to graph-only evidence. This mode supports
+registry references found in rendered workloads even when absent from
+`images.txt`. Local image mode does not accept workload bindings. Image evidence
+continues to require platform/credential proof and linked admission.
+
+### Signed image bindings
+
+`astro nvke agent install-plan image-binding prepare|review|retry-preparation`
+binds retained image proofs to the reviewed workload inventory. Keep the exact
+original-operation, plan, chart and tree flags, add the required
+`--workload`, `--workload-version` and `--workload-digest` tuple, and choose a
+distinct `--artifact` UUID. The CLI reviews every parent and the workload before
+the binding request.
+
+Preparation takes a private `--file` and a private `--request-file` metadata
+journal. JSON fields are `format: 1`, `artifactId`, `planId`, `planDigest`,
+`treeId`, `treeDigest`, `workloadId`, `workloadDigest`, `imageBindings`,
+`maximumBytes`, `maximumImageBytes` and `timeoutSeconds`. Each image reference
+selects exactly `{ "sourceKind": "local|registry", "artifactId": "UUID",
+"artifactDigest": "PUBLIC_ARTIFACT_SHA256" }`. The source kind is either
+`local` or `registry`; use the retained image's public artifact digest. Duplicate
+keys, aliases, unknown/private fields and parent UUID collisions are refused.
+Output bytes are limited to 67,108,864, image bytes to 9,223,372,036,854,775,807
+and timeout to 300 seconds; byte budgets are canonical positive decimal strings.
+
+The journal is durable before the request and contains source metadata and an
+input hash. It does not retain image references or proof selections. A lost
+reply preserves the original UUID: use `image-binding review`, then an explicit
+`retry-preparation` when needed. Recovery uses the server's retained private
+intent under its original caller/token. Results contain only digests, counts,
+verified bytes and observation time. Binding evidence does not authorize native
+continuation or replace operator/platform/credential/import/fresh-use checks.
+
+
+### Immutable phase payloads and execution trees
+
+`astro nvke agent install-plan image-payload prepare|review|retry-preparation` and
+`astro nvke agent install-plan immutable-execution-tree prepare|review|retry-preparation`
+prepare and recover artifacts for the original uncertain management installation.
+Keep the reviewed operation/site/authority, plan, chart, tree and workload flags
+used by `image-binding`, and add `--binding`, `--binding-version` and
+`--binding-digest`. The binding digest is the binding's `bindingDigest`, not its
+public `artifactDigest`. Choose a distinct `--artifact` UUID. Each command reviews
+all parents and the image binding before requesting the selected artifact.
+
+Preparation requires private `--file` input and a private `--request-file`
+metadata journal. Both request kinds contain exactly `format: 1`, `artifactId`,
+`planId`, `planDigest`, `treeId`, `treeDigest`, `bindingId`, `bindingDigest`,
+`maximumBytes` and `timeoutSeconds`. Phase payloads additionally require `item`
+and `maximumResources`. Sealed trees instead require `payloadBindings`: one entry
+for every original phase, including completed phases, keyed by its exact name.
+Each entry contains only `{ "artifactId": "PAYLOAD_UUID", "artifactDigest":
+"PUBLIC_PAYLOAD_ARTIFACT_SHA256" }`. Payload UUIDs must be distinct from each
+other and all parent/output UUIDs. No private file paths or dispatch controls are
+accepted in the request.
+
+Byte budgets are canonical positive decimal strings: at most 67,108,864 for a
+phase payload and 9,223,372,036,854,775,807 for a sealed tree. Payload resource
+budgets are 1–10,000; timeout is 1–300 seconds. Duplicate keys, aliases, unknown
+fields, mismatched sources and malformed summaries are refused. The journal is
+saved before API preparation and contains reviewed source metadata and an input
+hash; it omits phase names and payload selections. Changed input cannot reuse it.
+
+After a lost response, keep the original artifact UUID and use `review` first.
+`retry-preparation` explicitly uses the server's retained encrypted intent under
+the original caller/token. Neither command needs a new private input file.
+Results expose source digests, bounded counts, sizes and observation times. These
+artifacts do not authorize native continuation or release the original uncertainty
+fence; fresh platform, credential, import/use and linked admission checks remain.
+
+### Admitted-Pod pull-authority observations
+
+`astro nvke agent install-plan pull-authority prepare|review|retry-preparation`
+uses the reviewed operation, plan, chart, tree, workload and image-binding flags.
+Select a distinct `--artifact` UUID. Preparation requires private `--file` JSON
+and a private `--request-file` metadata journal, saved before the request is sent.
+
+The JSON contains exactly `format: 1`, `artifactId`, `planId`, `planDigest`,
+`treeId`, `treeDigest`, `bindingId`, `bindingDigest`, `selectedPods`,
+`maximumBytes`, `maximumCalls` and `timeoutSeconds`. `selectedPods` maps explicit
+`namespace/pod-name` keys to distinct live Pod UIDs. The byte budget is a canonical
+positive decimal string up to 67,108,864; calls are integers up to 32,768 and must
+allow two reads per selected Pod plus the cluster identity bracket. Timeout is
+1–300 seconds. Duplicate keys, aliases, nulls, paths and unsupported fields refuse.
+
+The journal binds exact input bytes and reviewed source metadata without storing
+Pod names or UIDs. Preserve it after a lost reply and use `review`; explicit
+`retry-preparation` uses the server's original encrypted intent and caller/token.
+Review and retry take no new private input or credential path. Results contain
+only source digests, observation time and Pod/account/Secret/missing-reference
+counts. Counts are checked against the selected Pod scope and read-call budget.
+
+This observes admitted-Pod references separately from current ServiceAccount
+references. It does not prove workload ownership, native kubelet/plugin or
+original/proposed registry credential correspondence, successful pulls or linked
+admission. Continuation remains false and the original uncertainty fence stays.
+
+### Node/image platform observations
+
+`astro nvke agent install-plan node-platforms prepare|review|retry-preparation`
+uses the same reviewed operation, plan, chart, tree, workload and binding flags
+as immutable artifact controls. Choose a distinct `--artifact` UUID. Preparation
+requires private `--file` JSON and a private `--request-file` metadata journal.
+
+The input contains exactly `format: 1`, `artifactId`, `planId`, `planDigest`,
+`treeId`, `treeDigest`, `bindingId`, `bindingDigest`, `nodePlatforms`,
+`maximumImageBytes`, `maximumMetadataBytes`, `maximumBytes`,
+`maximumObservationBytes`, `maximumHelperBytes`, `maximumCalls`, `maximumPairs`
+and `timeoutSeconds`. Each node entry contains exactly `uid`, `runtimeProfile`
+and `platform`. Platform requires `os`/`architecture`, with optional `variant`,
+`os.version` and string-array `os.features`. Node UIDs must be distinct. Supported
+profiles are containerd 2.3.0, 2.3.4, 2.3.7, 2.2.3, 2.1.7 and 1.7.31, named
+`containerd/v<version>`.
+
+All byte limits are canonical positive decimal strings. Image/helper budgets
+are int64; metadata/observation budgets are at most 64 MiB; output is at most
+16 MiB. Calls are at most 65,536 and at least `4 * nodes + 4`; pairs are at most
+100,000; timeout is 1–300 seconds. Private input is limited to 1 MiB. Duplicate
+keys, aliases, unknown fields, caller helper paths and malformed summaries refuse.
+
+The journal saves only source identities and the exact input hash before API
+preparation. It excludes node names, platforms and credentials. After a lost
+reply, review the retained artifact first. Explicit retry uses the server's
+original encrypted intent and caller/token. No command automatically replays
+preparation. Results expose digests, bounded counts and historical observation
+time. CPU/importer attestation, scheduling, credentials, availability, fresh phase
+use and linked admission remain required; continuation stays unauthorized.
+
+The owned integration case `scripts/integration/test_nvke_node_platform_browser.py`
+qualifies the compiled CLI and production browser recovery controller against
+real persistence and the authenticated native agent. Select the frontend and
+Storybook with `NVKE_TEST_NODE_PLATFORMS_FRONTEND` and
+`NVKE_TEST_NODE_PLATFORMS_STORYBOOK`, and all five compiled selectors with
+`NVKE_TEST_PLATFORM_HELPERS`. The case retains the existing pinned native-tool
+and database fixture requirements. Controlled Node API responses verify transport,
+source binding and cold recovery; they do not attest physical CPUs or importer
+binaries, scheduling, image availability or native admission.
+### Private Secret candidate interpretation
+
+`astro nvke agent install-plan pull-secret-analysis prepare|review|retry-preparation`
+adds `--pull-authority`, `--pull-authority-version` and `--pull-authority-digest`
+to the exact original/plan/chart/tree/workload/image-binding flags above. Use the
+prepared pull observation's `authorityDigest` and a distinct `--artifact` UUID.
+
+Preparation takes private `--file` JSON (or `-` for stdin) and a private
+`--request-file` metadata journal. The JSON contains exactly `format: 1`,
+`artifactId`, `planId`, `planDigest`, `treeId`, `treeDigest`, `bindingId`,
+`bindingDigest`, `pullAuthorityId`, `pullAuthorityDigest`, `imageSelections`,
+`maximumBytes`, `maximumHelperBytes` and `timeoutSeconds`. Each of 1–1,024 image
+selections contains exactly `podKey` (`namespace/pod-name`), `imagePointer`
+(`/spec/containers/N/image`, `/spec/initContainers/N/image` or
+`/spec/ephemeralContainers/N/image`) and an explicit boolean
+`ensureSecretPulledImages`. Image uses must be distinct. Both byte budgets are
+canonical positive decimal strings up to 67,108,864; the per-helper output budget
+cannot exceed the total budget. Timeout is an integer from 1–300 seconds.
+
+The fsynced journal binds the parent observation, exact input-byte SHA and source
+metadata without retaining image selections or credentials. After a lost reply,
+preserve the artifact ID and journal and use `review`. Explicit
+`retry-preparation` uses the original encrypted server intent; review and retry
+accept no new input file. Changed input bytes or parent metadata refuse reuse.
+
+Output contains only source metadata, capture/interpretation times and image-use,
+candidate and missing-reference counts. The feature setting is an explicit
+interpretation choice, not observed kubelet configuration. Candidates cover only
+admitted Pod Secrets under the pinned native profile; they do not establish node
+keyrings/plugins, runtime trust, registry authorization, successful pulls,
+availability or linked admission. Continuation stays false.
+
+`astro nvke agent install-plan pull-runtime review OPERATION_GUID` reads historical
+Pod/node pull correspondence from already prepared captures. Supply the normal
+original source flags and `--pull-authority`, `--pull-authority-version`,
+`--pull-authority-digest`, `--artifact` (existing Secret analysis),
+`--analysis-version`, `--analysis-digest`, `--node-platform`,
+`--node-platform-version` and `--node-platform-digest`. The analysis and node
+flags use the analysis authorityDigest and node platformDigest (signed capture
+index digests), rather than their public artifactDigest tags. Output includes both exact
+public parent records, counts, a correspondence digest and historical times.
+The command accepts no private input or recovery journal, never prepares or
+retries a capture, and keeps continuation unauthorized. Registry access, actual
+image availability, ownership/scheduling and linked native admission require
+separate evidence.
+
+The integration helper `scripts/integration/pull_runtime_browser_qualification.py`
+accepts an existing real App source and prepared parent records for the owned
+HTTP-backed browser story. It snapshots the original operation and all supplied
+parent rows, exercises a deliberately lost read response and explicit repeat
+read, and requires every row to remain unchanged. It creates no parent records.
+Its static/import checks do not establish a connected browser qualification;
+that requires running it against the actual App/database/native fixture.
+The opt-in `scripts/integration/test_nvke_pull_runtime_browser.py` consumes a
+private owned native handoff selected by `NVKE_TEST_PULL_RUNTIME_HOST_HANDOFF`
+and a compiled CLI selected by `ASTROLIFT_NVKE_CLI`. It verifies the actual authority, matches the controlled uncertain original,
+registers the retained native parents through normal App preparation paths,
+compares direct App and compiled CLI results with the native summary, and
+requires two successful audited browser reads. Parent registration uses
+`scripts/integration/pull_runtime_parent_qualification.py`; no prepared App rows
+are fabricated. Original dispatch and physical installation remain outside this
+fixture. The connected test is pending qualification.
+
+For host/App qualification against a disposable Linux agent, the integration-only
+`DockerAgentBridge` in `scripts/integration/docker_agent_bridge.py` carries opaque
+TLS bytes over `docker exec` to the container's loopback listener. It binds one
+exact container/run nonce, preserves end-to-end client certificate checks and
+uses no published container port or external container network. It does not
+create installation admissions. The manual
+`scripts/integration/qualify_docker_agent_bridge.py` accepts a prepared private
+`--profile`, an `--opscode` checkout and a fresh `--output` prefix; it freezes the
+runtime sources, verifies real host mTLS and missing-client refusal, checks run
+binding and target immutability, and cleans up its proxy/container. Its passing
+record qualifies transport only, not App/PostgreSQL/artifact or lifecycle flows.
+
+Qualification wrappers can use `scripts/integration/qualification_result.py` to
+require named literal-true success checks and integer-zero cleanup statuses.
+Explicit failure metadata rejects an otherwise zero process status. The retained
+host-native v2 report has a false zero marker from exception-variable shadowing;
+`qualification/nvke-pull-runtime-browser-integration-local.json` records the
+corrective assessment. It is an unsuccessful integrated run, despite its host
+SDK matching the native summary. The corrected fixture/tool-binding run remains
+separately pending.

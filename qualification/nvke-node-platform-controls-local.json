@@ -1,0 +1,110 @@
+{
+  "format": 1,
+  "scope": "node/platform prepare, review and explicit retry CLI/API controls",
+  "status": "command/API contracts and actual frozen CLI/App/browser/mTLS recovery qualified at recorded pins",
+  "sources": {
+    "cmd/nvke_install_plan.go": "b61bd6851e7766677c58a258b4eb3b88b8173b4ce7dfa49ceb217d9ec5e1bc6e",
+    "cmd/nvke_install_plan_immutable.go": "6861eb9a8348adba1ca1c1a4855cc045ccf49bdadfb789e4edc15fc5f4564e29",
+    "cmd/nvke_install_plan_node_platforms.go": "bc6aecc80587c94ee10e44743059eae3540e89949fcc512137d70a9f98f46bd4",
+    "cmd/nvke_install_plan_node_platforms_test.go": "223957528f87770bbbf40d4620326ec9c4e8f71f798c24510eed493bb76b8356",
+    "internal/api/nvke_install_plan_node_platforms.go": "5e60a0f560a9320fe1f1157b0bfd84fb411def05007d4b72a8338def7eabc790",
+    "README.md": "7a006621ce6ada14c7d5665cdf38f361cefbff60fc25581cf7626b94550d78f4",
+    "CHANGELOG.md": "aac2e030df05dd967495a1695b3a0ff55cb96c7e00a89725c629d876f09072dd",
+    "scripts/integration/test_nvke_install_plan_tree.py": "04872b628c7f4ca62cd9daf33f868bb93d1a0efc29eb2a27a2820805cd2b4c3b",
+    "scripts/integration/node_platform_cli_qualification.py": "b8d7df951bdfcdee20c3fcb4d304e73a6a48af332934c928f1debaa890213119",
+    "scripts/integration/node_platform_browser_qualification.py": "7d575001986d48c89c1c996910665378a5f85f4f572bb7cf4297505546541c2b",
+    "scripts/integration/test_nvke_node_platform_browser.py": "c89fe410f5f796025cefa9269d6c1e96df881dadf3e70782383f4ac2cdb8a4ae"
+  },
+  "checks": [
+    {
+      "check": "format",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-format-v1.log"
+    },
+    {
+      "check": "test",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-test-v1.log"
+    },
+    {
+      "check": "vet",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-vet-v1.log"
+    },
+    {
+      "check": "lint",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-lint-v1.log"
+    },
+    {
+      "check": "build",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-node-platform-cli-build-v1.log"
+    }
+  ],
+  "focused": {
+    "runnerPid": 80730,
+    "logPath": "/tmp/astrolift-nvke-node-platform-cli-focused-v2.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-cli-focused-v2.exit",
+    "exitCode": 0,
+    "scope": "new node/platform request, HTTP-peer recovery/journal and result validation tests, plus existing immutable command regressions"
+  },
+  "invariants": [
+    "common exact original/plan/chart/tree/workload/binding reviews retained for both old and new commands",
+    "all five runtime profile names and closed node/platform scope",
+    "canonical int64 byte budgets without numeric coercion",
+    "metadata-only owner-private journal before preparation",
+    "changed exact input refuses journal reuse",
+    "lost response does not automatically replay preparation",
+    "review/retry take no new private input",
+    "mandatory unresolved state and continuationAuthorized=false"
+  ],
+  "remaining": [
+    "final current-source combined repinning",
+    "source-event refusal investigation",
+    "CPU/importer, scheduling, credentials, availability, phase use and linked admission"
+  ],
+  "compiledBinary": {
+    "path": "/tmp/astrolift-nvke-node-platform-clients-cli-v1/astro",
+    "sha256": "eeb7dc0a849ab3d4c5002defa7097298f84199f6dc0ba5d58d3499c1d1e35c3c",
+    "sourceRevision": "5da5dae230c4bf24262605a4fe75814eb340b168",
+    "cleanVcsBuild": true,
+    "buildMetadataPath": "/tmp/astrolift-nvke-node-platform-cli-build-v4.json"
+  },
+  "pairedHarness": {
+    "status": "actual frozen native qualification passed",
+    "checksPath": "/tmp/astrolift-nvke-node-platform-peer-cli-v1.json",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-peer-cli-v1.exit",
+    "exitCode": 0,
+    "scope": "format, full Go tests, vet, lint, Python syntax and Ruff; final pinned-source validation supports the two tracked relative Go symlinks without following sources outside the selected tree",
+    "sourcePreflightLog": "/tmp/astrolift-nvke-node-platform-source-preflight-v1.log",
+    "sourcePreflightExit": "/tmp/astrolift-nvke-node-platform-source-preflight-v1.exit",
+    "sourcePreflightExitCode": 0,
+    "agentRevision": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+  },
+  "pairedNative": {
+    "evidence": "nvke-node-platform-cli-browser-native-local.json",
+    "sourcePins": {
+      "app": "34c208745ff96b4a64446986d5cf337693414b5c",
+      "cli": "5da5dae230c4bf24262605a4fe75814eb340b168",
+      "opscode": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+    },
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "runtimeProfiles": 5,
+    "logPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.exit"
+  },
+  "linuxAgentRoute": {
+    "scope": "direct mTLS agent route with five profiles and offline cold recovery; App/CLI/browser proof has separate frozen pins",
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "metadataPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.json",
+    "logPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.exit",
+    "sourceManifestPath": "/tmp/astrolift-nvke-host-platform-linux-v2-sources.json",
+    "sourceManifestMatches": true
+  }
+}
