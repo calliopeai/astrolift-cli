@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-11T22:46:22.216736+00:00",
+  "scope": "Qualification exit evidence guard; a failed/incomplete run cannot qualify through a zero marker",
+  "status": "five-regression-cases-and-static-checks-passed",
+  "local": {
+    "exitCode": 0,
+    "checks": [
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "format",
+          "--check",
+          "qualification_result.py",
+          "test_qualification_result.py"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.0130253741517663,
+        "log": "/tmp/astrolift-nvke-qualification-result-local-v1-0.log"
+      },
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "check",
+          "qualification_result.py",
+          "test_qualification_result.py"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.015079250559210777,
+        "log": "/tmp/astrolift-nvke-qualification-result-local-v1-1.log"
+      },
+      {
+        "command": [
+          "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+          "-B",
+          "-m",
+          "unittest",
+          "test_qualification_result",
+          "-v"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.058052875101566315,
+        "log": "/tmp/astrolift-nvke-qualification-result-local-v1-2.log"
+      }
+    ],
+    "sourcesUnchanged": true,
+    "sourceSha256": {
+      "qualification_result.py": "dc44869ea0d018eeefaede76ce89788b293bb960c2f850996c77fefae65b7a73",
+      "test_qualification_result.py": "ae98f51a355f187c26180d15251cff48bdb5931f2a74327e0c742045ef9ddd17"
+    }
+  },
+  "retainedMisleadingWrapperAssessment": {
+    "qualifiedExitCode": 1,
+    "originalReportedExitCode": 0,
+    "originalReportSha256": "e3248cae9b56cc999f50fcd62df3be941979e59b36d099bf383640712040938e",
+    "actualAppReportSha256": "4642ffcf9edeb3b030a7bbe5a56dc756291824111a30593cfdf61fc93e9640a2",
+    "actualAppExitCode": 1,
+    "failureStage": "actual-app-postgresql-cli-browser",
+    "hostSdkMatchedNativeSummary": true,
+    "nativeBeforeAfterCompleted": false,
+    "reason": "The wrapper reused its outer exit-code variable while reading exception codes. AssertionError replaced it with None; successful container cleanup then replaced it with zero. App failure and missing native final invariants make this an unsuccessful run."
+  },
+  "assessmentPath": "/tmp/astrolift-nvke-pull-runtime-host-native-v2.assessment.json",
+  "assessmentSha256": "618d1078d3a3092bfd05871b17ac5aa2f0ce6187d4d7c655058c378fda7549db",
+  "coverage": [
+    "Explicit failure fields override an attempted zero exit",
+    "Every named required check must be literal True; empty/malformed/duplicate requirements refuse",
+    "Cleanup evidence must be a nonempty sequence of integer zero statuses; booleans and strings refuse",
+    "Invalid/boolean/negative/out-of-range attempted exit codes refuse; real nonzero errors remain nonzero",
+    "Actual failed host-native v2 report is rejected despite its incorrectly written zero exit marker"
+  ],
+  "limits": [
+    "This is harness integrity, not a product/native/client success claim",
+    "Earlier raw reports/markers are retained unchanged; consumers must use the corrective assessment for v2",
+    "No native source, authority, admission or production timeout gate changed"
+  ]
+}

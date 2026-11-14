@@ -1,0 +1,51 @@
+{
+  "format": 1,
+  "scope": "owned-app-postgres-native-verification-browser-acceptance-harness",
+  "status": "actual-browser-app-postgres-native-verification-acceptance-passed",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "9a0b150e7c176751bcfd7b48341518e16ac4c77fade48d30782a99426cb9c531",
+    "scripts/integration/context_cli_qualification.py": "90a198b9a2df66e58d63e606ae5c626308cc6d811d1aae2a9b1fdbbdb4f76c5c",
+    "scripts/integration/verification_browser_qualification.py": "48d16b37be7a2fbafaa1e40e4e2e96b4b0d39e302ac1337d6f59ca209acfc22c"
+  },
+  "agentRevision": "c93fe5f5dcafd870dd6d34211a4a034b600b1b70",
+  "checks": {
+    "ruff": {
+      "exitCode": 0
+    },
+    "collection": {
+      "status": "passed",
+      "sessionId": 58070,
+      "exitMarker": "/tmp/astrolift-nvke-verification-browser-collect.exit",
+      "exitCode": 0,
+      "selectedCases": 2,
+      "seconds": 14.46,
+      "logSha256": "83d92336464343814dee2b2e3bebb2d344afc95061d7dc34c0455dbe4fc61919"
+    },
+    "actualAcceptance": {
+      "status": "passed",
+      "sessionId": 39376,
+      "logPath": "/tmp/astrolift-nvke-verification-browser-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-browser-v1.exit",
+      "database": "test_astro_nvke_verification_20261109",
+      "storybook": "http://127.0.0.1:16425",
+      "serverSessionId": 46100,
+      "frontendSource": "production API Storybook build ece934e33; runtime hook/component source identical to combined integration frontend; test-only changes do not enter this Storybook bundle.",
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 1229.16,
+      "logSha256": "7db9d725b95b2cda38fb2811a5268aceed4d4cac28bb267c53cfddd1e340641a",
+      "serverStopped": true
+    }
+  },
+  "implemented": [
+    "Explicit verification-browser mode retains the reviewed native pin and all existing CLI context qualification before starting Chromium.",
+    "Only an owned loopback Storybook frontend and actual App endpoint are selected through owner-only private config/log files.",
+    "Dropped preparation reply followed by browser reload, historical read and private retry must produce a prepared immutable verification record with matching native summary hashes and one attempt. Original operation, guard, native runs, parent plan and chart retention checks remain in the shared scenario."
+  ],
+  "remaining": [
+    "Browser and compiled CLI acceptance passed. Fresh phase-use/resource/credential/schema/image proofs, exactly-once admission, full surface/live qualification and release remain open.",
+    "Run real CLI and browser scenarios without increasing authority or process timeouts."
+  ],
+  "continuationAuthorized": false
+}

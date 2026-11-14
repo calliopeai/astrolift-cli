@@ -3,7 +3,9 @@
 ## What this is
 
 `astro` is the developer-facing CLI for the Astrolift PaaS. It ships as a single
-Go binary with no runtime dependencies. Developers use it for daily operations
+Go binary. API commands use the built-in transport; local operator commands invoke
+their declared toolchains (such as Helm and the pinned NVKE native tools).
+Developers use it for daily operations
 (login, deploy, logs, exec); CI runners use it for automated build-and-deploy
 pipelines.
 

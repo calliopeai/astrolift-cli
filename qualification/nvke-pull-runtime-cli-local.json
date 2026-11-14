@@ -1,0 +1,91 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-11T20:20:38.265765+00:00",
+  "scope": "astro nvke agent install-plan pull-runtime review",
+  "status": "controlled-http-and-complete-local-go-gates-qualified-real-api-pairing-pending",
+  "checks": {
+    "exitCode": 0,
+    "elapsedSeconds": 101.58669725060463,
+    "checks": [
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "test",
+          "./cmd",
+          "./internal/api",
+          "-run",
+          "TestNVKEPullRuntime",
+          "-count=1"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "vet",
+          "./..."
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "make",
+          "lint"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "test",
+          "./..."
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/Users/ragelink/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.11.darwin-arm64/bin/go",
+          "build",
+          "-o",
+          "/tmp/astrolift-nvke-pull-runtime-cli-v4-astro",
+          "."
+        ],
+        "exitCode": 0
+      }
+    ],
+    "sourceSha256": {
+      "cmd/nvke_install_plan_pull_runtime.go": "990383bbc86a90a1af86bf25f3f409cae4805eb03b4d1c9ca9c6b65b9d272304",
+      "cmd/nvke_install_plan_pull_runtime_test.go": "8eaa529202a70d8543a1e17839391c72c9839161b28ab3d0a7ad72acb4928bea",
+      "internal/api/nvke_install_plan_pull_runtime.go": "9a5dd8c4f763a399e70e1e59254c608747f5df753071ace605ab0e6e046ea7c6",
+      "cmd/nvke_install_plan.go": "0f9ebb11b51538a1c7ef18be72d341a6715967e8ac0fdcb8d4745880283c452c",
+      "README.md": "d7d95da4d41a35e208adf9d611d3e6cb9295e66a51cea6aae4b00fafad98910f"
+    },
+    "sourcesUnchanged": true
+  },
+  "coverage": [
+    "Closed read-only command with exact original ancestry plus distinct pull/analysis/node identities and reviewed versions",
+    "Analysis authorityDigest and node platformDigest identify signed capture indexes; public artifactDigest tags refused",
+    "Existing full parent validators check both nested public records; complete common source, exact IDs/version/digests, counts/time ranges, continuation false and unresolved execution state required",
+    "Invalid pins refused before HTTP, changed summaries refused before output, lost read sent once and not retried",
+    "No private input/journal/prepare/retry action for this view; output is public metadata"
+  ],
+  "retainedSetupAttempts": [
+    {
+      "report": "/tmp/astrolift-nvke-pull-runtime-cli-v1.json",
+      "scope": "Test helper omitted command context; fixed and strengthened summary rejection cases to require exactly one reached result"
+    },
+    {
+      "report": "/tmp/astrolift-nvke-pull-runtime-cli-v2.json",
+      "scope": "Focused cases and vet passed; isolated PATH omitted installed lint tool"
+    },
+    {
+      "report": "/tmp/astrolift-nvke-pull-runtime-cli-v3.json",
+      "scope": "Prior source revision passed lint/full Go tests/build; final digest semantics corrected and all checks rerun as v4"
+    }
+  ],
+  "limits": [
+    "Real GraphQL/PostgreSQL/SDK/agent/native pairing for new view is not qualified",
+    "App API current digest semantics test rerun remains pending",
+    "No native scheduling/credential/registry/availability/fresh-phase/linked-admission completion, final PR/main merge or deployment claimed"
+  ]
+}

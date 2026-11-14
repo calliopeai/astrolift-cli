@@ -1,0 +1,82 @@
+{
+  "format": 1,
+  "scope": "reviewed-workload-registry-acquisition-cli",
+  "status": "local-commands-and-actual-linked-cli-browser-native-recovery-qualified-release-incomplete",
+  "sourceSha256": {
+    "cmd/nvke_install_plan_image.go": "f847c662cc31c99fcb8f3de444609bf2a854ff496585cbb434913a816528f88c",
+    "cmd/nvke_install_plan_workload_image_test.go": "9bc7ac73dedf217ef34bac593e5c74b310e699461b075e4b254650e9ac4928ea",
+    "internal/api/nvke_install_plan_image.go": "a65c00feb78e7572adc53b8b27462b011c97e20d371dbe893bf65493402fa978",
+    "README.md": "86d66d03dd49bddf83d447d727e6967a13ad8d6174de33f5507f8c4f6903b768"
+  },
+  "checks": {
+    "focused": {
+      "sessionId": 47457,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-cli-focused-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-cli-focused-v1.log",
+      "logSha256": "e6eed7f2dfea11f0cf90953385978dae469501b08d2331762316bddb91adea2f"
+    },
+    "test": {
+      "sessionId": 82669,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-cli-test-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-cli-test-v1.log",
+      "logSha256": "1396e1838b6b4fb192fcbeb15cdacb696a2fd99ce6e20a9b703b5914c9adfb33"
+    },
+    "vet": {
+      "sessionId": 82669,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-cli-vet-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-cli-vet-v1.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "lint": {
+      "sessionId": 82669,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-cli-lint-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-cli-lint-v1.log",
+      "logSha256": "32c0f2dc5b6bbdd4444d5a65a5c7e8224ee3fb55866900d418f546419aace63a"
+    },
+    "build": {
+      "sessionId": 82669,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-cli-build-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-cli-build-v1.log",
+      "logSha256": "d46ee6d9020771d4ff915a56632a393052562af101d4448585637889bd9c87c3"
+    },
+    "actualApiNative": {
+      "sessionId": 42016,
+      "status": "complete",
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.log",
+      "logSha256": "12b74444c0dfb57f93e90e8d8e7aab2de519d8bd4aafe49476186eac4be27ed7",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 605.12
+    },
+    "actualBrowserApiNative": {
+      "sessionId": 77587,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-image-browser-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-image-browser-app-agent-v1.log",
+      "logSha256": "2da748e172b015271d8ddd944ea3124bfac09c09cd2bd7e37460dfb07d9618ce",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 989.28
+    }
+  },
+  "coverage": [
+    "Explicit distinct workload UUID, reviewed version and digest are required together for registry acquisition; local mode refuses them",
+    "Review exact source-bound workload before image RPC; private body must retain the same ID/digest before writing journal",
+    "Metadata-only journal contains reviewed workload tuple and exact raw-input hash without registry reference, policy or limits",
+    "Prepare, historical read and retained-private-intent retry keep the tuple; changed/missing peer metadata and graph-only downgrades are refused",
+    "Existing graph-only and local image regression checks pass"
+  ],
+  "limits": [
+    "Actual linked CLI and Chromium/API/PostgreSQL/native controlled-registry proofs passed; full live NVKE acceptance remains pending",
+    "Actual unlinked workload CLI/browser proof is recorded separately in nvke-workload-cli-local.json",
+    "Full signed image closure, platform/credential correspondence and linked native continuation remain incomplete",
+    "No main merge or deployment occurred"
+  ]
+}

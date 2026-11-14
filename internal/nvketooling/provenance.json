@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "sourceRevision": "89326a16ef8a15c2dde08c9d623c51506fa6d016",
+  "upstreamRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "runnerSha256": "0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd",
+  "backendRendererSha256": "8f9a22c5d953f7c0765cfda6cf991fd2b4d6a31685916d1bd3983c6418e30bb1",
+  "managementApiRendererSha256": "d16b7ed50a5c03d1ba6e972aa06fab04ea4dc8942109f32ae5212c7769ef7b18",
+  "managementControllerRendererSha256": "eb6fcead76f25afc5a42e0cafde315ea365114f07cf7a209047c28e3602de216",
+  "commands": [
+    "bootstrap site",
+    "generate oidc-kubeconfig",
+    "generate sitespec",
+    "get bootstrap-manifest",
+    "inspect nvkr-release",
+    "inspect sitespec",
+    "inspect stack-config",
+    "inspect values",
+    "management check",
+    "management configure-access",
+    "management install",
+    "render deploy-path",
+    "render management-apis",
+    "render management-controller",
+    "render nktp-backend",
+    "validate sitespec",
+    "version"
+  ]
+}

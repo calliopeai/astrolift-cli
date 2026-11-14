@@ -139,6 +139,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -v
           make vendor-charts-check
+          make vendor-nvke-tooling-check
 
       # Verify before tagging. build-publish.yml also runs the suite on the
       # tag, but by then the version number is already spent.

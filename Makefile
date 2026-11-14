@@ -20,8 +20,12 @@ DOCS_DST := internal/portabledocs/content
 
 .PHONY: build test fmt lint clean docs manpages vendor-docs vendor-docs-check vendor-charts vendor-charts-check vendor-skills vendor-skills-check
 
-build: vendor-charts-check
+build: vendor-charts-check vendor-nvke-tooling-check
 	go build $(LDFLAGS) -o $(BINARY) .
+
+.PHONY: vendor-nvke-tooling-check
+vendor-nvke-tooling-check:
+	python3 scripts/vendor-nvke-tooling.py --check
 
 test:
 	go test ./... -v -count=1
