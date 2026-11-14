@@ -24,7 +24,7 @@ func newNVKEAgentInstallPlanPullSecretAnalysisCommand() *cobra.Command {
 	group := &cobra.Command{Use: name, Short: "Prepare and recover admitted-Pod Secret-only image credential interpretations"}
 	for _, verb := range []string{"prepare", "review", "retry-preparation"} {
 		action := verb
-		leaf := &cobra.Command{Use: verb + " OPERATION_GUID", Args: cobra.ExactArgs(1), Short: verb + " a private Secret-only interpretation", Long: `Preparation saves a private metadata journal before sending the bounded request.
+		leaf := &cobra.Command{Use: verb + " OPERATION_GUID", Args: cobra.ExactArgs(1), Short: nvkeShortRetry(verb, verb+" a private Secret-only interpretation"), Long: `Preparation saves a private metadata journal before sending the bounded request.
 Review reads the retained artifact after a lost response. Explicit retry uses the
 server's original private intent and original caller/token. These commands do not
 execute the installation or release the original uncertainty fence.
