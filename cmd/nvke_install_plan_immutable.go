@@ -30,7 +30,7 @@ func newNVKEAgentInstallPlanImmutableCommand(tree bool) *cobra.Command {
 	group := &cobra.Command{Use: name, Short: "Prepare and recover immutable install artifacts"}
 	for _, verb := range []string{"prepare", "review", "retry-preparation"} {
 		action := verb
-		leaf := &cobra.Command{Use: verb + " OPERATION_GUID", Args: cobra.ExactArgs(1), Short: verb + " an immutable install artifact", Long: `Preparation saves a private metadata journal before sending the bounded request.
+		leaf := &cobra.Command{Use: verb + " OPERATION_GUID", Args: cobra.ExactArgs(1), Short: nvkeShortRetry(verb, verb+" an immutable install artifact"), Long: `Preparation saves a private metadata journal before sending the bounded request.
 Review reads the retained artifact after a lost response. Explicit retry uses the
 server's original private intent and original caller/token. These commands do not
 execute the installation or release the original uncertainty fence.`, RunE: nvkeScoped(func(cmd *cobra.Command, ctx context.Context, c *api.Client, args []string) error {
@@ -362,4 +362,13 @@ func reviewNVKEImageBindingSources(cmd *cobra.Command, ctx context.Context, c *a
 	}
 	inputSource := api.NVKEInstallPlanImmutableSource{NVKEInstallPlanImageBindingSource: bindingSource, BindingID: bindingID, ExpectedBindingVersion: bindingVersion, BindingDigest: bindingDigest}
 	return &nvkeReviewedImageBindingSources{review: review, source: source, plan: plan, publication: publication, tree: tree, workload: workload, binding: binding, input: inputSource, artifactID: artifactID}, nil
+}
+
+// nvkeShortRetry keeps the deepest retry-preparation commands' one-line summary
+// short enough for their man page NAME line (80 bytes); Long carries the detail.
+func nvkeShortRetry(verb, short string) string {
+	if verb == "retry-preparation" {
+		return "retry"
+	}
+	return short
 }
