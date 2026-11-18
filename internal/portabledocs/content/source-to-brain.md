@@ -32,7 +32,10 @@ target. This protocol currently supports an operator-prepared managed AWS target
 generic Kaniko support does not establish another provider's registry identity.
 
 Use the original person's current `alft_at_…` bearer with `write:apps` and the
-organization's `chat_studio_integration` module enabled. Sessions and deploy
+organization's `chat_studio_integration` module enabled. A new install offers
+that module only after an install administrator allows it under
+**Admin › Platform settings** (Organization modules); until then the builder
+routes answer `403` with the reason `module_disabled_by_install`. Sessions and deploy
 tokens refuse. Source access requires current TEAM/ORG authority plus the source
 creator or team administrator. Destination admission requires current project
 `app.create` and `app.deploy`, coherent organization/team/project ancestry, the

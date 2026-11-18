@@ -14,6 +14,7 @@ Admin › Organization contains:
 
 - **Organization** (`/administration/organization`): organization identity, install-facing defaults, the house theme, trusted domains, and the **Create accounts for trusted domains** setting. With that setting on, a verified sign-in under a trusted domain creates its own account and joins with the domain's default role; off (the default) admits only people who already have an account. Turning it on or off is audited.
 - **Access** (`/administration/access`): People, Teams, Roles, Policies, and Check access (permission diagnostics). Roles also carry Assignments, Easy setup presets, and Action safety.
+- **App access** (`/administration/app-access`): who may enter each environment of every app you can read, who set that rule, and whether the edge holds it.
 - **Projects** (`/administration/projects`): the app-registration boundary; each app belongs to a project.
 
 Routes are under `/administration/...`; older `/settings/...`, `/members`, `/teams`, and `/projects` links redirect to the canonical pages.

@@ -126,7 +126,9 @@ The reviewed server scope catalogue includes `read:apps`, `write:apps`,
 `manage:auth-users`, `write:app-access`, `agent-env-spec:write`,
 `project:write`, `team:write`, `app:onboard`, `secret:read`, `secret:write`,
 `workflow:write`, `workflow:trigger`, `mcp:read`, `mcp:dispatch`, `mcp:write`,
-and `admin`.
+`scm:read`, `scm:write`, and `admin`. `scm:read` lists the organization's
+source connections and repositories and `scm:write` creates a repository; both
+hold only at the token's own organization.
 The selected installation's token catalogue is authoritative; a listed scope
 is not necessarily part of the default device-flow credential. Use the smallest
 set that supports the integration. `astro auth login --scope` selects documented
@@ -439,7 +441,10 @@ their fields require a compatible server and do not add CLI live/export commands
 A GraphQL error raised by a permission check carries
 `extensions.code = "PERMISSION_DENIED"`, `extensions.reason` and
 `extensions.permission` (the permission key, for example `org.read`). The
-message is unchanged (`<reason>: <permission>`). Mutation envelopes use the
+message is `<reason>: <permission>`; a refusal because the token's scopes lack a
+permission that only one scope carries, such as `audit_log.read`, adds a
+sentence on how to get it. Match on `extensions.reason` and
+`extensions.permission`, not on the message. Mutation envelopes use the
 same `PERMISSION_DENIED` code. Apps and clusters expose `viewerPermissions` so
 clients can offer only what the viewer may do there; the mutation still decides.
 
