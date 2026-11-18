@@ -178,6 +178,7 @@ execution again. See [reviewed starts](../guides/reviewed-starts.md).
 | `astrolift_delete_brain` | `mcp:write`, `write:apps` | Archive: scale to zero, drop from the register, revoke hosted apps' tokens |
 | `astrolift_host_app_on_brain` | `mcp:write`, `write:apps` | Create a public web app given the brain's MCP URL and a read token on every deploy |
 | `astrolift_set_app_expiry` | `mcp:write`, `write:apps` | Set, extend, shorten or clear a [temporary app](../guides/temporary-apps.md)'s expiry |
+| `astrolift_reprovision_app` | `mcp:write`, `write:apps` | Re-apply an app's environments, or the one named, against the release each runs; no build and no new image; needs `app.deploy` |
 
 Share, delete and expiry-clear are refused for agent callers unless the
 organization's `brain.share`, `brain.delete` or `app.expiry.clear` rule allows
