@@ -2,7 +2,7 @@
 // `astro app set-build-context` (#159).
 //
 // A manifest in a sub-directory of a monorepo builds from that directory:
-// src/client-cgm/astrolift.toml builds src/client-cgm with its Dockerfile.
+// src/web-portal/astrolift.toml builds src/web-portal with its Dockerfile.
 // A manifest that names its own build_context or dockerfile_path keeps the
 // repository root as the app's context, so those paths apply as written.
 // This is the platform's rule (astrolift-app astrolift_manifest/build_context.py);
@@ -265,7 +265,7 @@ paths until it is pushed again; the command prints how. A platform build
 uses the new paths from its next run.
 
 Examples:
-  astro app set-build-context client-cgm src/client-cgm
+  astro app set-build-context web-portal src/web-portal
   astro app set-build-context web . --dockerfile docker/Dockerfile.prod`,
 	Args: cobra.ExactArgs(2),
 	RunE: workflowOrgScopedRunE(func(cmd *cobra.Command, ctx context.Context, client *api.Client, args []string) error {
