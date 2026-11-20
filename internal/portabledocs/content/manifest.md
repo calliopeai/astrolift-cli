@@ -267,7 +267,13 @@ users = ["oncall@example.com"]
 
 The login gate is a cluster setting, not an app setting. A cluster on the ALB
 ingress class gates with Cognito; other classes gate with the cluster's central
-OIDC proxy. Every managed hostname on a gated cluster sits behind the gate.
+OIDC proxy. Every managed hostname on a gated cluster sits behind the gate
+unless the app is public. On the Envoy and ingress-nginx edges, a cluster that
+allows public apps (the default) honours the app's **Public access** switch,
+which lets the app's platform URL answer without the sign-in. Only the app's
+own authentication then protects it. Turning the switch on may ask you to sign
+in again, and it is refused while the app has an access list. ALB clusters do
+not honour it, and custom domains keep their own setting.
 
 `[ingress]` and `[ingress.auth]` are the platform's record of that gate in the
 app's repo. When an operator changes a cluster's gate, Astrolift AI writes the
@@ -286,7 +292,7 @@ is never written to the manifest.
 Editing or removing `[ingress.auth]` does not change the gate. An app whose
 manifest has no `[ingress.auth]` is still gated while its cluster is, and the
 platform writes the table back the next time the cluster's gate changes. To
-take an app off the gate, change the cluster, not the manifest.
+take one app off the gate, use its **Public access** switch, not the manifest.
 
 ### `[ingress.access]`
 
@@ -530,13 +536,15 @@ workflows/**/*.toml
 Agent package `[package]` rules create a separate chrooted source slice. Use
 explicit `--manifest-path` selections to register only part of a large repo.
 
-The image build context is an app setting, and its default depends on how the
-app was registered. Whole-repo discovery sets it to the manifest's directory.
-`astro app register --manifest-path apps/web/astrolift.toml` leaves it at the
-repository root unless you also pass `--build-context apps/web`. A container's
-own `build_context` and `dockerfile_path` are read relative to the manifest's
-directory, and apply only while the app-level value is still the default. See
-[Build a monorepo app in CI](../guides/monorepo-ci.md).
+The image build context is an app setting, chosen at registration from the
+manifest's path: registering `apps/web/astrolift.toml` builds from `apps/web`,
+with the `Dockerfile` inside it. A manifest that sets its own `build_context` or
+`dockerfile_path` on a container, job or task keeps the app's context at the
+repository root, and those paths apply, read relative to the manifest's
+directory. `astro app register` shows the detected paths before registering;
+`--build-context` and `--dockerfile` set them, and `astro app set-build-context`
+changes them later. See [Build a monorepo app in CI](../guides/monorepo-ci.md),
+which also covers a Storybook whose image needs files outside its directory.
 
 ## Validate and render
 

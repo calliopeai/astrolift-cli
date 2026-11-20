@@ -122,8 +122,7 @@ configured-channel support; SES capabilities are separate. See
 [install alert SMTP](install-alert-mail.md) for private setup and nonce recovery.
 
 The server GraphQL explorer at `/app/gql/config/` exposes the exact supported
-schema. Download the [published SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
-from an immutable backend tag or commit when generating clients. Check both
+schema; generate clients from that installation's introspection. Check both
 GraphQL `errors` and mutation `ok`; HTTP 200 alone does not prove success.
 
 ## Find the right setup guide

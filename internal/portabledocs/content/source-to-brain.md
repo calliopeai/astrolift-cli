@@ -32,7 +32,10 @@ target. This protocol currently supports an operator-prepared managed AWS target
 generic Kaniko support does not establish another provider's registry identity.
 
 Use the original person's current `alft_at_…` bearer with `write:apps` and the
-organization's `chat_studio_integration` module enabled. Sessions and deploy
+organization's `chat_studio_integration` module enabled. A new install offers
+that module only after an install administrator allows it under
+**Admin › Platform settings** (Organization modules); until then the builder
+routes answer `403` with the reason `module_disabled_by_install`. Sessions and deploy
 tokens refuse. Source access requires current TEAM/ORG authority plus the source
 creator or team administrator. Destination admission requires current project
 `app.create` and `app.deploy`, coherent organization/team/project ancestry, the
@@ -75,8 +78,7 @@ tags; they do not inspect IAM policy or prove network isolation.
 
 ## Step 1: build the admitted source
 
-Create and sync the source environment through the existing
-[Builder API](https://github.com/calliopeai/astrolift-app/blob/ada29b4f02e9e28efd159f121408daf62f4ffc88/docs/builder-api.md).
+Create and sync the source environment through the existing Builder API.
 Then read its exact current archive descriptor:
 
 ```http
@@ -199,8 +201,7 @@ original namespace UID; it never deletes the preprovisioned namespace,
 repository, service account or role. An uncertain resource creation without a
 UID receipt cannot be adopted by name.
 
-Contract source:
-[operator protocol at ada29b4](https://github.com/calliopeai/astrolift-app/blob/ada29b4f02e9e28efd159f121408daf62f4ffc88/docs/operators/builder-brain-source.md).
+Contract source: the operator protocol at platform commit ada29b4.
 Check the selected installation's current schema, discovery and target before
 using it. See [the control API](../reference/api.md) for bearer and tenancy
 conventions.

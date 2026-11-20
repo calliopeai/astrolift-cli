@@ -4,7 +4,7 @@
 
 The pages are plain Markdown. Where a machine-readable source exists, prefer it over prose:
 
-- GraphQL schema: `backend/schema.graphql` in https://github.com/calliopeai/astrolift-app; the installation's own schema is authoritative.
+- GraphQL schema: introspect the installation's endpoint (`https://<install-host>/app/gql/config/`, see the Control API reference); the installation's own schema is authoritative.
 - CLI: `astro --help` and `astro <command> --help` on the installed binary; `astro docs list`, `astro docs show <topic>`, `astro docs search <query>` and `astro docs export <directory>` give the release-matched offline reference.
 - MCP: call `tools/list` on the installation's endpoint (`https://<install-host>/api/mcp/v1/`, see the MCP reference) rather than hard-coding tool names or input schemas.
 - Declarative formats: the astrolift.toml and Workflow TOML reference pages below list every key the current parsers consume.
