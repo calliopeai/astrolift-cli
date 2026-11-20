@@ -4,8 +4,8 @@
 
     The installed server is the truth: run introspection or
     `astro api graphql -q 'query { astroliftServerInfo { version capabilities } }'`
-    before trusting this page, and read the SDL at
-    `backend/schema.graphql` in `calliopeai/astrolift-app` (pin a tag or SHA).
+    before trusting this page, and read the SDL from that installation's
+    introspection.
     Fields the SDL marks `@deprecated` (for example `astroliftWebhookSubscriptions`,
     capped at 200 rows) have a named replacement; prefer it. A capability key only
     says a surface exists, never that this credential may use it.
@@ -170,16 +170,15 @@ array before reading `data`. Mutations generally return an envelope with
 success without checking `ok`.
 
 The installation's explorer and introspection expose the exact schema supported
-by that server. The platform repository also publishes `schema.graphql` for
-client generation. Prefer generated types or committed operations over building
-query strings from user input.
+by that server; generate clients from it. Prefer generated types or committed
+operations over building query strings from user input.
 
 ## Generated contracts and drift checks
 
-The release source publishes the [GraphQL SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
-and the [MCP capability superset](https://github.com/calliopeai/astrolift-app/blob/main/backend/contracts/mcp-tools.json).
-Replace `main` in those URLs with an immutable backend tag or commit SHA when
-pinning a client build.
+The platform source generates the GraphQL SDL and the MCP capability superset.
+Outside it, use an installation instead: introspection returns the SDL that
+server supports, and `tools/list` returns the MCP tools the caller may use (see
+the [MCP reference](mcp.md)).
 
 Platform contributors regenerate both artifacts with `make contracts` and
 verify them with `make contracts-check`. CI assembles the full-feature

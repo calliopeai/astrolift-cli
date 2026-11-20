@@ -6,9 +6,8 @@
     tools this token and this person may call, with their exact input schemas.
     `astro onboard` writes the MCP client entry for the selected install;
     `ASTROLIFT_TOKEN=alft_at_...` authenticates both the CLI and the gateway.
-    The checked-in superset is `backend/contracts/mcp-tools.json` in
-    `calliopeai/astrolift-app`. Every listed tool is stable; the workflow tools
-    disappear from `tools/list` when the installation's workflows feature is off.
+    Every listed tool is stable; the workflow tools disappear from `tools/list`
+    when the installation's workflows feature is off.
     Common mistakes: a token without an `mcp:*` scope (HTTP 403 before any JSON-RPC),
     a tool whose additional scope (`read:apps`, `workflow:write`, ...) the token lacks
     (`isError: true`, `code: permission_denied`), and treating a delivered control
@@ -97,11 +96,10 @@ shows the docs component.
 ## Tools
 
 The server filters `tools/list` to operations allowed by both scope and RBAC.
-The checked-in [generated capability document](https://github.com/calliopeai/astrolift-app/blob/main/backend/contracts/mcp-tools.json)
-is the caller-independent superset used for release tooling and documentation.
-Pin a tag or commit instead of `main` for reproducible generation. It includes
-the required token scopes, RBAC permissions, and input JSON Schemas; it does
-not imply that a particular caller may invoke every listed tool.
+The platform source checks in a generated capability document: the
+caller-independent superset used for release tooling and documentation. It
+includes the required token scopes, RBAC permissions, and input JSON Schemas;
+it does not imply that a particular caller may invoke every listed tool.
 
 A tool is listed when the caller holds its grant anywhere in the organization;
 the call itself checks the exact target. Project resource tools are listed only

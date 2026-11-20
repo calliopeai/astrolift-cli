@@ -78,8 +78,7 @@ tags; they do not inspect IAM policy or prove network isolation.
 
 ## Step 1: build the admitted source
 
-Create and sync the source environment through the existing
-[Builder API](https://github.com/calliopeai/astrolift-app/blob/ada29b4f02e9e28efd159f121408daf62f4ffc88/docs/builder-api.md).
+Create and sync the source environment through the existing Builder API.
 Then read its exact current archive descriptor:
 
 ```http
@@ -202,8 +201,7 @@ original namespace UID; it never deletes the preprovisioned namespace,
 repository, service account or role. An uncertain resource creation without a
 UID receipt cannot be adopted by name.
 
-Contract source:
-[operator protocol at ada29b4](https://github.com/calliopeai/astrolift-app/blob/ada29b4f02e9e28efd159f121408daf62f4ffc88/docs/operators/builder-brain-source.md).
+Contract source: the operator protocol at platform commit ada29b4.
 Check the selected installation's current schema, discovery and target before
 using it. See [the control API](../reference/api.md) for bearer and tenancy
 conventions.
