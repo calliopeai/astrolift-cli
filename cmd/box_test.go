@@ -525,7 +525,7 @@ func TestResolveBoxPodFallsBackToAgentBoxPods(t *testing.T) {
 
 // The pod's first container status is not its main container: the control
 // plane lists init containers first and the kubelet orders the rest by name.
-// Attaching to the init container fails once it has finished (a client report).
+// Attaching to the init container fails once it has finished.
 func TestResolveBoxPodPicksThePrimaryContainer(t *testing.T) {
 	var captured gqlRequest
 	srv := gqlServer(t, map[string]interface{}{
