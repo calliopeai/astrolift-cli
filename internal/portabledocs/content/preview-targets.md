@@ -212,8 +212,6 @@ informational and never grants permission. Mobile clients can consume this
 canonical contract; native mobile integration and consent UI require
 separate acceptance evidence.
 
-The resource-only contract is pinned to
-[merged backend 09e3f2c2](https://github.com/calliopeai/astrolift-app/blob/09e3f2c28875fc3f476e5104151fd2a3166aae14/backend/schema.graphql).
-Its [operator rollout notes](https://github.com/calliopeai/astrolift-app/blob/09e3f2c28875fc3f476e5104151fd2a3166aae14/docs/operators/retire-costing.md)
-cover paired clients and worker retirement. Source qualification does not prove
-that the selected installation has deployed this contract.
+The resource-only contract is pinned to merged backend 09e3f2c2. Its operator
+rollout notes cover paired clients and worker retirement. Source qualification
+does not prove that the selected installation has deployed this contract.

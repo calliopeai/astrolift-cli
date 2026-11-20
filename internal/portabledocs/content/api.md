@@ -4,8 +4,8 @@
 
     The installed server is the truth: run introspection or
     `astro api graphql -q 'query { astroliftServerInfo { version capabilities } }'`
-    before trusting this page, and read the SDL at
-    `backend/schema.graphql` in `calliopeai/astrolift-app` (pin a tag or SHA).
+    before trusting this page, and read the SDL from that installation's
+    introspection.
     Fields the SDL marks `@deprecated` (for example `astroliftWebhookSubscriptions`,
     capped at 200 rows) have a named replacement; prefer it. A capability key only
     says a surface exists, never that this credential may use it.
@@ -126,7 +126,9 @@ The reviewed server scope catalogue includes `read:apps`, `write:apps`,
 `manage:auth-users`, `write:app-access`, `agent-env-spec:write`,
 `project:write`, `team:write`, `app:onboard`, `secret:read`, `secret:write`,
 `workflow:write`, `workflow:trigger`, `mcp:read`, `mcp:dispatch`, `mcp:write`,
-and `admin`.
+`scm:read`, `scm:write`, and `admin`. `scm:read` lists the organization's
+source connections and repositories and `scm:write` creates a repository; both
+hold only at the token's own organization.
 The selected installation's token catalogue is authoritative; a listed scope
 is not necessarily part of the default device-flow credential. Use the smallest
 set that supports the integration. `astro auth login --scope` selects documented
@@ -168,16 +170,15 @@ array before reading `data`. Mutations generally return an envelope with
 success without checking `ok`.
 
 The installation's explorer and introspection expose the exact schema supported
-by that server. The platform repository also publishes `schema.graphql` for
-client generation. Prefer generated types or committed operations over building
-query strings from user input.
+by that server; generate clients from it. Prefer generated types or committed
+operations over building query strings from user input.
 
 ## Generated contracts and drift checks
 
-The release source publishes the [GraphQL SDL](https://github.com/calliopeai/astrolift-app/blob/main/backend/schema.graphql)
-and the [MCP capability superset](https://github.com/calliopeai/astrolift-app/blob/main/backend/contracts/mcp-tools.json).
-Replace `main` in those URLs with an immutable backend tag or commit SHA when
-pinning a client build.
+The platform source generates the GraphQL SDL and the MCP capability superset.
+Outside it, use an installation instead: introspection returns the SDL that
+server supports, and `tools/list` returns the MCP tools the caller may use (see
+the [MCP reference](mcp.md)).
 
 Platform contributors regenerate both artifacts with `make contracts` and
 verify them with `make contracts-check`. CI assembles the full-feature
@@ -439,7 +440,10 @@ their fields require a compatible server and do not add CLI live/export commands
 A GraphQL error raised by a permission check carries
 `extensions.code = "PERMISSION_DENIED"`, `extensions.reason` and
 `extensions.permission` (the permission key, for example `org.read`). The
-message is unchanged (`<reason>: <permission>`). Mutation envelopes use the
+message is `<reason>: <permission>`; a refusal because the token's scopes lack a
+permission that only one scope carries, such as `audit_log.read`, adds a
+sentence on how to get it. Match on `extensions.reason` and
+`extensions.permission`, not on the message. Mutation envelopes use the
 same `PERMISSION_DENIED` code. Apps and clusters expose `viewerPermissions` so
 clients can offer only what the viewer may do there; the mutation still decides.
 

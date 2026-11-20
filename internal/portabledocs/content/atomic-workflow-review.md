@@ -176,5 +176,4 @@ service. After adoption, drain reviewed schedules before rolling back to old
 API/worker code; prefer forward repair. Database guards do not make arbitrary
 mixed versions safe.
 
-Contract source:
-[reviewed schedule protocol at b1fb41a](https://github.com/calliopeai/astrolift-app/blob/b1fb41afdd7111bf726859a2fb4ab443e22707e0/docs/runbooks/atomic-workflow-review.md).
+Contract source: the reviewed schedule protocol at platform commit b1fb41a.

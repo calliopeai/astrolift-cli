@@ -93,5 +93,5 @@ original identity without resubmitting sensitive inputs. Older slug-only
 no dispatch; there is no automatic legacy-write fallback.
 
 This migration concerns Definition execution. `runAstroliftAgent`,
-`astro agent dispatch`, `astro agent task run` and app-bound configured
-`astro workflow run` keep their separate contracts.
+`astro agent dispatch` and app-bound configured `astro workflow run` keep their
+separate contracts.

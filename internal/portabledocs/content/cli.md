@@ -258,6 +258,11 @@ astro app show --app <slug>
 astro app reprovision --app <slug> --env production --wait
 ```
 
+`astro app reprovision`, and the reachability that `astro app show` and
+`astro app list` print, need a CLI newer than 0.16.0; `astro app --help` lists
+`reprovision` when yours has it. With 0.16.0, the app header and the URL card's
+**Reprovision** button do the same.
+
 `astro app show` and `astro app list` print a reachability next to the status
 on servers that report it: `reachable`, `provisioning`, `needs reprovision` or
 `no managed domain`. Deployed means the workload rolled out; reachable means
