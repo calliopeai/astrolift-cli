@@ -12,10 +12,10 @@ import (
 // astro app access (astrolift-app#2132).
 
 func TestAllowAndDenyMergeIntoTheCurrentList(t *testing.T) {
-	if got := mergeAccess([]string{"veruus"}, []string{"staff", "veruus"}, nil); !reflect.DeepEqual(got, []string{"veruus", "staff"}) {
+	if got := mergeAccess([]string{"acme"}, []string{"staff", "acme"}, nil); !reflect.DeepEqual(got, []string{"acme", "staff"}) {
 		t.Fatalf("allow = %v", got)
 	}
-	if got := mergeAccess([]string{"veruus", "staff"}, nil, []string{"veruus"}); !reflect.DeepEqual(got, []string{"staff"}) {
+	if got := mergeAccess([]string{"acme", "staff"}, nil, []string{"acme"}); !reflect.DeepEqual(got, []string{"staff"}) {
 		t.Fatalf("deny = %v", got)
 	}
 	if got := mergeAccess(nil, nil, nil); got == nil || len(got) != 0 {
@@ -40,7 +40,7 @@ func TestAChangeThatLocksPeopleOutNeedsConfirmation(t *testing.T) {
 	cmd, _ := appTestCmd()
 	_ = cmd.Root().PersistentFlags().Set("no-prompt", "true")
 
-	err := runAppAccessChange(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "veruus-demo", []string{"veruus"}, []string{})
+	err := runAppAccessChange(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "acme-demo", []string{"acme"}, []string{})
 
 	if err == nil || !strings.Contains(err.Error(), "b@example.com") || !strings.Contains(err.Error(), "--yes") {
 		t.Fatalf("want a refusal naming who loses access, got %v", err)
@@ -59,7 +59,7 @@ func TestAConfirmedChangeIsSaved(t *testing.T) {
 			saved = req
 			return map[string]interface{}{"setAppAccess": map[string]interface{}{
 				"ok": true, "errors": []interface{}{},
-				"data": map[string]interface{}{"appSlug": "veruus-demo", "groups": []string{"veruus"}, "users": []string{},
+				"data": map[string]interface{}{"appSlug": "acme-demo", "groups": []string{"acme"}, "users": []string{},
 					"restricted": true, "managedByManifest": false, "enforcedOn": []string{"c"}},
 			}}
 		}
@@ -68,11 +68,11 @@ func TestAConfirmedChangeIsSaved(t *testing.T) {
 	defer srv.Close()
 	cmd, out := appTestCmd()
 
-	if err := runAppAccessChange(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "veruus-demo", []string{"veruus"}, []string{}); err != nil {
+	if err := runAppAccessChange(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), "acme-demo", []string{"acme"}, []string{}); err != nil {
 		t.Fatal(err)
 	}
 	input := saved.Variables["input"].(map[string]interface{})
-	if input["appSlug"] != "veruus-demo" || !reflect.DeepEqual(input["groups"], []interface{}{"veruus"}) {
+	if input["appSlug"] != "acme-demo" || !reflect.DeepEqual(input["groups"], []interface{}{"acme"}) {
 		t.Fatalf("input = %v", input)
 	}
 	if !strings.Contains(out.String(), "only these may enter") {

@@ -105,7 +105,7 @@ type execPodInfo struct {
 // kubelet orders the rest by name, so the first entry is an init container
 // or a sidecar whenever the pod has one. Opening a session in a finished init
 // container fails inside the cluster after the WebSocket upgrade, and the
-// relay reports that as a bare exit code 1 (DV-9250).
+// relay reports that as a bare exit code 1.
 //
 // Empty when no container is marked primary, which leaves the choice to
 // Kubernetes: the only container of a single-container pod, or a refusal
