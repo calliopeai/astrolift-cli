@@ -15,9 +15,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Target resolution for `astro exec` without --pod (SteadyMD DV-9250).
+// Target resolution for `astro exec` without --pod.
 //
-// Reported on 0.11.2: `astro exec --app abbott-cgm -- <cmd>` printed nothing
+// Reported on 0.11.2: `astro exec --app web-portal -- <cmd>` printed nothing
 // and exited 1 against a pod that was running and ready, while naming the pod
 // and `--container web` worked. The lookup found the right pod and then took
 // its container from the first entry of containerStatuses. The control plane
@@ -151,7 +151,7 @@ func TestExecAutoResolveOpensThePrimaryContainerNotTheFirstListed(t *testing.T) 
 		s.send(execFrame{Type: "exit", Code: 0})
 	})
 
-	withExecLookup(t, "abbott-cgm", "", func(code int) {
+	withExecLookup(t, "web-portal", "", func(code int) {
 		t.Errorf("exit 0 forwarded a status %d", code)
 	})
 	cmd, _, _ := execTestCmd()
@@ -162,7 +162,7 @@ func TestExecAutoResolveOpensThePrimaryContainerNotTheFirstListed(t *testing.T) 
 	srv.wait(t)
 
 	queries, dials := srv.recorded()
-	if len(dials) != 1 || dials[0] != "/app/exec/abbott-cgm/web-6c78bc9f68-tbv7c" {
+	if len(dials) != 1 || dials[0] != "/app/exec/web-portal/web-6c78bc9f68-tbv7c" {
 		t.Fatalf("relay dials = %v, want the one ready pod", dials)
 	}
 	if open.Container != "web" {
@@ -185,14 +185,14 @@ func TestExecRefusesToPickAPodThatIsNotReady(t *testing.T) {
 		t.Error("dialed the relay for a pod that is not ready")
 	})
 
-	withExecLookup(t, "abbott-cgm", "", func(int) { t.Error("forwarded an exit status") })
+	withExecLookup(t, "web-portal", "", func(int) { t.Error("forwarded an exit status") })
 	cmd, _, _ := execTestCmd()
 
 	err := runExec(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), []string{"echo", "hi"})
 	if err == nil {
 		t.Fatal("expected an error when no pod is ready")
 	}
-	for _, want := range []string{`"abbott-cgm"`, "default environment", "2 pods", "web-a (Pending, not ready)", "web-b (Running, not ready)", "--pod"} {
+	for _, want := range []string{`"web-portal"`, "default environment", "2 pods", "web-a (Pending, not ready)", "web-b (Running, not ready)", "--pod"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should mention %s: %v", want, err)
 		}
@@ -212,14 +212,14 @@ func TestExecSaysWhereItLookedWhenNoPodsAreListed(t *testing.T) {
 		t.Error("dialed the relay with no pod")
 	})
 
-	withExecLookup(t, "abbott-cgm", "", func(int) { t.Error("forwarded an exit status") })
+	withExecLookup(t, "web-portal", "", func(int) { t.Error("forwarded an exit status") })
 	cmd, _, _ := execTestCmd()
 
 	err := runExec(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), nil)
 	if err == nil {
 		t.Fatal("expected an error when the app has no pods")
 	}
-	for _, want := range []string{`"abbott-cgm"`, "default environment", "no pods"} {
+	for _, want := range []string{`"web-portal"`, "default environment", "no pods"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should mention %s: %v", want, err)
 		}
@@ -239,7 +239,7 @@ func TestExecNamesTheWorkloadsThatDoHavePods(t *testing.T) {
 		t.Error("dialed the relay for a workload with no pods")
 	})
 
-	withExecLookup(t, "abbott-cgm", "api", func(int) { t.Error("forwarded an exit status") })
+	withExecLookup(t, "web-portal", "api", func(int) { t.Error("forwarded an exit status") })
 	cmd, _, _ := execTestCmd()
 
 	err := runExec(cmd, context.Background(), api.NewClient(srv.URL, "tok", false), nil)
@@ -247,7 +247,7 @@ func TestExecNamesTheWorkloadsThatDoHavePods(t *testing.T) {
 		t.Fatal("expected an error when the workload has no pods")
 	}
 	// A typo in --workload is the likely cause, so name what does exist.
-	for _, want := range []string{`workload "api"`, `"abbott-cgm"`, "default environment", "2 pods", "web", "worker"} {
+	for _, want := range []string{`workload "api"`, `"web-portal"`, "default environment", "2 pods", "web", "worker"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should mention %s: %v", want, err)
 		}
@@ -352,7 +352,7 @@ func withReviewedExecLookup(t *testing.T) {
 	t.Cleanup(func() {
 		execApp, execWorkload, execEnvironment, execPod, execContainer = prevApp, prevWorkload, prevEnvironment, prevPod, prevContainer
 	})
-	execApp, execWorkload, execEnvironment, execPod, execContainer = "abbott-cgm", "", execTestEnvironmentID, "", ""
+	execApp, execWorkload, execEnvironment, execPod, execContainer = "web-portal", "", execTestEnvironmentID, "", ""
 }
 
 // reviewedExecResponder answers the reviewed lookup: the environment list,
@@ -418,7 +418,7 @@ func TestExecEnvironmentSaysWhereItLookedWhenNoPodQualifies(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error when no pod in the environment is ready")
 	}
-	for _, want := range []string{`"abbott-cgm"`, `environment "production"`, execTestEnvironmentID, "1 pod", "web-a (Pending, not ready)", "no primary fallback"} {
+	for _, want := range []string{`"web-portal"`, `environment "production"`, execTestEnvironmentID, "1 pod", "web-a (Pending, not ready)", "no primary fallback"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should mention %s: %v", want, err)
 		}

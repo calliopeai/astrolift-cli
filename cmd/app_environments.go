@@ -3,7 +3,7 @@
 //
 // Before, an app's environments came only from registration and repo
 // resync, so an app registered with only production could not gain staging
-// while its manifest was a staged draft (SteadyMD DV-9250).
+// while its manifest was a staged draft.
 //
 // GraphQL operations (field names per backend/schema.graphql):
 //   - list   → astroliftEnvironments(appSlug)

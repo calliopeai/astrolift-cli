@@ -1,5 +1,5 @@
 // Package cmd -- `astro app manifest push|pull`: settle an app's staged
-// manifest draft without the web Config page (SteadyMD DV-9250, #159).
+// manifest draft without the web Config page (#159).
 //
 // An app registered with --manifest-raw, or edited on the platform, holds a
 // staged draft, and the repo resync reports it as diverged until the draft

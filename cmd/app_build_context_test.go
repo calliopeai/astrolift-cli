@@ -12,14 +12,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// SteadyMD's abbott-cgm: one app of a monorepo, its manifest in a
+// web-portal: one app of a monorepo, its manifest in a
 // sub-directory (#159). Registered without a context, its managed CI
 // workflow built the repository root.
-const monorepoManifestPath = "src/abbott-cgm/astrolift.toml"
+const monorepoManifestPath = "src/web-portal/astrolift.toml"
 
 const plainManifest = `[app]
-slug = "abbott-cgm"
-display_name = "Abbott CGM"
+slug = "web-portal"
+display_name = "Web Portal"
 
 [[workloads]]
 name = "web"
@@ -39,7 +39,7 @@ func TestManifestDirectory(t *testing.T) {
 	// The cases astrolift-app's test_build_context_159.py pins, so the CLI
 	// shows what the platform would detect.
 	for path, want := range map[string]string{
-		"src/abbott-cgm/astrolift.toml":    "src/abbott-cgm",
+		"src/web-portal/astrolift.toml":    "src/web-portal",
 		"apps/web/astrolift.toml":          "apps/web",
 		"./services/api/astrolift.toml":    "services/api",
 		"services//api/astrolift.toml":     "services/api",
@@ -123,7 +123,7 @@ func newRegisterRun(t *testing.T, manifest, manifestPath string, interactive boo
 	appRegisterYes, appRegisterManifestRaw, appRegisterJSON = false, false, false
 	appRegisterFile = file
 	appRegisterProjectID = "11111111-2222-4333-8444-555555555555"
-	appRegisterSourceRepo = "steadymd/monorepo"
+	appRegisterSourceRepo = "acme/monorepo"
 	appRegisterSourceKind = "github"
 	appRegisterManifestPath = manifestPath
 	promptInteractive = func() bool { return interactive }
@@ -143,8 +143,8 @@ func newRegisterRun(t *testing.T, manifest, manifestPath string, interactive boo
 		return map[string]interface{}{"registerApp": map[string]interface{}{
 			"ok": true, "errors": []interface{}{},
 			"data": map[string]interface{}{
-				"id": testAppGUID, "slug": "abbott-cgm", "name": "Abbott CGM",
-				"organizationSlug": "steadymd", "projectSlug": "cgm", "k8sNamespace": "steadymd-abbott-cgm",
+				"id": testAppGUID, "slug": "web-portal", "name": "Web Portal",
+				"organizationSlug": "acme", "projectSlug": "portal", "k8sNamespace": "acme-web-portal",
 				"buildContext": context, "dockerfilePath": dockerfile,
 			},
 		}}
@@ -189,8 +189,8 @@ func TestRegisterSendsTheDetectedContextWithoutATerminal(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 	input := run.input(t)
-	if input["buildContext"] != "src/abbott-cgm" {
-		t.Errorf("buildContext = %v, want src/abbott-cgm", input["buildContext"])
+	if input["buildContext"] != "src/web-portal" {
+		t.Errorf("buildContext = %v, want src/web-portal", input["buildContext"])
 	}
 	if _, ok := input["dockerfilePath"]; ok {
 		t.Errorf("dockerfilePath sent without being asked for: %v", input["dockerfilePath"])
@@ -199,7 +199,7 @@ func TestRegisterSendsTheDetectedContextWithoutATerminal(t *testing.T) {
 		t.Errorf("prompted without a terminal:\n%s", run.errOut.String())
 	}
 	got := run.out.String()
-	for _, want := range []string{"Build context:    src/abbott-cgm", "Dockerfile:       Dockerfile"} {
+	for _, want := range []string{"Build context:    src/web-portal", "Dockerfile:       Dockerfile"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q:\n%s", want, got)
 		}
@@ -214,15 +214,15 @@ func TestRegisterAsksAndEnterAcceptsTheDetection(t *testing.T) {
 	}
 	prompt := run.errOut.String()
 	for _, want := range []string{
-		"Build context:  src/abbott-cgm (the manifest's directory)",
-		"Dockerfile:     Dockerfile (src/abbott-cgm/Dockerfile)",
+		"Build context:  src/web-portal (the manifest's directory)",
+		"Dockerfile:     Dockerfile (src/web-portal/Dockerfile)",
 		"Use this? [Y/n/edit]",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("prompt missing %q:\n%s", want, prompt)
 		}
 	}
-	if got := run.input(t)["buildContext"]; got != "src/abbott-cgm" {
+	if got := run.input(t)["buildContext"]; got != "src/web-portal" {
 		t.Errorf("buildContext = %v", got)
 	}
 }
@@ -243,12 +243,12 @@ func TestRegisterNoCancelsWithoutRegistering(t *testing.T) {
 
 func TestRegisterEditSendsTheTypedPaths(t *testing.T) {
 	run := newRegisterRun(t, plainManifest, monorepoManifestPath, true)
-	run.cmd.SetIn(strings.NewReader("edit\nsrc/abbott-cgm/\ndocker/Dockerfile.prod\n"))
+	run.cmd.SetIn(strings.NewReader("edit\nsrc/web-portal/\ndocker/Dockerfile.prod\n"))
 	if err := run.register(t); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	input := run.input(t)
-	if input["buildContext"] != "src/abbott-cgm" || input["dockerfilePath"] != "docker/Dockerfile.prod" {
+	if input["buildContext"] != "src/web-portal" || input["dockerfilePath"] != "docker/Dockerfile.prod" {
 		t.Errorf("input = %v", input)
 	}
 	if !strings.Contains(run.errOut.String(), "Dockerfile, relative to the build context [Dockerfile]:") {
@@ -263,7 +263,7 @@ func TestRegisterEditKeepsTheShownValuesOnEnter(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 	input := run.input(t)
-	if input["buildContext"] != "src/abbott-cgm" {
+	if input["buildContext"] != "src/web-portal" {
 		t.Errorf("buildContext = %v", input["buildContext"])
 	}
 	if _, ok := input["dockerfilePath"]; ok {
@@ -302,8 +302,8 @@ func TestRegisterFlagsSkipThePrompt(t *testing.T) {
 		wantDockerfile    interface{}
 	}{
 		{"an explicit root", "build-context", ".", ".", nil},
-		{"a Dockerfile only", "dockerfile", "docker/Dockerfile.prod", "src/abbott-cgm", "docker/Dockerfile.prod"},
-		{"the earlier flag name", "dockerfile-path", "Dockerfile.web", "src/abbott-cgm", "Dockerfile.web"},
+		{"a Dockerfile only", "dockerfile", "docker/Dockerfile.prod", "src/web-portal", "docker/Dockerfile.prod"},
+		{"the earlier flag name", "dockerfile-path", "Dockerfile.web", "src/web-portal", "Dockerfile.web"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Interactive, with nothing to read: a prompt would cancel.
@@ -340,7 +340,7 @@ func TestRegisterYesAndNoPromptTakeTheDetection(t *testing.T) {
 			if err := run.register(t); err != nil {
 				t.Fatalf("register: %v", err)
 			}
-			if got := run.input(t)["buildContext"]; got != "src/abbott-cgm" {
+			if got := run.input(t)["buildContext"]; got != "src/web-portal" {
 				t.Errorf("buildContext = %v", got)
 			}
 			if strings.Contains(run.errOut.String(), "Use this?") {
@@ -391,9 +391,9 @@ func setBuildContextServer(t *testing.T, app map[string]interface{}, update map[
 
 func legacyApp(mode string) map[string]interface{} {
 	return map[string]interface{}{
-		"id": testAppGUID, "slug": "abbott-cgm", "version": 4,
+		"id": testAppGUID, "slug": "web-portal", "version": 4,
 		"buildContext": ".", "dockerfilePath": "Dockerfile",
-		"buildMode": mode, "sourceRepo": "steadymd/monorepo",
+		"buildMode": mode, "sourceRepo": "acme/monorepo",
 	}
 }
 
@@ -401,7 +401,7 @@ func updated(context, dockerfile string) map[string]interface{} {
 	return map[string]interface{}{
 		"ok": true, "errors": []interface{}{},
 		"data": map[string]interface{}{
-			"id": testAppGUID, "slug": "abbott-cgm", "buildContext": context, "dockerfilePath": dockerfile,
+			"id": testAppGUID, "slug": "web-portal", "buildContext": context, "dockerfilePath": dockerfile,
 		},
 	}
 }
@@ -427,22 +427,22 @@ func updateInput(t *testing.T, seen []gqlRequest) map[string]interface{} {
 func TestSetBuildContextSavesAgainstTheReadVersion(t *testing.T) {
 	withSetBuildContextDockerfile(t, "")
 	var seen []gqlRequest
-	client := setBuildContextServer(t, legacyApp("ci_pushed"), updated("src/abbott-cgm", "Dockerfile"), &seen)
+	client := setBuildContextServer(t, legacyApp("ci_pushed"), updated("src/web-portal", "Dockerfile"), &seen)
 
 	cmd, out := appTestCmd()
-	if err := runAppSetBuildContext(cmd, context.Background(), client, "abbott-cgm", "src/abbott-cgm/"); err != nil {
+	if err := runAppSetBuildContext(cmd, context.Background(), client, "web-portal", "src/web-portal/"); err != nil {
 		t.Fatalf("runAppSetBuildContext: %v", err)
 	}
 	input := updateInput(t, seen)
-	if input["id"] != testAppGUID || input["buildContext"] != "src/abbott-cgm" ||
+	if input["id"] != testAppGUID || input["buildContext"] != "src/web-portal" ||
 		input["dockerfilePath"] != "Dockerfile" || input["ifMatchVersion"] != float64(4) {
 		t.Errorf("updateApp input = %v", input)
 	}
 	got := out.String()
 	for _, want := range []string{
-		"abbott-cgm: build context . -> src/abbott-cgm",
+		"web-portal: build context . -> src/web-portal",
 		"still builds from the old paths",
-		"astro ci setup abbott-cgm --skip-webhook --skip-secrets",
+		"astro ci setup web-portal --skip-webhook --skip-secrets",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q:\n%s", want, got)
@@ -459,7 +459,7 @@ func TestSetBuildContextWithADockerfile(t *testing.T) {
 	client := setBuildContextServer(t, legacyApp("platform_build"), updated(".", "docker/Dockerfile.prod"), &seen)
 
 	cmd, out := appTestCmd()
-	if err := runAppSetBuildContext(cmd, context.Background(), client, "abbott-cgm", "."); err != nil {
+	if err := runAppSetBuildContext(cmd, context.Background(), client, "web-portal", "."); err != nil {
 		t.Fatalf("runAppSetBuildContext: %v", err)
 	}
 	if got := updateInput(t, seen)["dockerfilePath"]; got != "docker/Dockerfile.prod" {
@@ -482,7 +482,7 @@ func TestSetBuildContextUnchangedSendsNothing(t *testing.T) {
 	client := setBuildContextServer(t, legacyApp("ci_pushed"), updated(".", "Dockerfile"), &seen)
 
 	cmd, out := appTestCmd()
-	if err := runAppSetBuildContext(cmd, context.Background(), client, "abbott-cgm", "./"); err != nil {
+	if err := runAppSetBuildContext(cmd, context.Background(), client, "web-portal", "./"); err != nil {
 		t.Fatalf("runAppSetBuildContext: %v", err)
 	}
 	if updateInput(t, seen) != nil {
@@ -502,7 +502,7 @@ func TestSetBuildContextStaleVersionSavesNothing(t *testing.T) {
 	}, &seen)
 
 	cmd, _ := appTestCmd()
-	err := runAppSetBuildContext(cmd, context.Background(), client, "abbott-cgm", "src/abbott-cgm")
+	err := runAppSetBuildContext(cmd, context.Background(), client, "web-portal", "src/web-portal")
 	if err == nil || !strings.Contains(err.Error(), "changed while this command ran") {
 		t.Fatalf("err = %v", err)
 	}
@@ -520,7 +520,7 @@ func TestSetBuildContextSurfacesARefusal(t *testing.T) {
 	}, &seen)
 
 	cmd, _ := appTestCmd()
-	err := runAppSetBuildContext(cmd, context.Background(), client, "abbott-cgm", "../outside")
+	err := runAppSetBuildContext(cmd, context.Background(), client, "web-portal", "../outside")
 	if err == nil || !strings.Contains(err.Error(), "must not escape the repository root") {
 		t.Fatalf("err = %v", err)
 	}
@@ -528,7 +528,7 @@ func TestSetBuildContextSurfacesARefusal(t *testing.T) {
 
 func TestSetBuildContextRefusesAnEmptyPath(t *testing.T) {
 	cmd, _ := appTestCmd()
-	err := runAppSetBuildContext(cmd, context.Background(), nil, "abbott-cgm", " ")
+	err := runAppSetBuildContext(cmd, context.Background(), nil, "web-portal", " ")
 	if err == nil || !strings.Contains(err.Error(), "use . for the repository root") {
 		t.Fatalf("err = %v", err)
 	}
@@ -549,17 +549,17 @@ func TestSetBuildContextUnknownApp(t *testing.T) {
 func TestSetBuildContextJSON(t *testing.T) {
 	withSetBuildContextDockerfile(t, "")
 	var seen []gqlRequest
-	client := setBuildContextServer(t, legacyApp("none"), updated("src/abbott-cgm", "Dockerfile"), &seen)
+	client := setBuildContextServer(t, legacyApp("none"), updated("src/web-portal", "Dockerfile"), &seen)
 
 	cmd, out := appTestCmd()
 	if err := cmd.Flags().Set("json", "true"); err != nil {
 		t.Fatal(err)
 	}
-	if err := runAppSetBuildContext(cmd, context.Background(), client, "abbott-cgm", "src/abbott-cgm"); err != nil {
+	if err := runAppSetBuildContext(cmd, context.Background(), client, "web-portal", "src/web-portal"); err != nil {
 		t.Fatalf("runAppSetBuildContext: %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, `"buildContext": "src/abbott-cgm"`) || strings.Contains(got, "astro ci setup") {
+	if !strings.Contains(got, `"buildContext": "src/web-portal"`) || strings.Contains(got, "astro ci setup") {
 		t.Errorf("JSON output:\n%s", got)
 	}
 }
