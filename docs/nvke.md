@@ -740,4 +740,4 @@ and null unknowns, with no native inputs or raw diagnostics. A successful review
 keeps the original install uncertain and authorizes no continuation or guard
 release. Refresh source metadata after a refused or unavailable review.
 
-Installation review and continuation are tracked in [opscode #97](https://github.com/calliopeai/astrolift-opscode/issues/97), under [full integration #2656](https://github.com/calliopeai/astrolift-app/issues/2656). CLI #212 separately tracks watch diagnostics and original-operation recovery.
+Installation review and continuation are tracked in the private platform tracker. CLI #212 separately tracks watch diagnostics and original-operation recovery.
