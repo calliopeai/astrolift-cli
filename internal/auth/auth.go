@@ -41,6 +41,7 @@ type LoginSession struct {
 	LoginURL     string `json:"login_url"`
 	PollInterval int    `json:"poll_interval_seconds"`
 	ExpiresIn    int    `json:"expires_in_seconds"`
+	Organization string `json:"organization,omitempty"`
 }
 
 // ErrPending is returned by PollLogin while the user hasn't
@@ -81,11 +82,20 @@ func ClientKindForScope(scope string) (string, error) {
 // StartLogin initiates the browser device flow. An empty clientKind sends no
 // kind, which the server treats as the plain CLI.
 func StartLogin(ctx context.Context, apiURL, clientKind string) (*LoginSession, error) {
+	return StartOrganizationLogin(ctx, apiURL, clientKind, "")
+}
+
+// StartOrganizationLogin directs the browser to the requested organization's sign-in.
+func StartOrganizationLogin(ctx context.Context, apiURL, clientKind, organization string) (*LoginSession, error) {
 	url := strings.TrimSuffix(apiURL, "/") + "/api/cli/v1/auth/start"
-	body := []byte("{}")
+	options := make(map[string]string)
 	if clientKind != "" {
-		body, _ = json.Marshal(map[string]string{"client_kind": clientKind})
+		options["client_kind"] = clientKind
 	}
+	if organization != "" {
+		options["organization"] = organization
+	}
+	body, _ := json.Marshal(options)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -106,6 +116,9 @@ func StartLogin(ctx context.Context, apiURL, clientKind string) (*LoginSession, 
 	var session LoginSession
 	if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
 		return nil, fmt.Errorf("decoding session: %w", err)
+	}
+	if organization != "" && session.Organization != organization {
+		return nil, fmt.Errorf("server did not confirm sign-in for organization %q", organization)
 	}
 	if session.PollInterval <= 0 {
 		session.PollInterval = 2

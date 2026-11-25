@@ -404,7 +404,7 @@ func TestZentinelleLoginPreflightRefusesOldServerBeforeIssuance(t *testing.T) {
 				fmt.Fprint(w, `{"session_id":"new","login_url":"https://example.test/approve"}`)
 			}))
 			defer server.Close()
-			_, err := startScopedLogin(context.Background(), server.URL, "cli-zentinelle")
+			_, err := startScopedLogin(context.Background(), server.URL, "cli-zentinelle", "")
 			if supported {
 				if err != nil || starts != 1 {
 					t.Fatalf("starts=%d err=%v", starts, err)

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Manage SSO providers, connector approvals, authentication policies, authenticators, step-up PINs, and browser sessions with astro auth.
+
 - Add `astro nvke agent install-plan node-platforms prepare|review|retry-preparation`, with exact source reviews, explicit runtime/node scope, canonical byte budgets and private metadata recovery journals. Observations keep continuation unauthorized (#214).
 
 - Add organization-owned NVKE management commands: the 88-action controller/tenant/operator/datastore vocabulary, site and credential configuration, native schema discovery, paginated operation metadata, private recovery files, readiness-aware waiting, cancellation and explicit reconciliation. Preserve all native JSON fields and opaque versions. Sensitive results require an explicit private output file or stdout opt-in. Bootstrap/access/telemetry and live controller qualification remain in progress (#211).

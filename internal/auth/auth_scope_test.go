@@ -49,3 +49,24 @@ func TestStartLoginSendsTheClientKind(t *testing.T) {
 		t.Fatal("the plain login must send no client_kind, so the server keeps its CLI default")
 	}
 }
+
+func TestOrganizationLoginRequiresTheServerToConfirmTheRequestedOrganization(t *testing.T) {
+	for _, confirmed := range []string{"workforce", "other", ""} {
+		t.Run(confirmed, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]string
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				if body["organization"] != "workforce" {
+					t.Errorf("organization = %q, want workforce", body["organization"])
+				}
+				_ = json.NewEncoder(w).Encode(LoginSession{SessionID: "s", Organization: confirmed})
+			}))
+			defer srv.Close()
+
+			_, err := StartOrganizationLogin(context.Background(), srv.URL, "", "workforce")
+			if (err == nil) != (confirmed == "workforce") {
+				t.Fatalf("server echoed %q and returned %v", confirmed, err)
+			}
+		})
+	}
+}
