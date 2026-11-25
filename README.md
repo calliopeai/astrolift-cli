@@ -701,6 +701,131 @@ astro auth wait --session-id <id>    # blocks until they finish, then stores
 The MCP config references `${ASTROLIFT_TOKEN}` rather than a resolved bearer,
 so the file is safe to commit and works for every agent on the machine.
 
+### Organization identity providers
+
+Use `astro auth providers` to manage the same organization records shown in the
+portal under **Providers → Identity**. Pass `--org` to choose an organization when
+needed. Listing requires `org.read`. Changes require `org.update` and an
+administrator-scoped credential. Platform operators can obtain one with
+`astro auth login --scope admin`. Organization administrators can use an
+API token with the `admin` scope and their existing organization role.
+
+```bash
+astro auth providers list
+astro auth providers list --json
+astro auth providers connections
+astro auth providers create oidc --connection workforce-oidc
+astro auth providers create github --connection team-github
+astro auth providers create saml --connection workforce-saml
+astro auth login --organization workforce
+astro auth providers create oidc --name Workforce \
+  --oidc-discovery-url https://id.example.com/.well-known/openid-configuration \
+  --client-id astrolift
+astro auth providers edit <id> --if-version <version> --name "Workforce SSO"
+astro auth providers activate <id> --yes
+astro auth providers delete <inactive-id> --yes
+```
+
+Use `--config-file` for provider-specific options and `--client-secret-ref` for
+the reference to the OAuth client secret. The secret itself belongs in the
+secrets backend. Omitted fields are preserved on edit. Read the version from
+`list` before editing. With managed browser SSO enabled, the primary provider
+must match an approved installation connection. GitHub OAuth uses a connection
+registered for GitHub.com. SAML uses a connection with the installation's
+approved signing certificate and metadata URL. Use `--require-mfa` on OIDC or
+SAML provider create or edit to require the provider to attest to MFA. Pass
+`--require-mfa=false` to clear that requirement.
+
+### Install authentication policy
+
+Platform operators approve and rotate SSO credentials with
+`astro auth providers connections approve`. For a new approval, supply
+`--organization`, `--protocol`, `--config-file` for public settings,
+and `--credential-file` for the client secret or PEM certificate. Pass
+`--installation-wide` for the installation's primary sign-in organization
+when the connection should also authenticate platform operators.
+Use `connections approvals` to read the current version. An approval
+with `--if-version <version> --credential-file <file>` rotates the credential
+while preserving the connection settings. `connections remove-approval`
+removes an inactive approval after confirmation.
+
+Platform operators can manage the authentication controls in **Administration →
+Platform settings** or with `astro auth policy`. Use an administrator-scoped
+credential.
+
+```bash
+astro auth policy list
+astro auth policy set LOCAL_PASSWORD_SIGN_IN enabled --yes
+astro auth policy set REQUIRE_LOCAL_AUTHENTICATOR true --yes
+astro auth policy reset REQUIRE_LOCAL_AUTHENTICATOR --yes
+```
+
+When enrollment is required, users without an authenticator can set one up
+during password sign-in. They receive recovery codes and then finish sign-in
+with a fresh authenticator or recovery code.
+
+### Organization authentication policy
+
+Organization administrators can manage PIN policy and trusted-domain sign-up
+for a selected organization.
+
+```sh
+astro --org workforce auth policy organization list
+astro --org workforce auth policy organization set allow-step-up-pin true
+astro --org workforce auth policy organization domains add example.com --requires-review
+astro --org workforce auth policy organization set trusted-domain-signup true
+```
+
+### Personal step-up PIN
+
+```sh
+astro auth step-up-pin status
+astro auth step-up-pin set
+astro auth step-up-pin clear
+```
+
+Set and clear open a browser confirmation for the account that requested the
+change. Setting or replacing a PIN requires fresh password or SSO verification.
+Enter the PIN in the browser. Use `--no-browser` to open the printed link
+yourself or `--no-wait` to return a request ID immediately. Read its result with
+`astro auth step-up-pin status <request-id>`.
+
+### Authenticator app
+
+Accounts with a local password can enroll an authenticator from **Settings →
+Security → Authentication** or from an authenticated CLI session.
+
+```bash
+astro auth authenticator status
+astro auth authenticator begin
+astro auth authenticator confirm
+astro auth authenticator replace
+astro auth authenticator confirm-replacement <enrollment-id>
+astro auth authenticator regenerate
+astro auth authenticator remove
+```
+
+Add the setup key to your authenticator app before confirming. Save the
+one-time recovery codes printed after confirmation. Password sign-in asks for
+an authenticator code or a recovery code. Replacement uses a current code to
+prepare the new authenticator. Verify the new app to activate it and issue a
+fresh set of recovery codes. The CLI keeps your password and
+verification code off the command line. For scripting, `--proof-stdin` reads
+the current password on the first line and the code, when required, on the
+second line.
+
+### Browser sessions
+
+Inspect and revoke the same browser sessions shown in **Settings → Security**.
+
+```bash
+astro auth sessions list
+astro auth sessions revoke <id>
+astro auth sessions revoke-all --yes
+```
+
+Use `astro auth logout` to end the CLI’s own sign-in.
+
 ### Organization skill catalog
 
 `astro onboard --only skills` installs bundled skills into a local workspace.

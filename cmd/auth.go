@@ -18,7 +18,7 @@ import (
 
 var authCmd = &cobra.Command{
 	Use:   "auth",
-	Short: "Authentication commands (login, wait, logout, status, refresh)",
+	Short: "Sign in and manage authentication settings",
 }
 
 // Device flow, with a relay path for callers that have no browser.
@@ -30,9 +30,10 @@ var authCmd = &cobra.Command{
 // once the human is done. With --json the session is a machine-readable
 // object, so relaying it does not mean scraping prose.
 var (
-	loginNoWait    bool
-	loginNoBrowser bool
-	loginScope     string
+	loginNoWait       bool
+	loginNoBrowser    bool
+	loginScope        string
+	loginOrganization string
 )
 
 var authLoginCmd = &cobra.Command{
@@ -45,6 +46,9 @@ authentication. The resulting credentials are stored at
 
 If no server slug is given, uses --server or the saved current_server.
 Use 'astro server add' to register a new server first.
+
+Use --organization <slug> to open that organization's sign-in and
+authorize this device for the same organization.
 
 A sign-in's scopes cap what it may do, whatever your roles allow, and
 the approval page lists them. --scope clusters adds updating and
@@ -110,7 +114,14 @@ MCP gateway alike.`,
 		if err != nil {
 			return err
 		}
-		session, err := startScopedLogin(startCtx, entry.APIURL, clientKind)
+		organization := strings.TrimSpace(loginOrganization)
+		if globalOrg, _ := cmd.Flags().GetString("org"); globalOrg != "" {
+			if organization != "" && organization != globalOrg {
+				return fmt.Errorf("--org and --organization select different organizations")
+			}
+			organization = globalOrg
+		}
+		session, err := startScopedLogin(startCtx, entry.APIURL, clientKind, organization)
 		if err != nil {
 			return fmt.Errorf("starting login: %w", err)
 		}
@@ -372,6 +383,7 @@ func init() {
 		"start the flow, report the session, and exit without polling")
 	authLoginCmd.Flags().StringVar(&loginScope, "scope", "",
 		"scope profile: clusters, zentinelle (read only), nvke-read, nvke, or admin (platform operator, 12 hours)")
+	authLoginCmd.Flags().StringVar(&loginOrganization, "organization", "", "Sign in through this organization (slug)")
 	authLoginCmd.Flags().BoolVar(&loginNoBrowser, "no-browser", false,
 		"do not try to open a browser")
 
@@ -406,7 +418,7 @@ func openBrowser(url string) error {
 	return exec.Command(cmd, args...).Start()
 }
 
-func startScopedLogin(ctx context.Context, apiURL, clientKind string) (*auth.LoginSession, error) {
+func startScopedLogin(ctx context.Context, apiURL, clientKind, organization string) (*auth.LoginSession, error) {
 	if clientKind == "cli-nvke" || clientKind == "cli-nvke-read" {
 		if err := requireServerFeature(ctx, api.NewClient(apiURL, "", false), "identity.nvke_scopes", "NVKE scoped sign-in"); err != nil {
 			return nil, err
@@ -417,5 +429,5 @@ func startScopedLogin(ctx context.Context, apiURL, clientKind string) (*auth.Log
 			return nil, err
 		}
 	}
-	return auth.StartLogin(ctx, apiURL, clientKind)
+	return auth.StartOrganizationLogin(ctx, apiURL, clientKind, organization)
 }
